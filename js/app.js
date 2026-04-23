@@ -1065,6 +1065,13 @@ function loadVideo(index, file, handle = null) {
   updateMediaControls(index);
   _currentHandle[index]  = handle;
   _loadedFileName[index] = file.name;
+  // URL欄・ページリンクをリセット
+  _loadedPageUrl[index]  = '';
+  _updateDropLink(index);
+  const _vi = document.getElementById(`urlInput${index + 1}`);
+  const _ve = document.getElementById(`urlErr${index + 1}`);
+  if (_vi) { _vi.value = ''; _vi.style.borderColor = ''; }
+  if (_ve)   _ve.textContent = '';
   // ロード中見た目
   const zone = document.getElementById(`drop${index + 1}`);
   zone.classList.remove('loaded');
@@ -1699,8 +1706,9 @@ function _mApplyDrop() {
       list2.splice(insertAt, 0, moved);
       list2[folderIdx].open = true; // ドロップ後にフォルダを開く
       savePresets(list2);
+      return insertAt; // 移動後の新インデックス
     }
-    return;
+    return null;
   }
   const insertAt = _mCalcInsertAt();
   const list2 = loadPresets();
@@ -1716,10 +1724,11 @@ function _mApplyDrop() {
   if (fi > _mDragSrcIdx) fi -= count;
   fi = Math.max(0, fi);
   testList.splice(fi, 0, ...moved);
-  if (JSON.stringify(testList) === JSON.stringify(list2)) return; // no change
+  if (JSON.stringify(testList) === JSON.stringify(list2)) return null; // no change
   list2.splice(_mDragSrcIdx, count);
   list2.splice(fi, 0, ...moved);
   savePresets(list2);
+  return fi; // 移動後の新インデックス
 }
 // 移動閾値を超えた時点で一度だけ呼ばれる — ドラッグモードに確定
 function _mStartDrag(pending) {
@@ -1844,7 +1853,12 @@ function _mOnMouseUp() {
     });
     return;
   }
-  _mApplyDrop();
+  const _dropSrcIdx = _mDragSrcIdx;
+  const _dropNewIdx  = _mApplyDrop();
+  if (_dropNewIdx != null && _dropSrcIdx === _activePresetIdx) {
+    _activePresetIdx = _dropNewIdx;
+    _f2Target = { type: 'preset', idx: _dropNewIdx };
+  }
   _mCleanup();
   renderPresets();
 }
