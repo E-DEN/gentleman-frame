@@ -37,7 +37,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Segoe UI', Arial, sans-serif;
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', Arial, sans-serif;
       height: 100vh;
       overflow: hidden;
       display: flex;
