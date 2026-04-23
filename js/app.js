@@ -3767,12 +3767,16 @@ document.getElementById('presetAddFolderBtn').addEventListener('click', () => {
 // インライン取込
 const _doInlineImport = async (rawOverride) => {
   const inp = document.getElementById('presetCodeInput');
-  const raw = rawOverride != null ? String(rawOverride).trim() : inp.value.trim();
+  // 全角チルダ各種をASCII ~に正規化し、先頭の不可視文字も除去
+  // rawOverride が文字列でない場合（Eventオブジェクト等）は inp.value を使用
+  const raw = (typeof rawOverride === 'string' ? rawOverride : inp.value)
+    .replace(/[\uFF5E\u301C\u02DC\u2053\u223C\u3030\uFE4B\uFE4F]/g, '~').trim();
   if (!raw) return;
   let arr;
   try {
-    if (raw.startsWith('gf2~')) {
-      arr = [_presetDecodeOne(raw)];
+    const gf2Idx = raw.indexOf('gf2~');
+    if (gf2Idx !== -1) {
+      arr = [_presetDecodeOne(raw.slice(gf2Idx))];
     } else {
       try { arr = JSON.parse(raw); }
       catch { arr = await _presetDecodeMulti(raw); }
@@ -3806,7 +3810,7 @@ const _doInlineImport = async (rawOverride) => {
         if (items[i]) items[i].classList.add('preset-item-flash');
       }
     });
-  } catch { if (rawOverride == null) inp.classList.add('error'); _presetStatusMsg(t('preset-import-err'), false); }
+  } catch(e) { console.error('[preset import]', e); if (rawOverride == null) inp.classList.add('error'); _presetStatusMsg(t('preset-import-err'), false); }
 };
 
 document.getElementById('presetImportBtn').addEventListener('click', _doInlineImport);
@@ -3917,7 +3921,7 @@ renderPresets();
 //  ℹ️  Iwara ID 14文字×2が最小単位のため6-12文字は不可能
 // ============================================================
 const _B64U = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-const _B64D = s => Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+const _B64D = s => { const b64 = s.replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(b64.padEnd(Math.ceil(b64.length/4)*4,'=')), c => c.charCodeAt(0)); };
 
 // ---- Bit-pack: 157 bits → 20 bytes → 27 base64url chars ----
 const _MSHAPES = ['circle','rect','triangle','diamond','star','hexagon','none','ellipse'];
