@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gentleman Frame</title>
+  <link rel="icon" href="data:,">
+  <script src="https://unpkg.com/lucide@1.9.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- i18n エンジン（app.js より先に読み込む必要あり） -->
+  <script src="js/i18n.js"></script>
+  <!-- 言語ファイルはアプリ内の「言語読込」ボタンから JSON で読み込めます -->
+</head>
+<body>
+
+<!-- ===== ヘッダー ===== -->
+<header>
+  <div class="logo" style="cursor:pointer" onclick="window.scrollTo({top:0,behavior:'smooth'})">Gentleman Frame</div>
+  <div class="header-controls">
+    <select id="langSelect" style="display:none"></select>
+    <div class="lang-popover-anchor">
+      <button class="btn" id="langImportBtn" data-i18n-title="lang-import-title" title="言語を切り替える" style="min-width:0;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center"><i data-lucide="globe"></i></button>
+      <div id="langImportDialog" class="lang-popover" hidden>
+        <!-- 言語オプション一覧（JS で生成） -->
+        <div id="langOptionList" class="lang-option-list"></div>
+        <!-- 追加／インポートセクション（「+ 追加」選択時に表示） -->
+        <div id="langAddSection" hidden>
+          <hr class="lang-dialog-sep" style="margin:0">
+          <div class="lang-add-form">
+            <div id="langImportDrop" class="lang-import-drop">
+              <i data-lucide="file-json" style="width:22px;height:22px;opacity:0.5;flex-shrink:0"></i>
+              <div class="drop-text">
+                <span data-i18n="lang-import-drop"></span>
+                <span style="font-size:10px;" data-i18n="drop-hint"></span>
+              </div>
+            </div>
+            <p class="lang-import-or" data-i18n="lang-import-or"></p>
+            <textarea id="langImportText" class="lang-import-textarea" rows="4" data-i18n-ph="lang-import-ph"></textarea>
+            <div class="lang-import-actions">
+              <button class="btn primary" id="langImportApply" data-i18n="lang-import-apply"></button>
+              <button class="btn" id="langTemplateDownload" data-i18n="lang-template-dl"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" id="themeBtn" style="min-width:0;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center"><i data-lucide="moon"></i></button>
+    <a class="btn" href="https://github.com/E-DEN/gentleman-frame" target="_blank" rel="noopener" title="GitHub" style="min-width:0;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+  </div>
+</header>
+
+<!-- ===== アプリ本体 ===== -->
+<div class="app-body">
+
+  <!-- ===== キャンバス ＋ トランスポート（オーバーレイ） ===== -->
+  <div class="canvas-area">
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="mainCanvas" width="854" height="480"></canvas>
+      <!-- URL 読み込みオーバーレイ -->
+      <div id="canvasLoadOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:20;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;font-size:13px;border-radius:inherit;pointer-events:none">
+        <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.75s linear infinite"></div>
+        <span id="canvasLoadMsg"></span>
+      </div>
+      <!-- マスク D&D オーバーレイ：マスク領域に絶対配置し、実際のドロップターゲットとして機能 -->
+      <div id="maskDropOverlay"></div>
+      <!-- トランスポートオーバーレイ -->
+      <div class="transport">
+        <div class="transport-row">
+          <button class="tbtn" id="playBtn" title="再生/一時停止"><i data-lucide="play"></i></button>
+          <button class="tbtn" id="stopBtn" title="停止"><i data-lucide="square"></i></button>
+          <div class="progress-track" id="progressTrack">
+            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-thumb" id="progressThumb"></div>
+          </div>
+          <div class="time-label" id="timeLabel">0:00 / 0:00</div>
+          <div class="transport-vol">
+            <div class="transport-vol-popup">
+              <div class="vol-track-wrap">
+                <div class="vol-track" id="masterVolTrack">
+                  <div class="vol-fill" id="masterVolFill"></div>
+                  <div class="vol-thumb" id="masterVolThumb"></div>
+                </div>
+              </div>
+            </div>
+            <button class="tbtn transport-mute-btn" id="masterMuteBtn" title="ミュート"><i data-lucide="volume-2"></i></button>
+          </div>
+          <button class="tbtn" id="theaterBtn" title="シアターモード（パネル非表示）"><i data-lucide="panel-right-close"></i></button>
+          <button class="tbtn" id="fullscreenBtn" title="フルスクリーン"><i data-lucide="maximize"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 右パネル ===== -->
+  <div class="panel">
+
+    <!-- 動画 1 -->
+    <div class="card" data-card-id="vid1">
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="video"></i><span data-i18n="vid1-title">動画 1（背景）</span></span><button class="preset-item-del icon-btn--vis" id="visBtn1" title="表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="resetBtn1" title="コントロールをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="drop-zone" id="drop1" role="button" tabindex="0">
+      <div class="drop-loading-overlay" style="display:none"></div>
+        <button class="drop-delete" id="del1" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
+        <a class="drop-link" id="dropLink1" href="#" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
+        <div class="drop-icon"><i data-lucide="upload"></i></div>
+        <div class="drop-text">
+          <div class="drop-label1" data-i18n="drop-label">MP4をここにドロップ</div>
+          <div class="drop-hint" style="font-size:10px;" data-i18n="drop-hint">またはクリックして選択</div>
+        </div>
+        <input type="file" id="file1" accept="video/*,image/*" style="display:none">
+      </div>
+      <div id="videoControls1">
+      <div class="url-row">
+        <label for="urlInput1" style="font-size:11px;color:var(--text-muted);flex-shrink:0;white-space:nowrap;height:26px;display:inline-flex;align-items:center">URL</label>
+        <input type="text" class="url-input" id="urlInput1" placeholder="https://www.iwara.tv/video/..." autocomplete="off" spellcheck="false">
+        <button class="url-load-btn" id="urlLoadBtn1" data-i18n="load-btn">読込</button>
+      </div>
+      <div id="urlErr1" style="font-size:10px;color:#e5534b;height:14px;line-height:14px;margin-top:2px;overflow:hidden;"></div>
+      <div class="ctrl-row">
+        <label><span data-i18n="vol">音量</span><button class="mute-btn" id="mute1" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button></label>
+        <input type="range" id="vol1" min="0" max="100" value="25">
+        <input type="text" class="ctrl-val" id="vol1Val" value="25" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="offset">オフセット</label>
+        <input type="range" id="offset1" min="-10" max="10" value="0" step="0.01">
+        <input type="text" class="ctrl-val" id="offset1Val" value="+0.00" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="offset-btns">
+        <button class="offset-btn" data-id="offset1" data-d="-0.1">-0.1</button>
+        <button class="offset-btn" data-id="offset1" data-d="-0.01">-0.01</button>
+        <button class="offset-btn" data-id="offset1" data-d="0">0</button>
+        <button class="offset-btn" data-id="offset1" data-d="+0.01">+0.01</button>
+        <button class="offset-btn" data-id="offset1" data-d="+0.1">+0.1</button>
+      </div>
+      </div>
+    </div>
+
+    <!-- 入れ替えセパレーター -->
+    <div class="panel-sep">
+      <button class="panel-sep-btn" id="swapBtn" data-i18n-title="swap-title" title="背景・前景入れ替え"><i data-lucide="arrow-up-down"></i></button>
+    </div>
+
+    <!-- 動画 2 -->
+    <div class="card" data-card-id="vid2">
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="video"></i><span data-i18n="vid2-title">動画 2（前景）</span></span><button class="preset-item-del icon-btn--vis" id="visBtn2" title="表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="resetBtn2" title="コントロールをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="drop-zone" id="drop2" role="button" tabindex="0">
+      <div class="drop-loading-overlay" style="display:none"></div>
+        <button class="drop-delete" id="del2" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
+        <a class="drop-link" id="dropLink2" href="#" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
+        <div class="drop-icon"><i data-lucide="upload"></i></div>
+        <div class="drop-text">
+          <div class="drop-label2" data-i18n="drop-label">MP4をここにドロップ</div>
+          <div class="drop-hint" style="font-size:10px;" data-i18n="drop-hint">またはクリックして選択</div>
+        </div>
+        <input type="file" id="file2" accept="video/*,image/*" style="display:none">
+      </div>
+      <div id="videoControls2">
+      <div class="url-row">
+        <label for="urlInput2" style="font-size:11px;color:var(--text-muted);flex-shrink:0;white-space:nowrap;height:26px;display:inline-flex;align-items:center">URL</label>
+        <input type="text" class="url-input" id="urlInput2" placeholder="https://www.iwara.tv/video/..." autocomplete="off" spellcheck="false">
+        <button class="url-load-btn" id="urlLoadBtn2" data-i18n="load-btn">読込</button>
+      </div>
+      <div id="urlErr2" style="font-size:10px;color:#e5534b;height:14px;line-height:14px;margin-top:2px;overflow:hidden;"></div>
+      <div class="ctrl-row">
+        <label><span data-i18n="vol">音量</span><button class="mute-btn" id="mute2" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button></label>
+        <input type="range" id="vol2" min="0" max="100" value="25">
+        <input type="text" class="ctrl-val" id="vol2Val" value="25" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="offset">オフセット</label>
+        <input type="range" id="offset2" min="-10" max="10" value="0" step="0.01">
+        <input type="text" class="ctrl-val" id="offset2Val" value="+0.00" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="offset-btns">
+        <button class="offset-btn" data-id="offset2" data-d="-0.1">-0.1</button>
+        <button class="offset-btn" data-id="offset2" data-d="-0.01">-0.01</button>
+        <button class="offset-btn" data-id="offset2" data-d="0">0</button>
+        <button class="offset-btn" data-id="offset2" data-d="+0.01">+0.01</button>
+        <button class="offset-btn" data-id="offset2" data-d="+0.1">+0.1</button>
+      </div>
+      </div>
+    </div>
+
+    <div class="panel-sep"></div>
+
+    <!-- マスク -->
+    <div class="card" data-card-id="mask">
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="crop"></i><span data-i18n="mask-title">マスク</span></span><button class="preset-item-del icon-btn--vis" id="maskVisBtn" title="マスクを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="maskResetBtn" title="マスクをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="ctrl-row">
+        <label data-i18n="shape">形状</label>
+        <div class="shape-group">
+          <button class="shape-btn active" data-shape="rect" data-i18n-title="shape-rect" title="四角"><i data-lucide="square"></i></button>
+          <button class="shape-btn" data-shape="circle" data-i18n-title="shape-circle" title="円"><i data-lucide="circle"></i></button>
+          <button class="shape-btn" data-shape="heart" data-i18n-title="shape-heart" title="ハート"><i data-lucide="heart"></i></button>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="mask-x">X</label>
+        <input type="range" id="maskOffX" min="-480" max="480" value="0" step="1">
+        <input type="text" class="ctrl-val" id="maskOffXVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="mask-y">Y</label>
+        <input type="range" id="maskOffY" min="-270" max="270" value="0" step="1">
+        <input type="text" class="ctrl-val" id="maskOffYVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="width">幅</label>
+        <input type="range" id="maskW" min="10" max="790" value="400">
+        <input type="text" class="ctrl-val" id="maskWVal" value="400" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="height">高さ</span><span id="arLockBtn" class="ar-lock-icon" title="アス比を固定する"><i data-lucide="lock-open"></i></span></label>
+        <input type="range" id="maskH" min="10" max="790" value="400">
+        <input type="text" class="ctrl-val" id="maskHVal" value="400" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-mini-sep"></div>
+      <div class="ctrl-row">
+        <label data-i18n="blur">ぼかし</label>
+        <input type="range" id="blurAmt" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="blurAmtVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-pixel">ピクセル化</label>
+        <input type="range" id="filterPixel" min="0" max="10" value="0" step="1">
+        <input type="text" class="ctrl-val" id="filterPixelVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-mini-sep"></div>
+        <div class="ctrl-row" id="borderColRow">
+          <label data-i18n="border-col">枠の色</label>
+          <input type="color" id="borderColor" value="#ffffff" style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
+          <input type="hidden" id="borderAnim" value="none">
+          <button id="borderColorSwatch" class="border-color-swatch" title="色を選択"></button>
+          <div id="borderColorPopover" class="border-color-popover" style="display:none">
+            <canvas id="bcpSvCanvas"  class="bcp-sv-canvas"  width="160" height="120"></canvas>
+            <canvas id="bcpHueCanvas" class="bcp-hue-canvas" width="160" height="12"></canvas>
+            <div class="bcp-hex-row">
+              <div id="bcpPreview" class="bcp-preview"></div>
+              <input id="bcpHexInput" class="bcp-hex-input" type="text" maxlength="7" spellcheck="false" autocomplete="off">
+            </div>
+            <hr class="bcp-sep">
+            <div class="bcp-solid-row" id="bcpSolidRow"><!-- JS で生成 --></div>
+            <hr class="bcp-sep">
+            <div class="bcp-grad-row">
+              <button class="banim-btn" data-anim="rainbow" data-i18n-title="border-anim-rainbow" title="レインボー"></button>
+              <button class="banim-btn" data-anim="cm"      data-i18n-title="border-anim-cm"      title="シアン/マゼンタ"></button>
+              <button class="banim-btn" data-anim="sakura"  data-i18n-title="border-anim-sakura"  title="サクラ"></button>
+              <button class="banim-btn" data-anim="neon"    data-i18n-title="border-anim-neon"    title="ネオン"></button>
+              <button class="banim-btn" data-anim="fire"    data-i18n-title="border-anim-fire"    title="ファイア"></button>
+              <button class="banim-btn" data-anim="aurora"  data-i18n-title="border-anim-aurora"  title="オーロラ"></button>
+            </div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <label data-i18n="border-w">枠の太さ</label>
+          <input type="range" id="borderW" min="0" max="10" value="1.0" step="0.1">
+          <input type="text" class="ctrl-val" id="borderWVal" value="1.0" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="ctrl-row">
+          <label data-i18n="border-op">枠の透過</label>
+          <input type="range" id="borderOpacity" min="0" max="100" value="100">
+          <input type="text" class="ctrl-val" id="borderOpacityVal" value="100" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="ctrl-row" id="borderAnimSpeedRow" style="display:none">
+          <label data-i18n="border-speed">枠の速度</label>
+          <input type="range" id="borderAnimSpeed" min="0" max="10" value="1" step="0.1">
+          <input type="text" class="ctrl-val" id="borderAnimSpeedVal" value="1.0" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="ctrl-row" id="borderAnimBrightRow" style="display:none">
+          <label data-i18n="border-bright">枠の輝度</label>
+          <input type="range" id="borderAnimBright" min="0" max="100" value="70" step="1">
+          <input type="text" class="ctrl-val" id="borderAnimBrightVal" value="70" spellcheck="false" autocomplete="off">
+        </div>
+    </div>
+
+    <div class="panel-sep"></div>
+
+    <!-- カラーグレード / フィルター -->
+    <div class="card" id="filterCard" data-card-id="filter">
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="sparkles"></i><span data-i18n="filter-title">フィルター</span></span><button class="preset-item-del icon-btn--vis" id="filterVisBtn" title="フィルターを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="filterResetBtn" title="フィルターをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div id="filterQuickPresets" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+        <button class="fqp-btn" data-fqp="cinema" data-i18n="fqp-cinema">シネマ</button>
+        <button class="fqp-btn" data-fqp="retro" data-i18n="fqp-retro">レトロ</button>
+        <button class="fqp-btn" data-fqp="insta" data-i18n="fqp-insta">インスタ</button>
+        <button class="fqp-btn" data-fqp="pastel" data-i18n="fqp-pastel">パステル</button>
+        <button class="fqp-btn" data-fqp="neon" data-i18n="fqp-neon">ネオン</button>
+        <button class="fqp-btn" data-fqp="sunset" data-i18n="fqp-sunset">夕焼け</button>
+        <button class="fqp-btn" data-fqp="cool" data-i18n="fqp-cool">クール</button>
+        <button class="fqp-btn" data-fqp="dreamy" data-i18n="fqp-dreamy">ドリーミー</button>
+        <button class="fqp-btn" data-fqp="glitch" data-i18n="fqp-glitch">グリッチ</button>
+        <button class="fqp-btn" data-fqp="noir" data-i18n="fqp-noir">ノワール</button>
+        <button class="fqp-btn" data-fqp="horror" data-i18n="fqp-horror">ホラー</button>
+        <button class="fqp-btn" data-fqp="modern" data-i18n="fqp-modern">モダン</button>
+        <button class="fqp-btn" data-fqp="trend" data-i18n="fqp-trend">トレンド</button>
+      </div>
+      <div class="ctrl-mini-sep"></div>
+      <!-- 露出・明るさ -->
+      <div class="ctrl-row">
+        <label data-i18n="brightness">明るさ</label>
+        <input type="range" id="filterBrightness" min="0" max="200" value="100" step="1">
+        <input type="text" class="ctrl-val" id="filterBrightnessVal" value="100" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="contrast">コントラスト</label>
+        <input type="range" id="filterContrast" min="0" max="200" value="100" step="1">
+        <input type="text" class="ctrl-val" id="filterContrastVal" value="100" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-highlight">ハイライト</label>
+        <input type="range" id="filterHighlight" min="-100" max="100" value="0" step="1">
+        <input type="text" class="ctrl-val" id="filterHighlightVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-shadow">シャドウ</label>
+        <input type="range" id="filterShadow" min="-100" max="100" value="0" step="1">
+        <input type="text" class="ctrl-val" id="filterShadowVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-mini-sep"></div>
+      <!-- 色調整 -->
+      <div class="ctrl-row">
+        <label data-i18n="saturation">彩度</label>
+        <input type="range" id="filterSaturation" min="0" max="200" value="100" step="1">
+        <input type="text" class="ctrl-val" id="filterSaturationVal" value="100" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-temp">色温度</label>
+        <input type="range" id="filterTemp" min="-50" max="50" value="0" step="1">
+        <input type="text" class="ctrl-val" id="filterTempVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-tint">色かぶり補正</label>
+        <input type="range" id="filterTint" min="-50" max="50" value="0" step="1">
+        <input type="text" class="ctrl-val" id="filterTintVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-mini-sep"></div>
+      <!-- ルック・仕上げ -->
+      <div class="ctrl-row">
+        <label data-i18n="filter-sharpness">シャープネス</label>
+        <input type="range" id="filterSharpness" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterSharpnessVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="ca">色収差</label>
+        <input type="range" id="filterCA" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterCAVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="vignette">ビネット</label>
+        <input type="range" id="filterVignette" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterVignetteVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-matte">マット</label>
+        <input type="range" id="filterMatte" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterMatteVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-grain">フィルム粒子</label>
+        <input type="range" id="filterGrain" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterGrainVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-flare">カラーフレア</label>
+        <input type="range" id="filterFlare" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterFlareVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-bars">レターボックス</label>
+        <input type="range" id="filterBars" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterBarsVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+    </div><!-- /filterCard -->
+
+    <div class="panel-sep"></div>
+
+    <!-- プリセット -->
+    <div class="card" id="presetCard" data-card-id="preset">
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="bookmark"></i><span data-i18n="preset-title">プリセット</span></span><button class="preset-item-del icon-btn--import" id="presetImportToggleBtn" title="コードをインポート" style="width:22px;height:22px;padding:0"><i data-lucide="log-in"></i></button><button class="preset-item-del icon-btn--copy" id="presetCopyAllBtn" data-i18n-title="copy-all-code" title="コードをコピー" style="width:22px;height:22px;padding:0"><i data-lucide="copy"></i></button><button class="preset-item-del icon-btn--dl" id="presetJsonExportBtn" data-i18n-title="export-json" title="JSONファイルで保存" style="width:22px;height:22px;padding:0"><i data-lucide="download"></i></button></div>
+      <div class="preset-input-row" id="presetInputRow" style="display:none">
+        <input type="text" class="url-input" id="presetCodeInput" data-i18n-ph="preset-code-ph" placeholder="取込コード（gf2~…）または JSON を貼り付け" maxlength="4096" autocomplete="off" spellcheck="false">
+        <button class="url-load-btn" id="presetImportBtn" data-i18n="load-btn">読込</button>
+      </div>
+      <div class="preset-action-bar">
+        <button class="preset-action-btn" id="presetAddFolderBtn" data-i18n-title="folder-add-title" title="フォルダを作成"><i data-lucide="folder-plus"></i><span data-i18n="folder-new">新しいフォルダ</span></button>
+        <button class="preset-action-btn" id="presetAddBtn" data-i18n-title="preset-add-title" title="プリセットを作成"><i data-lucide="plus"></i><span data-i18n="preset-add-label">新しいプリセット</span></button>
+      </div>
+      <div class="preset-list" id="presetList" data-dnd-import></div>
+      <div id="presetDndHint" style="display:none;font-size:11px;color:var(--text-muted);text-align:center;padding:6px 0;pointer-events:none" data-i18n="dnd-hint">JSONファイルをここにドロップ</div>
+      <div id="presetShareStatus" style="font-size:11px;color:var(--text-muted);margin-top:4px;min-height:14px;transition:opacity 0.4s"></div>
+    </div>
+
+  </div><!-- /パネル -->
+</div><!-- /アプリ本体 -->
+
+<script src="js/app.js"></script>
+</body>
+</html>
