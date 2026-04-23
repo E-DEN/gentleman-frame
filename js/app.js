@@ -3845,7 +3845,13 @@ const _doInlineImport = async (rawOverride) => {
   try {
     const gf2Idx = raw.indexOf('gf2~');
     if (gf2Idx !== -1) {
-      arr = [_presetDecodeOne(raw.slice(gf2Idx))];
+      // 複数の gf2~ コード（フォルダコピー等）を改行で分割してすべてデコード
+      const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('gf2~'));
+      if (lines.length > 1) {
+        arr = lines.map(l => _presetDecodeOne(l));
+      } else {
+        arr = [_presetDecodeOne(raw.slice(gf2Idx))];
+      }
     } else {
       try { arr = JSON.parse(raw); }
       catch { arr = await _presetDecodeMulti(raw); }
