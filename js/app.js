@@ -3652,7 +3652,9 @@ function renderPresets() {
         while (end < allList.length && allList[end].type !== 'folder') end++;
         const children = allList.slice(idx + 1, end);
         if (!children.length) return;
-        code = children.map(c => _presetEncodeOne(c)).join('\n');
+        // 先頭行にフォルダ名ヘッダーを付与してフォルダ構造を保持
+        const folderHeader = 'gff~' + encodeURIComponent(p.name || 'フォルダ');
+        code = [folderHeader, ...children.map(c => _presetEncodeOne(c))].join('\n');
       } else {
         code = _presetEncodeOne(p);
       }
@@ -3844,8 +3846,16 @@ const _doInlineImport = async (rawOverride) => {
   let arr;
   try {
     const gf2Idx = raw.indexOf('gf2~');
-    if (gf2Idx !== -1) {
-      // 複数の gf2~ コード（フォルダコピー等）を改行で分割してすべてデコード
+    const gffIdx  = raw.indexOf('gff~');
+    if (gffIdx !== -1) {
+      // フォルダコピー形式: 先頭行 gff~名前、以降が gf2~ プリセット群
+      const allLines = raw.split(/\r?\n/).map(l => l.trim());
+      const folderName = decodeURIComponent(allLines[0].slice(4)) || 'フォルダ';
+      const presetLines = allLines.slice(1).filter(l => l.startsWith('gf2~'));
+      arr = [{ type: 'folder', name: folderName, open: true },
+             ...presetLines.map(l => _presetDecodeOne(l))];
+    } else if (gf2Idx !== -1) {
+      // 単体 or 複数の gf2~ コード（フォルダコピー等）を改行で分割してすべてデコード
       const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('gf2~'));
       if (lines.length > 1) {
         arr = lines.map(l => _presetDecodeOne(l));
