@@ -53,6 +53,14 @@
 
 ---
 
+## プライバシー
+
+iwara の URL を入力した場合、動画解決リクエストは [Cloudflare Workers](https://workers.cloudflare.com/) 経由で処理されます。  
+Cloudflare のインフラは送信元 IP アドレスおよびアクセス日時を記録することがあります（[Cloudflare プライバシーポリシー](https://www.cloudflare.com/privacypolicy/)）。  
+このツール自体がユーザーの個人情報を収集・保存することはありません。
+
+---
+
 ## License
 
 [MIT](LICENSE)

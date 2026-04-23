@@ -882,7 +882,7 @@ _startRenderLoop();
 
 // proxy.js (yt-dlp) を使って Iwara ページURL → CDN URL を解決
 const _LOCAL_PROXY = 'http://localhost:8788';
-const _MY_PROXY = ''; // 本番Worker URL（将来用）
+const _MY_PROXY = 'https://gf-proxy.den1.workers.dev';
 
 async function resolveIwaraURL(pageUrl) {
   const base = _MY_PROXY || _LOCAL_PROXY;
