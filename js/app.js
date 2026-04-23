@@ -3848,8 +3848,9 @@ const _doInlineImport = async (rawOverride) => {
     const gf2Idx = raw.indexOf('gf2~');
     const gffIdx  = raw.indexOf('gff~');
     if (gffIdx !== -1) {
-      // フォルダコピー形式: gff~名前 行 + gf2~ プリセット群
-      const allLines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+      // フォルダコピー形式: gff~名前 + gf2~ プリセット群
+      // 改行・スペース等あらゆるセパレーターに対応 — gff~/gf2~ の直前で分割
+      const allLines = raw.split(/\s+(?=gf[f2]~)/).map(l => l.trim()).filter(l => l);
       const gffLine = allLines.find(l => l.startsWith('gff~'));
       if (gffLine) {
         let folderName;
@@ -3858,17 +3859,17 @@ const _doInlineImport = async (rawOverride) => {
         const presetLines = allLines.filter(l => l.startsWith('gf2~'));
         const decoded = [];
         for (const l of presetLines) {
-          try { decoded.push(_presetDecodeOne(l)); } catch (e) { console.warn('[folder import] skip:', e); }
+          try { decoded.push(_presetDecodeOne(l)); } catch (e) { console.error('[folder import] skip line:', JSON.stringify(l), e); }
         }
         arr = [{ type: 'folder', name: folderName, open: true }, ...decoded];
       } else {
-        // gff~ が行頭にない場合は通常の gf2 インポートにフォールバック
+        // gff~ が見つからない場合は通常の gf2 インポートにフォールバック
         const lines = allLines.filter(l => l.startsWith('gf2~'));
         arr = lines.length > 1 ? lines.map(l => _presetDecodeOne(l)) : [_presetDecodeOne(raw.slice(gf2Idx))];
       }
     } else if (gf2Idx !== -1) {
-      // 単体 or 複数の gf2~ コード（フォルダコピー等）を改行で分割してすべてデコード
-      const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('gf2~'));
+      // 単体 or 複数の gf2~ コードをあらゆるセパレーターで分割してすべてデコード
+      const lines = raw.split(/\s+(?=gf2~)/).map(l => l.trim()).filter(l => l.startsWith('gf2~'));
       if (lines.length > 1) {
         arr = lines.map(l => _presetDecodeOne(l));
       } else {
