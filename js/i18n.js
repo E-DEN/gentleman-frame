@@ -32,6 +32,11 @@ function registerLang(code, label, dict) {
   _I18N_LABELS[code] = label;
 }
 
+function unregisterLang(code) {
+  delete _I18N_DICTS[code];
+  delete _I18N_LABELS[code];
+}
+
 /** Returns registered languages in insertion order: [{code, label}, …] */
 function getRegisteredLangs() {
   return Object.keys(_I18N_DICTS).map(code => ({ code, label: _I18N_LABELS[code] || code }));

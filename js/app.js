@@ -3051,13 +3051,32 @@ document.getElementById('themeBtn').addEventListener('click', () => {
 function rebuildLangDialog() {
   const list = document.getElementById('langOptionList');
   list.innerHTML = '';
+  // 外部追加言語のコード一覧
+  let extCodes = [];
+  try { extCodes = JSON.parse(localStorage.getItem('gf-ext-langs') || '[]').map(x => x.code); } catch (e) {}
+
   getRegisteredLangs().forEach(({ code, label }) => {
+    const isExt = extCodes.includes(code);
     const btn = document.createElement('button');
     btn.className = 'lang-option-item' + (code === _lang ? ' active' : '');
     btn.innerHTML =
       `<span class="lang-option-check">${code === _lang ? '✓' : ''}</span>` +
-      `<span>${label}</span>`;
-    btn.addEventListener('click', () => {
+      `<span style="flex:1">${label}</span>` +
+      (isExt ? `<span class="lang-option-del" title="削除" data-code="${code}" style="margin-left:4px;opacity:0.5;font-size:12px;padding:0 4px;line-height:1">✕</span>` : '');
+    btn.addEventListener('click', e => {
+      // 削除ボタンのクリック
+      if (e.target.closest('.lang-option-del')) {
+        e.stopPropagation();
+        const delCode = e.target.closest('.lang-option-del').dataset.code;
+        try {
+          const saved = JSON.parse(localStorage.getItem('gf-ext-langs') || '[]').filter(x => x.code !== delCode);
+          localStorage.setItem('gf-ext-langs', JSON.stringify(saved));
+        } catch (err) {}
+        unregisterLang(delCode);
+        if (_lang === delCode) applyLang('ja');
+        rebuildLangDialog();
+        return;
+      }
       applyLang(code);
       document.getElementById('langAddSection').hidden = true;
       document.getElementById('langImportDialog').hidden = true;
@@ -3438,7 +3457,7 @@ function renderPresets() {
     const saveBtn = isActive
       ? `<button class="preset-item-del preset-item-save" data-idx="${i}" title="${t('preset-save-title')}"><i data-lucide="save"></i></button>`
       : '';
-    return `<div class="preset-item${isChild ? ' preset-item-child' : ''}${isActive ? ' preset-item--active' : ''}" data-idx="${i}">
+    return `<div class="preset-item${isChild ? ' preset-item-child' : ''}${isActive ? ' preset-item--active' : ''}" data-idx="${i}" tabindex="0">
         <span class="preset-drag-handle"><i data-lucide="grip-vertical"></i></span>
         <div class="preset-item-info" data-idx="${i}">
           <span class="preset-item-name"><span class="pname-inner">${_esc(p.name)}</span></span>
@@ -3542,6 +3561,7 @@ function renderPresets() {
       syncStop();
       applySettings(p.data);
       _activePresetIdx = idx;
+      _f2Target = { type: 'preset', idx };
       renderPresets();
       let needsRender = false;
       for (const i of [0, 1]) {
@@ -3728,6 +3748,41 @@ const _bindPresetAddBtn = () => {};
 document.getElementById('presetAddBtn').addEventListener('click', () => _doPresetAdd());
 document.getElementById('presetList').addEventListener('click', e => {
   // 旧来の互換（念のため）
+});
+
+// F2 リネーム: 最後にクリックされた対象（フォルダ or プリセット）をインデックスで追跡
+let _f2Target = null; // { type: 'folder'|'preset', idx: number }
+document.getElementById('presetList').addEventListener('mousedown', e => {
+  if (e.target.closest('button')) return; // ボタンクリックはスキップ
+  const header = e.target.closest('.preset-folder-header');
+  const item   = e.target.closest('.preset-item');
+  if (header) _f2Target = { type: 'folder', idx: +header.dataset.idx };
+  else if (item) _f2Target = { type: 'preset', idx: +item.dataset.idx };
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'F2') return;
+  const el = document.getElementById('presetList');
+  if (!el) return;
+  e.preventDefault();
+  // フォーカス中の要素を優先、なければ _f2Target、プリセットは _activePresetIdx にフォールバック
+  const focused = document.activeElement;
+  const focusedHeader = focused?.closest('.preset-folder-header');
+  const focusedItem   = focused?.closest('.preset-item');
+  let type, idx;
+  if (focusedHeader) {
+    type = 'folder'; idx = +focusedHeader.dataset.idx;
+  } else if (focusedItem) {
+    type = 'preset'; idx = +focusedItem.dataset.idx;
+  } else if (_f2Target) {
+    type = _f2Target.type; idx = _f2Target.idx;
+  } else if (_activePresetIdx != null) {
+    type = 'preset'; idx = _activePresetIdx;
+  } else return;
+  if (type === 'folder') {
+    el.querySelector(`.preset-folder-header .preset-item-rename[data-idx="${idx}"]`)?.click();
+  } else {
+    el.querySelector(`.preset-item-rename[data-idx="${idx}"]`)?.click();
+  }
 });
 
 // フォルダ追加
