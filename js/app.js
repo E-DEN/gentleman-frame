@@ -3848,12 +3848,24 @@ const _doInlineImport = async (rawOverride) => {
     const gf2Idx = raw.indexOf('gf2~');
     const gffIdx  = raw.indexOf('gff~');
     if (gffIdx !== -1) {
-      // フォルダコピー形式: 先頭行 gff~名前、以降が gf2~ プリセット群
-      const allLines = raw.split(/\r?\n/).map(l => l.trim());
-      const folderName = decodeURIComponent(allLines[0].slice(4)) || 'フォルダ';
-      const presetLines = allLines.slice(1).filter(l => l.startsWith('gf2~'));
-      arr = [{ type: 'folder', name: folderName, open: true },
-             ...presetLines.map(l => _presetDecodeOne(l))];
+      // フォルダコピー形式: gff~名前 行 + gf2~ プリセット群
+      const allLines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+      const gffLine = allLines.find(l => l.startsWith('gff~'));
+      if (gffLine) {
+        let folderName;
+        try { folderName = decodeURIComponent(gffLine.slice(4)); } catch { folderName = gffLine.slice(4); }
+        folderName = folderName || 'フォルダ';
+        const presetLines = allLines.filter(l => l.startsWith('gf2~'));
+        const decoded = [];
+        for (const l of presetLines) {
+          try { decoded.push(_presetDecodeOne(l)); } catch (e) { console.warn('[folder import] skip:', e); }
+        }
+        arr = [{ type: 'folder', name: folderName, open: true }, ...decoded];
+      } else {
+        // gff~ が行頭にない場合は通常の gf2 インポートにフォールバック
+        const lines = allLines.filter(l => l.startsWith('gf2~'));
+        arr = lines.length > 1 ? lines.map(l => _presetDecodeOne(l)) : [_presetDecodeOne(raw.slice(gf2Idx))];
+      }
     } else if (gf2Idx !== -1) {
       // 単体 or 複数の gf2~ コード（フォルダコピー等）を改行で分割してすべてデコード
       const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('gf2~'));
