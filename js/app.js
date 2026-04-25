@@ -53,6 +53,7 @@ const S = {
 const _currentHandle  = [null, null];
 const _loadedFileName = ['', ''];
 const _loadedPageUrl  = ['', '']; // Iwara等ページURLを記憶（プリセット復元用）
+const _loadedPixivId  = ['', '']; // Pixiv illust ID（pximg URL時）
 
 const _IDB = (() => {
   const DB = 'gentleFrameDB', ST = 'fileHandles';
@@ -970,8 +971,9 @@ async function loadVideoFromURL(index, url) {
         if (img[index].src?.startsWith('blob:')) URL.revokeObjectURL(img[index].src);
         _currentHandle[index]  = null;
         _loadedFileName[index] = name;
-        // pximg.net の直リンからPixivページURLを生成
-        const _pximgId = /pximg\.net\//.test(url) && (name.match(/^(\d+)_p\d+\.\w+$/) || [])[1];
+        // pximg.net の直リンからPixiv illust IDを抽出（_master1200等のサフィックスにも対応）
+        const _pximgId = /pximg\.net\//.test(url) && (url.match(/\/(\d+)_p\d+/) || [])[1];
+        _loadedPixivId[index]  = _pximgId || '';
         _loadedPageUrl[index]  = _pximgId ? `https://www.pixiv.net/artworks/${_pximgId}` : url;
         loaded[index] = false;
         mediaType[index] = 'image';
@@ -996,6 +998,17 @@ async function loadVideoFromURL(index, url) {
                 const pageLabel = [data.author, data.title].filter(Boolean).join(' - ');
                 _loadedFileName[index] = `${pageLabel}\n${name}`;
                 if (label) label.textContent = `${pageLabel}\n${name}`;
+                // アクティブなプリセットがメタデータ取得前に保存されていた場合、遡って更新
+                if (_activePresetIdx != null) {
+                  const _pList = loadPresets();
+                  const _pItem = _pList[_activePresetIdx];
+                  const _pKey = `vid${index}Name`;
+                  if (_pItem?.data?.[_pKey] === name) {
+                    _pItem.data[_pKey] = `${pageLabel}\n${name}`;
+                    savePresets(_pList);
+                    if (_presetsReady) renderPresets();
+                  }
+                }
               })
               .catch(() => {});
           }
@@ -1127,6 +1140,7 @@ function loadVideo(index, file, handle = null) {
   _loadedFileName[index] = file.name;
   // URL欄・ページリンクをリセット
   _loadedPageUrl[index]  = '';
+  _loadedPixivId[index]  = '';
   _updateDropLink(index);
   const _vi = document.getElementById(`urlInput${index}`);
   const _ve = document.getElementById(`urlErr${index}`);
@@ -1171,9 +1185,8 @@ function loadImage(index, file, handle = null) {
   _currentHandle[index]  = handle;
   _loadedFileName[index] = file.name;
   _loadedPageUrl[index]  = '';
+  _loadedPixivId[index]  = '';
   _updateDropLink(index);
-  loaded[index] = false;
-  mediaType[index] = 'image';
   updateMediaControls(index);
   const zone = document.getElementById(`drop${index}`);
   zone.classList.remove('loaded');
@@ -1392,6 +1405,7 @@ function clearVideo(index) {
   _currentHandle[index]  = null;
   _loadedFileName[index] = '';
   _loadedPageUrl[index]  = '';
+  _loadedPixivId[index]  = '';
   _updateDropLink(index);
   const zone  = document.getElementById(`drop${index}`);
   const input = document.getElementById(`file${index}`);
@@ -3383,6 +3397,8 @@ function collectSettings() {
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedPageUrl[0],
     vid1Url:       _loadedPageUrl[1],
+    vid0PixivId:   _loadedPixivId[0],
+    vid1PixivId:   _loadedPixivId[1],
   };
 }
 
