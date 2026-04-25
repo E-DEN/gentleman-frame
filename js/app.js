@@ -968,7 +968,9 @@ async function loadVideoFromURL(index, url) {
         if (img[index].src?.startsWith('blob:')) URL.revokeObjectURL(img[index].src);
         _currentHandle[index]  = null;
         _loadedFileName[index] = name;
-        _loadedPageUrl[index]  = url;
+        // pximg.net の直リンからPixivページURLを生成
+        const _pximgId = /pximg\.net\//.test(url) && (name.match(/^(\d+)_p\d+\.\w+$/) || [])[1];
+        _loadedPageUrl[index]  = _pximgId ? `https://www.pixiv.net/artworks/${_pximgId}` : url;
         loaded[index] = false;
         mediaType[index] = 'image';
         updateMediaControls(index);
