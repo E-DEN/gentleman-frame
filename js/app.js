@@ -1235,7 +1235,10 @@ function setupDropZone(index) {
     input.click();
   }
 
-  zone.addEventListener('click', pickFile);
+  zone.addEventListener('click', e => {
+    if (e.target.closest(`#dropLink${index}`)) return; // 元ページリンクはバブリング無視
+    pickFile();
+  });
   zone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickFile(); }
   });
