@@ -981,9 +981,8 @@ async function loadVideoFromURL(index, url) {
           if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
           _setZoneLoaded(zone, false);
           _setZoneLoaded(zone, true);
+          _updateDropLink(index);
           const label = zone.querySelector(`.drop-label${index}`);
-          if (label) label.textContent = name;
-          input.style.transition = 'border-color 0.1s';
           input.style.borderColor = 'var(--ok)';
           setTimeout(() => {
             input.style.transition = 'border-color 0.6s ease';
