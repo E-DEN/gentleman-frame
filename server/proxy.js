@@ -328,6 +328,85 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ---- Pixiv illust info (/pixiv-info?id=) ----
+  if (reqUrl.pathname === '/pixiv-info') {
+    const illustId = reqUrl.searchParams.get('id');
+    if (!illustId || !/^\d+$/.test(illustId)) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'Missing or invalid ?id=' })); return;
+    }
+    const apiUrl = `https://www.pixiv.net/ajax/illust/${illustId}`;
+    const opts = {
+      hostname: 'www.pixiv.net',
+      path: `/ajax/illust/${illustId}`,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://www.pixiv.net/',
+        'Accept': 'application/json',
+      },
+    };
+    https.get(opts, (upstream) => {
+      let body = '';
+      upstream.on('data', chunk => { body += chunk; });
+      upstream.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          if (data.error) {
+            res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ error: data.message || 'Not found' })); return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'max-age=3600' });
+          res.end(JSON.stringify({ title: data.body?.title || '', author: data.body?.userName || '' }));
+        } catch (e) {
+          res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+    }).on('error', (e) => {
+      res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    return;
+  }
+
+  // ---- 汎用 CORS プロキシ (?url=) ----
+  const genericTarget = reqUrl.searchParams.get('url');
+  if (reqUrl.pathname === '/' && genericTarget) {
+    let targetUrl;
+    try { targetUrl = new URL(genericTarget); } catch {
+      res.writeHead(400); res.end('Invalid URL'); return;
+    }
+    const REFERER_MAP = {
+      'i.pximg.net': 'https://www.pixiv.net/',
+      'i-f.pximg.net': 'https://www.pixiv.net/',
+    };
+    const referer = REFERER_MAP[targetUrl.hostname];
+    const opts = {
+      hostname: targetUrl.hostname,
+      path: targetUrl.pathname + targetUrl.search,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        ...(referer ? { 'Referer': referer } : {}),
+      },
+    };
+    https.get(opts, (upstream) => {
+      if ([301, 302, 303, 307, 308].includes(upstream.statusCode) && upstream.headers.location) {
+        upstream.resume();
+        res.writeHead(upstream.statusCode, { 'Location': upstream.headers.location, 'Access-Control-Allow-Origin': '*' });
+        res.end(); return;
+      }
+      const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': upstream.headers['content-type'] || 'application/octet-stream',
+        'Cache-Control': 'no-store',
+      };
+      if (upstream.headers['content-length']) headers['Content-Length'] = upstream.headers['content-length'];
+      res.writeHead(upstream.statusCode, headers);
+      upstream.pipe(res);
+    }).on('error', (e) => { res.writeHead(502); res.end(e.message); });
+    return;
+  }
+
   res.writeHead(404);
   res.end('Not found');
 });

@@ -138,6 +138,28 @@ export default {
 
     const reqUrl = new URL(request.url);
 
+    // /pixiv-info?id=<illust-id>
+    if (reqUrl.pathname === '/pixiv-info') {
+      const illustId = reqUrl.searchParams.get('id');
+      if (!illustId || !/^\d+$/.test(illustId)) return jsonResp({ error: 'Missing or invalid ?id=' }, 400);
+      try {
+        const apiRes = await fetch(`https://www.pixiv.net/ajax/illust/${illustId}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Referer': 'https://www.pixiv.net/',
+            'Accept': 'application/json',
+          },
+        });
+        const data = await apiRes.json().catch(() => ({}));
+        if (data.error) return jsonResp({ error: data.message || 'Not found' }, 404);
+        return new Response(JSON.stringify({ title: data.body?.title || '', author: data.body?.userName || '' }), {
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' },
+        });
+      } catch (e) {
+        return jsonResp({ error: e.message }, 502);
+      }
+    }
+
     // /resolve?url=<page-url>
     if (reqUrl.pathname === '/resolve') {
       const pageUrl = reqUrl.searchParams.get('url');

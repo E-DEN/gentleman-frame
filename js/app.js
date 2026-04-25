@@ -983,6 +983,20 @@ async function loadVideoFromURL(index, url) {
           _setZoneLoaded(zone, true);
           _updateDropLink(index);
           const label = zone.querySelector(`.drop-label${index}`);
+          if (label) label.textContent = name;
+          // Pixivメタデータ非同期取得してラベル更新
+          if (_pximgId) {
+            const _proxyBase = _MY_PROXY || _LOCAL_PROXY;
+            fetch(`${_proxyBase}/pixiv-info?id=${_pximgId}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(data => {
+                if (!data || (!data.title && !data.author)) return;
+                const pageLabel = [data.author, data.title].filter(Boolean).join(' - ');
+                _loadedFileName[index] = `${pageLabel}\n${name}`;
+                if (label) label.textContent = `${pageLabel}\n${name}`;
+              })
+              .catch(() => {});
+          }
           input.style.borderColor = 'var(--ok)';
           setTimeout(() => {
             input.style.transition = 'border-color 0.6s ease';
@@ -999,12 +1013,22 @@ async function loadVideoFromURL(index, url) {
         };
         img[index].onerror = () => {
           // CORS失敗 → プロキシ経由で再試行
-          const proxyUrl = `${_MY_PROXY}/?url=${encodeURIComponent(url)}`;
+          const _proxyBase = _MY_PROXY || _LOCAL_PROXY;
+          const proxyUrl = `${_proxyBase}/?url=${encodeURIComponent(url)}`;
           img[index].onerror = _imgFail;
           img[index].src = proxyUrl;
         };
-        img[index].crossOrigin = 'anonymous';
-        img[index].src = url;
+        // 既知のCORSブロックホストは最初からプロキシ経由
+        const PROXY_FIRST_HOSTS = ['i.pximg.net', 'i-f.pximg.net'];
+        const _needsProxy = PROXY_FIRST_HOSTS.some(h => url.includes(h));
+        if (_needsProxy) {
+          const _proxyBase = _MY_PROXY || _LOCAL_PROXY;
+          img[index].onerror = _imgFail;
+          img[index].src = `${_proxyBase}/?url=${encodeURIComponent(url)}`;
+        } else {
+          img[index].crossOrigin = 'anonymous';
+          img[index].src = url;
+        }
       });
       setStatus('');
       return;
@@ -2771,10 +2795,10 @@ function swapVideos() {
     if (urlErr1) urlErr1.textContent = '';
   }
   ['vol', 'offset'].forEach(key => {
-    const r1 = document.getElementById(`${key}1`);
-    const r2 = document.getElementById(`${key}2`);
-    const v1 = document.getElementById(`${key}1Val`);
-    const v2 = document.getElementById(`${key}2Val`);
+    const r1 = document.getElementById(`${key}0`);
+    const r2 = document.getElementById(`${key}1`);
+    const v1 = document.getElementById(`${key}0Val`);
+    const v2 = document.getElementById(`${key}1Val`);
     [r1.value, r2.value] = [r2.value, r1.value];
     [v1.value, v2.value] = [v2.value, v1.value];
     updateSliderFill(r1);

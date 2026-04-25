@@ -509,6 +509,7 @@
     .drop-link:hover { background: rgba(80,130,255,0.25); color: var(--accent); }
     .drop-icon { flex-shrink: 0; margin-bottom: 0; }
     .drop-text { display: flex; flex-direction: column; min-width: 0; }
+    [class^="drop-label"] { white-space: pre-line; word-break: break-all; font-size: 11px; }
     .url-row {
       display: flex;
       gap: 6px;
