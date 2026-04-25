@@ -1,3 +1,6 @@
+# Wrangler local cache (contains account ID etc.)
+.wrangler/
+
 ### Node
 # Dependencies
 node_modules/

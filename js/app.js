@@ -52,7 +52,8 @@ const S = {
 // ============================================================
 const _currentHandle  = [null, null];
 const _loadedFileName = ['', ''];
-const _loadedPageUrl  = ['', '']; // Iwara等ページURLを記憶（プリセット復元用）
+const _loadedPageUrl  = ['', '']; // Iwara等ページURLを記憶（リンク表示用）
+const _loadedSrcUrl   = ['', '']; // 実際にロードしたURL（プリセット復元用）
 
 const _IDB = (() => {
   const DB = 'gentleFrameDB', ST = 'fileHandles';
@@ -968,11 +969,13 @@ async function loadVideoFromURL(index, url) {
       setStatus('画像を読み込み中...');
       await new Promise((resolve, reject) => {
         if (img[index].src?.startsWith('blob:')) URL.revokeObjectURL(img[index].src);
+        img[index].removeAttribute('src'); // 同URLの再ロードでも onload を確実に発火させる
         _currentHandle[index]  = null;
         _loadedFileName[index] = name;
         // pximg.net の直リンからPixivページURLを生成
         const _pximgId = /pximg\.net\//.test(url) && (url.match(/\/(\d+)_p\d+/) || [])[1];
         _loadedPageUrl[index]  = _pximgId ? `https://www.pixiv.net/artworks/${_pximgId}` : url;
+        _loadedSrcUrl[index]   = url;
         loaded[index] = false;
         mediaType[index] = 'image';
         updateMediaControls(index);
@@ -981,6 +984,8 @@ async function loadVideoFromURL(index, url) {
           zone.classList.remove('loading');
           _setDropSpinner(index, false);
           if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
+          if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
+          if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
           _setZoneLoaded(zone, false);
           _setZoneLoaded(zone, true);
           _updateDropLink(index);
@@ -1043,6 +1048,7 @@ async function loadVideoFromURL(index, url) {
     _currentHandle[index]  = null;
     _loadedFileName[index] = name;
     _loadedPageUrl[index]  = url;
+    _loadedSrcUrl[index]   = url;
     _updateDropLink(index);
     mediaType[index] = 'video';
     updateMediaControls(index);
@@ -1114,6 +1120,7 @@ function loadVideo(index, file, handle = null) {
   _loadedFileName[index] = file.name;
   // URL欄・ページリンクをリセット
   _loadedPageUrl[index]  = '';
+  _loadedSrcUrl[index]   = '';
   _updateDropLink(index);
   const _vi = document.getElementById(`urlInput${index}`);
   const _ve = document.getElementById(`urlErr${index}`);
@@ -1158,6 +1165,7 @@ function loadImage(index, file, handle = null) {
   _currentHandle[index]  = handle;
   _loadedFileName[index] = file.name;
   _loadedPageUrl[index]  = '';
+  _loadedSrcUrl[index]   = '';
   _updateDropLink(index);
   updateMediaControls(index);
   const zone = document.getElementById(`drop${index}`);
@@ -1170,6 +1178,8 @@ function loadImage(index, file, handle = null) {
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
     if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
+    if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
+    if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
     _setZoneLoaded(zone, false);
     _setZoneLoaded(zone, true);
     const label = zone.querySelector(`.drop-label${index}`);
@@ -1377,6 +1387,7 @@ function clearVideo(index) {
   _currentHandle[index]  = null;
   _loadedFileName[index] = '';
   _loadedPageUrl[index]  = '';
+  _loadedSrcUrl[index]   = '';
   _updateDropLink(index);
   const zone  = document.getElementById(`drop${index}`);
   const input = document.getElementById(`file${index}`);
@@ -2739,6 +2750,7 @@ function swapVideos() {
   [_currentHandle[0], _currentHandle[1]]   = [_currentHandle[1], _currentHandle[0]];
   [_loadedFileName[0], _loadedFileName[1]] = [_loadedFileName[1], _loadedFileName[0]];
   [_loadedPageUrl[0],  _loadedPageUrl[1]]  = [_loadedPageUrl[1],  _loadedPageUrl[0]];
+  [_loadedSrcUrl[0],   _loadedSrcUrl[1]]   = [_loadedSrcUrl[1],   _loadedSrcUrl[0]];
   [_vidBitmap[0],      _vidBitmap[1]]      = [_vidBitmap[1],      _vidBitmap[0]];
   [_vidBitmapPending[0], _vidBitmapPending[1]] = [_vidBitmapPending[1], _vidBitmapPending[0]];
   [visHidden[0],       visHidden[1]]       = [visHidden[1],       visHidden[0]];
@@ -3366,8 +3378,8 @@ function collectSettings() {
     theme:         document.documentElement.dataset.theme,
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
-    vid0Url:       _loadedPageUrl[0],
-    vid1Url:       _loadedPageUrl[1],
+    vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
+    vid1Url:       _loadedSrcUrl[1] || _loadedPageUrl[1],
   };
 }
 
@@ -4212,6 +4224,9 @@ function _presetEncodeOne(p) {
     ff: d.filterFlare ?? '0',
     fb: d.filterBars ?? '0',
   };
+  // iwara以外のURL（画像等）はexに保存
+  if (d.vid0Url && !_iwaraId(d.vid0Url)) ex.u0 = d.vid0Url;
+  if (d.vid1Url && !_iwaraId(d.vid1Url)) ex.u1 = d.vid1Url;
   return base + '~' + _B64U(new TextEncoder().encode(JSON.stringify(ex)));
 }
 function _presetDecodeOne(code) {
@@ -4233,6 +4248,9 @@ function _presetDecodeOne(code) {
       if (ex.fp != null) data.filterPixel     = ex.fp;
       if (ex.ff != null) data.filterFlare     = ex.ff;
       if (ex.fb != null) data.filterBars      = ex.fb;
+      // iwara以外のURL（画像等）を復元
+      if (ex.u0 != null) { data.vid0Url = ex.u0; data.vid0Name = data.vid0Name || ex.u0.split('/').pop().split('?')[0]; }
+      if (ex.u1 != null) { data.vid1Url = ex.u1; data.vid1Name = data.vid1Name || ex.u1.split('/').pop().split('?')[0]; }
     } catch(e) {}
   }
   return {name:name||'インポート',data};
