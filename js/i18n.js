@@ -217,7 +217,7 @@ registerLang('en', 'English', {
 registerLang('zh', '中文', {
   'mode-dark':'深色模式','mode-light':'浅色模式',
   'bg-title':'背景','fg-title':'前景',
-  'mask-title':'遮罩',,'filter-title':'滤镜','preset-title':'预设',
+  'mask-title':'遮罩','filter-title':'滤镜','preset-title':'预设',
   'drop-label':'将 MP4 拖放到此处','drop-hint':'或点击选择',
   'del-title':'删除','load-btn':'加载','mute-title':'静音',
   'vol':'音量','offset':'偏移','swap-title':'交换背景与前景',
