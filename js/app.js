@@ -3105,11 +3105,15 @@ function rebuildLangDialog() {
   const _addLabel = () => _sec.hidden ? t('lang-add') : t('lang-cancel');
   addBtn.innerHTML = `<span class="lang-option-check"></span><span>${_addLabel()}</span>`;
   addBtn.addEventListener('click', () => {
+    const wasOpen = !_sec.hidden;
     _sec.hidden = !_sec.hidden;
     addBtn.querySelector('span:last-child').textContent = _addLabel();
     if (!_sec.hidden) {
       document.getElementById('langImportText').value = '';
       document.getElementById('langImportDrop').classList.remove('hover');
+    } else if (wasOpen) {
+      // キャンセル（section を閉じた）→ 言語ポップ全体も閉じる
+      document.getElementById('langImportDialog').hidden = true;
     }
   });
   list.appendChild(addBtn);
