@@ -119,11 +119,11 @@
         </div>
         <div id="videoControls1">
         <div class="url-row">
-          <label for="urlInput1" style="font-size:11px;color:var(--text-muted);flex-shrink:0;white-space:nowrap;height:26px;display:inline-flex;align-items:center">URL</label>
+          <label for="urlInput1" class="url-label">URL</label>
           <input type="text" class="url-input" id="urlInput1" placeholder="https://www.iwara.tv/video/..." autocomplete="off" spellcheck="false">
           <button class="url-load-btn" id="urlLoadBtn1" data-i18n="load-btn">読込</button>
         </div>
-        <div id="urlErr1" style="font-size:10px;color:#e5534b;height:14px;line-height:14px;margin-top:2px;overflow:hidden;"></div>
+        <div id="urlErr1" class="url-err"></div>
         <div class="ctrl-row">
           <label><span data-i18n="vol">音量</span><button class="mute-btn" id="mute1" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button></label>
           <input type="range" id="vol1" min="0" max="100" value="25">
@@ -146,7 +146,7 @@
 
       <!-- 入れ替えセパレーター -->
       <div class="vid-swap-sep">
-        <button class="panel-sep-btn" id="swapBtn" data-i18n-title="swap-title" title="背景・前景入れ替え"><i data-lucide="arrow-up-down"></i></button>
+        <button class="vid-swap-btn" id="swapBtn" data-i18n-title="swap-title" title="背景・前景入れ替え"><i data-lucide="arrow-up-down"></i></button>
       </div>
 
       <!-- 前景（動画2） -->
@@ -169,11 +169,11 @@
         </div>
         <div id="videoControls2">
         <div class="url-row">
-          <label for="urlInput2" style="font-size:11px;color:var(--text-muted);flex-shrink:0;white-space:nowrap;height:26px;display:inline-flex;align-items:center">URL</label>
+          <label for="urlInput2" class="url-label">URL</label>
           <input type="text" class="url-input" id="urlInput2" placeholder="https://www.iwara.tv/video/..." autocomplete="off" spellcheck="false">
           <button class="url-load-btn" id="urlLoadBtn2" data-i18n="load-btn">読込</button>
         </div>
-        <div id="urlErr2" style="font-size:10px;color:#e5534b;height:14px;line-height:14px;margin-top:2px;overflow:hidden;"></div>
+        <div id="urlErr2" class="url-err"></div>
         <div class="ctrl-row">
           <label><span data-i18n="vol">音量</span><button class="mute-btn" id="mute2" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button></label>
           <input type="range" id="vol2" min="0" max="100" value="25">
