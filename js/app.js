@@ -134,7 +134,7 @@ let maskHidden = false;
 let effectsHidden = false;
 
 vid.forEach(v => {
-  v.loop = true;
+  v.loop = false;
   v.playsInline = true;
   v.preload = 'auto';
 });
