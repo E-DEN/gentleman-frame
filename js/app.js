@@ -3912,7 +3912,7 @@ const _doInlineImport = async (rawOverride) => {
 };
 
 document.getElementById('presetImportBtn').addEventListener('click', _doInlineImport);
-document.getElementById('presetCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter') _doInlineImport(); });
+document.getElementById('presetCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) _doInlineImport(); });
 document.getElementById('presetCodeInput').addEventListener('input', () => { document.getElementById('presetCodeInput').classList.remove('error'); });
 // 入力フィールドへの D&D
 ((() => {
@@ -4157,20 +4157,15 @@ async function _presetDecodeMulti(code) {
 const _presetShareStatus = document.getElementById('presetShareStatus');
 let _presetStatusTimer = null;
 function _presetStatusMsg(msg, ok = true) {
-  const el = document.getElementById('presetShareStatus');
-  if (!el) return;
-  clearTimeout(_presetStatusTimer);
-  el.style.transition = 'none';
-  el.style.opacity = '1';
-  el.style.color = ok ? 'var(--ok)' : '#e5534b';
-  el.textContent = msg;
-  if (ok) {
-    _presetStatusTimer = setTimeout(() => {
-      el.style.transition = 'opacity 0.6s';
-      el.style.opacity = '0';
-      setTimeout(() => { el.textContent = ''; el.style.opacity = '1'; }, 650);
-    }, 3000);
-  }
+  // トースト表示
+  const container = document.getElementById('gf-toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'gf-toast ' + (ok ? 'ok' : 'err');
+  toast.textContent = msg;
+  container.appendChild(toast);
+  const remove = () => { toast.classList.add('out'); setTimeout(() => toast.remove(), 320); };
+  setTimeout(remove, ok ? 3000 : 5000);
 }
 
 document.getElementById('presetJsonExportBtn').addEventListener('click', () => {
