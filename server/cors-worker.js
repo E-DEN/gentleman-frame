@@ -139,24 +139,46 @@ export default {
     const reqUrl = new URL(request.url);
 
     // /pixiv-info?id=<illust-id>
-    // NOTE: Pixiv blocks requests from Cloudflare datacenter IPs (403).
-    // This endpoint works only from residential IPs (local proxy).
-    // In production, the client gracefully falls back to showing the filename only.
+    // Pixiv Ajax API blocks Cloudflare datacenter IPs (403).
+    // Workaround: scrape OGP / JSON-LD from the public artwork HTML page.
     if (reqUrl.pathname === '/pixiv-info') {
       const illustId = reqUrl.searchParams.get('id');
       if (!illustId || !/^\d+$/.test(illustId)) return jsonResp({ error: 'Missing or invalid ?id=' }, 400);
       try {
-        const apiRes = await fetch(`https://www.pixiv.net/ajax/illust/${illustId}`, {
+        const pageRes = await fetch(`https://www.pixiv.net/artworks/${illustId}`, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Referer': 'https://www.pixiv.net/',
-            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'ja,en;q=0.9',
           },
         });
-        if (!apiRes.ok) return jsonResp({ title: '', author: '' }); // Pixiv IP block → empty (client handles gracefully)
-        const data = await apiRes.json().catch(() => ({}));
-        if (data.error) return jsonResp({ title: '', author: '' });
-        return new Response(JSON.stringify({ title: data.body?.title || '', author: data.body?.userName || '' }), {
+        if (!pageRes.ok) return jsonResp({ title: '', author: '' });
+        const html = await pageRes.text();
+
+        // Try JSON-LD first (most reliable)
+        let title = '', author = '';
+        const ldMatch = html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/i);
+        if (ldMatch) {
+          try {
+            const ld = JSON.parse(ldMatch[1]);
+            title  = ld.name || ld.title || '';
+            author = ld.author?.name || '';
+          } catch {}
+        }
+
+        // Fallback: OGP meta tags
+        if (!title) {
+          const ogTitle = html.match(/<meta\s+(?:property="og:title"|name="og:title")\s+content="([^"]+)"/i)
+                       || html.match(/<meta\s+content="([^"]+)"\s+property="og:title"/i);
+          if (ogTitle) title = ogTitle[1].replace(/\s*[|｜]\s*pixiv.*$/i, '').trim();
+        }
+        if (!author) {
+          const ogDesc = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i)
+                      || html.match(/<meta\s+content="([^"]+)"\s+property="og:description"/i);
+          if (ogDesc) author = ogDesc[1].trim();
+        }
+
+        return new Response(JSON.stringify({ title, author }), {
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' },
         });
       } catch (e) {
