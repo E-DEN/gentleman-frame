@@ -328,6 +328,11 @@
       margin-bottom: 4px;
     }
     .vid-section-header span { flex: 1; }
+    .vid-section-btns { display: flex; align-items: center; gap: 0; }
+    .vid-section-header .preset-item-del {
+      opacity: 1;
+      pointer-events: auto;
+    }
     .vid-swap-sep {
       display: flex;
       align-items: center;

@@ -64,6 +64,10 @@
       </div>
       <!-- マスク D&D オーバーレイ：マスク領域に絶対配置し、実際のドロップターゲットとして機能 -->
       <div id="maskDropOverlay"></div>
+      <!-- 動画全非表示オーバーレイ -->
+      <div id="vidHiddenOverlay" style="display:none;position:absolute;inset:0;z-index:15;align-items:center;justify-content:center;pointer-events:none">
+        <i data-lucide="eye-off" style="width:48px;height:48px;opacity:0.25;color:#fff"></i>
+      </div>
       <!-- トランスポートオーバーレイ -->
       <div class="transport">
         <div class="transport-row">
@@ -97,19 +101,21 @@
 
     <!-- 動画 -->
     <div class="card" data-card-id="vid">
-      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="video"></i><span data-i18n="vid-title">動画</span></span></div>
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="video"></i><span data-i18n="vid-title">動画</span></span><button class="preset-item-del icon-btn--vis" id="vidVisAllBtn" data-i18n-title="vid-vis-title" title="動画を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="vidResetAllBtn" data-i18n-title="vid-clear-title" title="動画をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
 
       <!-- 背景（動画1） -->
       <div class="vid-section">
         <div class="vid-section-header">
           <span data-i18n="bg-title">背景</span>
-          <button class="preset-item-del icon-btn--vis" id="visBtn1" title="表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
-          <button class="preset-item-del icon-btn--reset" id="resetBtn1" title="コントロールをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
+          <div class="vid-section-btns">
+            <button class="preset-item-del icon-btn--vis" id="visBtn1" data-i18n-title="bg-vis-title" title="背景を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
+            <button class="preset-item-del icon-btn--reset" id="resetBtn1" data-i18n-title="bg-clear-title" title="背景をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
+          </div>
         </div>
         <div class="drop-zone" id="drop1" role="button" tabindex="0">
         <div class="drop-loading-overlay" style="display:none"></div>
           <button class="drop-delete" id="del1" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
-          <a class="drop-link" id="dropLink1" href="#" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
+          <a class="drop-link" id="dropLink1" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
           <div class="drop-icon"><i data-lucide="upload"></i></div>
           <div class="drop-text">
             <div class="drop-label1" data-i18n="drop-label">MP4をここにドロップ</div>
@@ -153,13 +159,15 @@
       <div class="vid-section">
         <div class="vid-section-header">
           <span data-i18n="fg-title">前景</span>
-          <button class="preset-item-del icon-btn--vis" id="visBtn2" title="表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
-          <button class="preset-item-del icon-btn--reset" id="resetBtn2" title="コントロールをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
+          <div class="vid-section-btns">
+            <button class="preset-item-del icon-btn--vis" id="visBtn2" data-i18n-title="fg-vis-title" title="前景を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
+            <button class="preset-item-del icon-btn--reset" id="resetBtn2" data-i18n-title="fg-clear-title" title="前景をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
+          </div>
         </div>
         <div class="drop-zone" id="drop2" role="button" tabindex="0">
         <div class="drop-loading-overlay" style="display:none"></div>
           <button class="drop-delete" id="del2" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
-          <a class="drop-link" id="dropLink2" href="#" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
+          <a class="drop-link" id="dropLink2" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
           <div class="drop-icon"><i data-lucide="upload"></i></div>
           <div class="drop-text">
             <div class="drop-label2" data-i18n="drop-label">MP4をここにドロップ</div>

@@ -488,7 +488,7 @@ function _renderFrame() {
   } else {
     ctx.fillStyle = _cachedBg;
     ctx.fillRect(0, 0, W, H);
-    drawHint(ctx, W / 2, H / 2 - 10, t('hint-bg'));
+    if (!loaded[0] && !visHidden[0]) drawHint(ctx, W / 2, H / 2 - 10, t('hint-bg'));
   }
 
   const blurAmt = parseFloat(elBlurAmt.value);
@@ -550,7 +550,7 @@ function _renderFrame() {
     ctx.drawImage(getMediaSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
     ctx.filter = 'none';
     ctx.restore();
-  } else if (!loaded[0]) {
+  } else if (!loaded[1] && !visHidden[1]) {
     drawHint(ctx, W / 2, H / 2 + 14, t('hint-fg'));
   }
 
@@ -1152,7 +1152,7 @@ function _updateDropLink(index) {
     link.classList.add('has-url');
     zone && zone.classList.add('has-link');
   } else {
-    link.href = '#';
+    link.removeAttribute('href');
     link.classList.remove('has-url');
     zone && zone.classList.remove('has-link');
   }
@@ -1252,12 +1252,19 @@ function setupDropZone(index) {
     };
     resetSlider(`vol${i + 1}`);
     resetSlider(`offset${i + 1}`);
+    clearVideo(i);
   });
 });
 
 // ============================================================
 //  動画表示切り替え
 // ============================================================
+const _vidHiddenOverlay = document.getElementById('vidHiddenOverlay');
+function _syncVidHiddenOverlay() {
+  const all = visHidden[0] && visHidden[1];
+  _vidHiddenOverlay.style.display = all ? 'flex' : 'none';
+}
+
 [0, 1].forEach(i => {
   const btn = document.getElementById(`visBtn${i + 1}`);
   btn.addEventListener('click', () => {
@@ -1266,7 +1273,36 @@ function setupDropZone(index) {
       ? '<i data-lucide="eye-off"></i>'
       : '<i data-lucide="eye"></i>';
     lucide.createIcons({ nodes: [btn] });
+    // 全体ボタンのアイコンを同期
+    const allHidden = visHidden[0] && visHidden[1];
+    const allBtn = document.getElementById('vidVisAllBtn');
+    allBtn.innerHTML = allHidden ? '<i data-lucide="eye-off"></i>' : '<i data-lucide="eye"></i>';
+    lucide.createIcons({ nodes: [allBtn] });
+    _syncVidHiddenOverlay();
   });
+});
+
+// 全体表示切り替え
+document.getElementById('vidVisAllBtn').addEventListener('click', () => {
+  const allHidden = visHidden[0] && visHidden[1];
+  const next = !allHidden;
+  [0, 1].forEach(i => {
+    if (visHidden[i] !== next) {
+      visHidden[i] = next;
+      const btn = document.getElementById(`visBtn${i + 1}`);
+      btn.innerHTML = next ? '<i data-lucide="eye-off"></i>' : '<i data-lucide="eye"></i>';
+      lucide.createIcons({ nodes: [btn] });
+    }
+  });
+  const allBtn = document.getElementById('vidVisAllBtn');
+  allBtn.innerHTML = next ? '<i data-lucide="eye-off"></i>' : '<i data-lucide="eye"></i>';
+  lucide.createIcons({ nodes: [allBtn] });
+  _syncVidHiddenOverlay();
+});
+
+// 全体リセット
+document.getElementById('vidResetAllBtn').addEventListener('click', () => {
+  [0, 1].forEach(i => document.getElementById(`resetBtn${i + 1}`).click());
 });
 
 // ============================================================
