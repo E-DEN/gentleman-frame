@@ -4,6 +4,7 @@
   "dict": {
     "mode-dark": "다크 모드",
     "mode-light": "라이트 모드",
+    "vid-title": "동영상",
     "bg-title": "동영상 1 (배경)",
     "fg-title": "동영상 2 (전경)",
     "mask-title": "마스크",
