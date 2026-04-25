@@ -310,8 +310,12 @@
       display: flex;
       flex-direction: column;
       gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0 8px 8px;
+      background: color-mix(in srgb, var(--bg) 40%, transparent);
     }
-    .vid-section + .vid-section { margin-top: 4px; }
+    .vid-section + .vid-section { margin-top: 6px; }
     .vid-section-header {
       display: flex;
       align-items: center;
@@ -319,7 +323,7 @@
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      padding: 4px 0 4px;
+      padding: 6px 0 6px;
       margin-bottom: 4px;
       border-bottom: 1px solid var(--border);
     }
@@ -328,7 +332,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 4px 0;
+      padding: 2px 0;
     }
     .card-title {
       font-size: 12px;
