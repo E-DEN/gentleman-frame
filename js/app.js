@@ -907,11 +907,13 @@ _startRenderLoop();
 // ============================================================
 
 // proxy.js (yt-dlp) を使って Iwara ページURL → CDN URL を解決
-const _LOCAL_PROXY = 'http://localhost:8788';
-const _MY_PROXY = 'https://gf-proxy.mydn.workers.dev';
+// ローカル実行時はローカルプロキシ、本番（Pages）ではWorkerを自動選択
+const _MY_PROXY = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:8788'
+  : 'https://gf-proxy.mydn.workers.dev';
 
 async function resolveIwaraURL(pageUrl) {
-  const base = _MY_PROXY || _LOCAL_PROXY;
+  const base = _MY_PROXY;
   const r = await fetch(`${base}/resolve?url=${encodeURIComponent(pageUrl)}`, {
     signal: AbortSignal.timeout(35000),
   });
@@ -986,7 +988,7 @@ async function loadVideoFromURL(index, url) {
           if (label) label.textContent = name;
           // Pixivメタデータ非同期取得してラベル更新
           if (_pximgId) {
-            const _proxyBase = _MY_PROXY || _LOCAL_PROXY;
+            const _proxyBase = _MY_PROXY;
             fetch(`${_proxyBase}/pixiv-info?id=${_pximgId}`)
               .then(r => r.ok ? r.json() : null)
               .then(data => {
@@ -1013,8 +1015,7 @@ async function loadVideoFromURL(index, url) {
         };
         img[index].onerror = () => {
           // CORS失敗 → プロキシ経由で再試行
-          const _proxyBase = _MY_PROXY || _LOCAL_PROXY;
-          const proxyUrl = `${_proxyBase}/?url=${encodeURIComponent(url)}`;
+          const proxyUrl = `${_MY_PROXY}/?url=${encodeURIComponent(url)}`;
           img[index].onerror = _imgFail;
           img[index].src = proxyUrl;
         };
@@ -1022,9 +1023,8 @@ async function loadVideoFromURL(index, url) {
         const PROXY_FIRST_HOSTS = ['i.pximg.net', 'i-f.pximg.net'];
         const _needsProxy = PROXY_FIRST_HOSTS.some(h => url.includes(h));
         if (_needsProxy) {
-          const _proxyBase = _MY_PROXY || _LOCAL_PROXY;
           img[index].onerror = _imgFail;
-          img[index].src = `${_proxyBase}/?url=${encodeURIComponent(url)}`;
+          img[index].src = `${_MY_PROXY}/?url=${encodeURIComponent(url)}`;
         } else {
           img[index].crossOrigin = 'anonymous';
           img[index].src = url;
