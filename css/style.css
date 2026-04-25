@@ -313,7 +313,7 @@
       border: 1px solid var(--border);
       border-radius: 7px;
       padding: 0 8px 8px;
-      background: color-mix(in srgb, var(--bg) 40%, transparent);
+      background: color-mix(in srgb, var(--surface) 60%, transparent);
     }
     .vid-section + .vid-section { margin-top: 6px; }
     .vid-section-header {
