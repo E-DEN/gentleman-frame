@@ -126,7 +126,7 @@
     "lang-import-drop": "JSON 파일을 여기에 드롭",
     "dnd-hint": "JSON 파일을 여기에 드롭",
     "lang-import-or": "또는 아래에 JSON 텍스트 붙여넣기",
-    "lang-import-ph": "{\"code\":\"zh\",\"label\":\"中文\",\"dict\":{...}}",
+    "lang-import-ph": "{\"code\":\"ko\",\"label\":\"한국어\",\"dict\":{...}}",
     "lang-import-apply": "적용",
     "lang-import-err": "언어 파일 불러오기 실패",
     "lang-add": "+ 추가",
