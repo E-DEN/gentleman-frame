@@ -1239,6 +1239,8 @@ function setupDropZone(index) {
     if (e.target.closest(`#dropLink${index}`)) return; // 元ページリンクはバブリング無視
     pickFile();
   });
+  // dropLinkのクリックはゾーンに伝播させない
+  document.getElementById(`dropLink${index}`)?.addEventListener('click', e => e.stopPropagation());
   zone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickFile(); }
   });
@@ -2743,8 +2745,8 @@ function swapVideos() {
   // ドロップゾーン入れ替え
   const zone1 = document.getElementById('drop0');
   const zone2 = document.getElementById('drop1');
-  const lbl1  = zone1.querySelector('.drop-label1');
-  const lbl2  = zone2.querySelector('.drop-label2');
+  const lbl1  = zone1.querySelector('.drop-label0');
+  const lbl2  = zone2.querySelector('.drop-label1');
   [lbl1.textContent, lbl2.textContent] = [lbl2.textContent, lbl1.textContent];
   // スワップ: アニメーションを発火させず loaded クラスと凍結状態だけを交換する
   const anim1 = zone1.style.animation;
@@ -3104,8 +3106,8 @@ function applyLang(lang) {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
     // 動画ロード済の dropラベルは更新しない（ファイル名が表示されているため）
-    if (el.classList.contains('drop-label1') && loaded[0]) return;
-    if (el.classList.contains('drop-label2') && loaded[1]) return;
+    if (el.classList.contains('drop-label0') && loaded[0]) return;
+    if (el.classList.contains('drop-label1') && loaded[1]) return;
     el.textContent = t(key);
   });
   // HTML コンテンツ（<br> などのタグを含む）

@@ -168,6 +168,7 @@ export default {
     if (xv) forwardHeaders.set('X-Version', xv);
     const referer = REFERER_MAP[targetUrl.hostname];
     if (referer) forwardHeaders.set('Referer', referer);
+    forwardHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
 
     const res = await fetch(targetUrl.toString(), { headers: forwardHeaders });
     const body = await res.arrayBuffer();
