@@ -15,6 +15,7 @@
 
 const http   = require('http');
 const https  = require('https');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { URL }  = require('url');
 const path   = require('path');
@@ -114,15 +115,93 @@ function getTokenType(token) {
 }
 
 async function resolveIwaraAPI(pageUrl, token = '') {
+  const m = pageUrl.match(/iwara\.(tv|ai)\/video\/([^/?#]+)/);
+  if (!m) throw new Error('Not an iwara video URL');
+  const videoId = m[2];
+
   // リフレッシュトークンならアクセストークンに交換
   let accessToken = token;
   if (token && getTokenType(token) === 'refresh_token') {
     accessToken = await exchangeToken(token);
   }
+  const authHeader = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
   if (accessToken) console.log('[iwara-api] 認証トークンを使用します');
 
-  const { resolveIwaraAPI: coreResolve } = await import('./resolver.mjs');
-  return coreResolve(pageUrl, accessToken);
+  console.log(`[iwara-api] fetching metadata for ${videoId}`);
+  const metaEndpoints = [
+    `https://apiq.iwara.tv/video/${videoId}`,
+    `https://api.iwara.tv/video/${videoId}`,
+  ];
+  let metaResult;
+  let differentSiteId = null;
+  for (const endpoint of metaEndpoints) {
+    try {
+      metaResult = await httpsGetJson(endpoint, authHeader);
+      if (metaResult.status === 200) break;
+      if (metaResult.data?.message === 'errors.differentSite') {
+        differentSiteId = metaResult.data.siteId;
+        console.log(`[iwara-api] ${endpoint} → differentSite(${differentSiteId})`);
+        continue;
+      }
+    } catch (e) {
+      console.log(`[iwara-api] ${endpoint} エラー: ${e.message}`);
+      continue;
+    }
+    console.log(`[iwara-api] ${endpoint} returned ${metaResult.status}, trying next...`);
+  }
+  if (differentSiteId && metaResult?.status !== 200) {
+    const err = new Error('err-different-site');
+    err.code = 'err-different-site';
+    err.site = differentSiteId === 'iwara_ai' ? 'iwara.ai' : differentSiteId;
+    throw err;
+  }
+  const { status: s1, data: info } = metaResult;
+  if (s1 === 403) {
+    const err = new Error('err-private-video');
+    err.code = 'err-private-video';
+    throw err;
+  }
+  if (s1 !== 200) throw new Error(`iwara API returned ${s1}`);
+
+  const title  = info.title || videoId;
+  const author = info.user?.name || info.user?.username || '';
+  const fileUrl = info.fileUrl;
+  if (!fileUrl) {
+    const err = new Error('err-auth-required');
+    err.code = 'err-auth-required';
+    throw err;
+  }
+
+  const fu     = new URL(fileUrl.startsWith('//') ? 'https:' + fileUrl : fileUrl);
+  const srcId  = (fu.pathname.match(/\/file\/([^/?#]+)/) || fu.pathname.match(/\/([^/]+)\/source/) || [])[1] || videoId;
+  const rawExp = fu.searchParams.get('expires') || '';
+  const xVer   = crypto.createHash('sha1').update(`${srcId}_${rawExp}_mSvL05GfEmeEmsEYfGCnVpEjYgTJraJN`).digest('hex');
+
+  console.log(`[iwara-api] fetching sources (X-Version: ${xVer.slice(0, 12)}...)`);
+  const { status: s2, data: sources } = await httpsGetJson(
+    fileUrl.startsWith('//') ? 'https:' + fileUrl : fileUrl,
+    { 'X-Version': xVer, ...authHeader }
+  );
+  if (s2 !== 200) throw new Error(`iwara sources API returned ${s2}`);
+
+  const allSources = Array.isArray(sources) ? sources : [];
+  console.log(`[iwara-api] available qualities: ${allSources.map(s => s.name).join(', ')}`);
+
+  const order  = ['Source', '4K', '2160', '1440', '1080', '720', '480', '360', '240'];
+  const sorted = allSources
+    .filter(s => s.name !== 'preview')
+    .sort((a, b) => {
+      const ia = order.indexOf(a.name); const ib = order.indexOf(b.name);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+
+  const best = sorted[0];
+  const url  = best?.src?.view || best?.src?.download;
+  if (!url) throw new Error('No playable URL in iwara sources');
+
+  const finalUrl = url.startsWith('//') ? 'https:' + url : url;
+  console.log(`[iwara-api] resolved (${best.name}) → ${finalUrl.slice(0, 80)}...`);
+  return { url: finalUrl, title, author };
 }
 
 // ---------- yt-dlp fallback (non-iwara) ----------
