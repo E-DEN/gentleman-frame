@@ -333,9 +333,6 @@
     .card-title-label:hover .card-toggle { color: var(--accent); }
     .card--collapsed > :not(.card-title) { display: none !important; }
     .card--collapsed .card-title { margin-bottom: 0; }
-    .card--collapsed { padding: 4px 14px; }
-    /* 動画1が折りたたまれたとき入れ替えボタンを非表示 */
-    [data-card-id="vid1"].card--collapsed + .panel-sep { display: none; }
 
     /* ---- Quick filter preset buttons ---- */
     .fqp-btn {
