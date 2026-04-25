@@ -139,6 +139,9 @@ export default {
     const reqUrl = new URL(request.url);
 
     // /pixiv-info?id=<illust-id>
+    // NOTE: Pixiv blocks requests from Cloudflare datacenter IPs (403).
+    // This endpoint works only from residential IPs (local proxy).
+    // In production, the client gracefully falls back to showing the filename only.
     if (reqUrl.pathname === '/pixiv-info') {
       const illustId = reqUrl.searchParams.get('id');
       if (!illustId || !/^\d+$/.test(illustId)) return jsonResp({ error: 'Missing or invalid ?id=' }, 400);
@@ -150,13 +153,14 @@ export default {
             'Accept': 'application/json',
           },
         });
+        if (!apiRes.ok) return jsonResp({ title: '', author: '' }); // Pixiv IP block → empty (client handles gracefully)
         const data = await apiRes.json().catch(() => ({}));
-        if (data.error) return jsonResp({ error: data.message || 'Not found' }, 404);
+        if (data.error) return jsonResp({ title: '', author: '' });
         return new Response(JSON.stringify({ title: data.body?.title || '', author: data.body?.userName || '' }), {
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' },
         });
       } catch (e) {
-        return jsonResp({ error: e.message }, 502);
+        return jsonResp({ title: '', author: '' });
       }
     }
 
