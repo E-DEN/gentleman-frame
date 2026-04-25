@@ -3157,18 +3157,11 @@ applyLang(_lang);
     openPopover();
   });
 
-  // 外側クリックでポップオーバーを閉じる（addSection が開いていたらまずそちらを閉じる）
+  // 外側クリックでポップオーバーを閉じる
   document.addEventListener('click', (e) => {
     if (dialog.hidden) return;
     if (dialog.contains(e.target)) return;
-    const sec = document.getElementById('langAddSection');
-    if (!sec.hidden) {
-      // addSection を閉じるだけ（ポップオーバーは維持）
-      sec.hidden = true;
-      _syncAddToggle();
-    } else {
-      closePopover();
-    }
+    closePopover();
   });
   dialog.addEventListener('click', (e) => e.stopPropagation());
 
@@ -3188,11 +3181,6 @@ applyLang(_lang);
   applyBtn.addEventListener('click', () => {
     const text = textEl.value.trim();
     if (text) applyJSONText(text);
-  });
-
-  document.getElementById('langImportCancel').addEventListener('click', () => {
-    document.getElementById('langAddSection').hidden = true;
-    _syncAddToggle();
   });
 
   document.getElementById('langTemplateDownload').addEventListener('click', () => {
