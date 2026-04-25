@@ -3542,7 +3542,7 @@ function renderPresets() {
       <div class="preset-folder-header" data-idx="${folderIdx}">
         <span class="preset-drag-handle"><i data-lucide="grip-vertical"></i></span>
         <span class="preset-folder-toggle"><i data-lucide="${folder.open !== false ? 'chevron-down' : 'chevron-right'}"></i></span>
-        <span class="preset-folder-name">${_esc(folder.name)}</span>
+        <span class="preset-folder-name"><span class="pname-inner">${_esc(folder.name)}</span></span>
         ${countBadge}
         <div class="preset-item-actions">
           <button class="preset-item-del preset-item-rename" data-idx="${folderIdx}" title="${t('folder-rename-title')}"><i data-lucide="pencil"></i></button>
@@ -3579,17 +3579,28 @@ function renderPresets() {
   lucide.createIcons();
 
   // ---- プリセット名ホバースライド: はみ出す名前に overflows クラスとスライド距離を設定 ----
-  requestAnimationFrame(() => {
-    el.querySelectorAll('.pname-inner').forEach(inner => {
-      const outer = inner.parentElement; // .preset-item-name or .preset-file-line
+  // 非ホバー時: 現在の clientWidth で初期計算
+  // ホバー時: mouseenter で実際のホバー後の clientWidth を使って再計算
+  //           (actions が展開した後の正確な幅でスライド距離を決める)
+  function _calcOverflows(item) {
+    item.querySelectorAll('.pname-inner').forEach(inner => {
+      const outer = inner.parentElement;
       const overflow = inner.scrollWidth - outer.clientWidth;
       if (overflow > 2) {
         inner.classList.add('overflows');
-        inner.style.setProperty('--slide-dist', `-${overflow}px`);
+        // mask-imageのフェードゾーン(3%)分を加算して終端の文字が隠れないようにする
+        const fadeZone = outer.clientWidth * 0.03;
+        inner.style.setProperty('--slide-dist', `-${overflow + fadeZone}px`);
       } else {
         inner.classList.remove('overflows');
         inner.style.removeProperty('--slide-dist');
       }
+    });
+  }
+  requestAnimationFrame(() => {
+    el.querySelectorAll('.preset-item, .preset-folder-header').forEach(item => {
+      _calcOverflows(item);
+      item.addEventListener('mouseenter', () => _calcOverflows(item));
     });
   });
 

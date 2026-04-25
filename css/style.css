@@ -1088,8 +1088,8 @@
       white-space: nowrap;
     }
     .preset-file-line:has(.pname-inner.overflows) {
-      -webkit-mask-image: linear-gradient(to right, black 92%, transparent 100%);
-      mask-image:         linear-gradient(to right, black 92%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, black 97%, transparent 100%);
+      mask-image:         linear-gradient(to right, black 97%, transparent 100%);
     }
     .preset-item-info:hover .preset-file-line .pname-inner.overflows {
       animation: preset-text-slide var(--slide-dur, 4.5s) 0.5s ease-in-out infinite alternate;
@@ -1119,12 +1119,14 @@
       overflow: hidden;
       max-width: 0;
       opacity: 0;
+      margin-left: -5px; /* flex gap を相殺して幅ゼロにする */
       transition: opacity 0.15s ease;
     }
     .preset-item:hover .preset-item-actions,
     .preset-folder-header:hover .preset-item-actions {
-      max-width: 72px;
+      max-width: 80px;
       opacity: 1;
+      margin-left: 0;
     }
     .preset-item:hover .preset-item-actions .preset-item-del,
     .preset-folder-header:hover .preset-item-actions .preset-item-del {
@@ -1232,7 +1234,15 @@
     .preset-folder-toggle { cursor: pointer; display: flex; align-items: center; color: var(--text-muted); }
     .preset-folder-toggle:hover { color: var(--text); }
     .preset-folder-toggle svg.lucide { width: 12px; height: 12px; }
-    .preset-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+    .preset-folder-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; font-weight: 600; }
+    .preset-folder-name > .pname-inner { display: inline-block; white-space: nowrap; }
+    .preset-folder-name:has(.pname-inner.overflows) {
+      -webkit-mask-image: linear-gradient(to right, black 97%, transparent 100%);
+      mask-image:         linear-gradient(to right, black 97%, transparent 100%);
+    }
+    .preset-folder-header:hover .preset-folder-name .pname-inner.overflows {
+      animation: preset-text-slide var(--slide-dur, 3.5s) ease-in-out infinite alternate;
+    }
     .preset-folder-count {
       font-size: 9px;
       font-weight: 600;
