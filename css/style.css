@@ -1111,11 +1111,25 @@
       pointer-events: none;
       transition: opacity 0.15s, color 0.15s;
     }
-    .preset-item:hover .preset-item-del,
-    .preset-folder-header:hover .preset-item-del {
+    .preset-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+      overflow: hidden;
+      max-width: 0;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .preset-item:hover .preset-item-actions,
+    .preset-folder-header:hover .preset-item-actions {
+      max-width: 72px;
+      opacity: 1;
+    }
+    .preset-item:hover .preset-item-actions .preset-item-del,
+    .preset-folder-header:hover .preset-item-actions .preset-item-del {
       opacity: 1;
       pointer-events: auto;
-      transition: opacity 0.15s, color 0.15s;
     }
     .preset-item-del:hover { color: #f04747; }
     /* セマンティック別ホバー色 */

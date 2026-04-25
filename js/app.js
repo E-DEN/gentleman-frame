@@ -1877,7 +1877,7 @@ function _mOnMouseUp() {
       range.selectNodeContents(nameEl); sel.removeAllRanges(); sel.addRange(range);
       const commit = () => {
         nameEl.contentEditable = 'false';
-        const next = nameEl.textContent.trim().slice(0, 30) || t('folder-new');
+        const next = nameEl.textContent.trim().slice(0, 50) || t('folder-new');
         nameEl.textContent = next;
         const l = loadPresets(); if (l[idx]) { l[idx].name = next; savePresets(l); }
       };
@@ -3453,7 +3453,7 @@ function renderPresets() {
   const el = document.getElementById('presetList');
 
   // ---- ヘルパー: 任意の名前要素のインライン名前変更 ----
-  function _startRename(nameEl, idx, maxLen = 30) {
+  function _startRename(nameEl, idx, maxLen = 50) {
     const prev = nameEl.textContent;
     nameEl.contentEditable = 'plaintext-only';
     nameEl.focus();
@@ -3519,10 +3519,12 @@ function renderPresets() {
           <span class="preset-item-name"><span class="pname-inner">${_esc(p.name)}</span></span>
           ${fileHint}
         </div>
-        ${saveBtn}
-        <button class="preset-item-del preset-item-rename" data-idx="${i}" title="${t('preset-rename-title')}"><i data-lucide="pencil"></i></button>
-        <button class="preset-item-del preset-item-share" data-idx="${i}" title="${t('preset-copy-title')}"><i data-lucide="copy"></i></button>
-        <button class="preset-item-del preset-item-delete" data-idx="${i}" title="${t('preset-del-title')}"><i data-lucide="x"></i></button>
+        <div class="preset-item-actions">
+          ${saveBtn}
+          <button class="preset-item-del preset-item-rename" data-idx="${i}" title="${t('preset-rename-title')}"><i data-lucide="pencil"></i></button>
+          <button class="preset-item-del preset-item-share" data-idx="${i}" title="${t('preset-copy-title')}"><i data-lucide="copy"></i></button>
+          <button class="preset-item-del preset-item-delete" data-idx="${i}" title="${t('preset-del-title')}"><i data-lucide="x"></i></button>
+        </div>
       </div>`;
   };
   const dz = (insertIdx) => `<div class="preset-dropzone" data-insert="${insertIdx}"></div>`;
@@ -3542,9 +3544,11 @@ function renderPresets() {
         <span class="preset-folder-toggle"><i data-lucide="${folder.open !== false ? 'chevron-down' : 'chevron-right'}"></i></span>
         <span class="preset-folder-name">${_esc(folder.name)}</span>
         ${countBadge}
-        <button class="preset-item-del preset-item-rename" data-idx="${folderIdx}" title="${t('folder-rename-title')}"><i data-lucide="pencil"></i></button>
-        <button class="preset-item-del preset-item-share" data-idx="${folderIdx}" title="${t('folder-copy-title')}"><i data-lucide="copy"></i></button>
-        <button class="preset-item-del preset-item-delete" data-idx="${folderIdx}" title="${t('folder-del-title')}"><i data-lucide="x"></i></button>
+        <div class="preset-item-actions">
+          <button class="preset-item-del preset-item-rename" data-idx="${folderIdx}" title="${t('folder-rename-title')}"><i data-lucide="pencil"></i></button>
+          <button class="preset-item-del preset-item-share" data-idx="${folderIdx}" title="${t('folder-copy-title')}"><i data-lucide="copy"></i></button>
+          <button class="preset-item-del preset-item-delete" data-idx="${folderIdx}" title="${t('folder-del-title')}"><i data-lucide="x"></i></button>
+        </div>
       </div>
       <div class="preset-folder-children${folder.open === false ? ' collapsed' : ''}">`;
     children.forEach(({ item, idx }) => {
@@ -3788,7 +3792,7 @@ const _doPresetAdd = async () => {
       range.selectNodeContents(nameEl); sel.removeAllRanges(); sel.addRange(range);
       const commit = () => {
         nameEl.contentEditable = 'false';
-        const next = nameEl.textContent.trim().slice(0, 30) || prev;
+        const next = nameEl.textContent.trim().slice(0, 50) || prev;
         nameEl.textContent = next;
         const l = loadPresets(); if (l[addedIdx]) { l[addedIdx].name = next; savePresets(l); }
       };
@@ -3861,7 +3865,7 @@ document.getElementById('presetAddFolderBtn').addEventListener('click', () => {
         range.selectNodeContents(nameEl); sel.removeAllRanges(); sel.addRange(range);
         const commit = () => {
           nameEl.contentEditable = 'false';
-          const next = nameEl.textContent.trim().slice(0, 30) || t('folder-new');
+          const next = nameEl.textContent.trim().slice(0, 50) || t('folder-new');
           nameEl.textContent = next;
           const l = loadPresets(); if (l[idx]) { l[idx].name = next; savePresets(l); }
         };
