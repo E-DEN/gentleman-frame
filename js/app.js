@@ -986,6 +986,21 @@ async function loadVideoFromURL(index, url) {
           _updateDropLink(index);
           const label = zone.querySelector(`.drop-label${index}`);
           if (label) label.textContent = name;
+          // ブラウザ（居住者IP）から直接Pixiv Ajax APIへfetch
+          // WorkerのデータセンターIPはブロックされるが、ブラウザIPはOKな場合がある
+          if (_pximgId) {
+            fetch(`https://www.pixiv.net/ajax/illust/${_pximgId}`, {
+              headers: { 'Accept': 'application/json' },
+            })
+              .then(r => r.ok ? r.json() : null)
+              .then(data => {
+                if (!data?.body?.title && !data?.body?.userName) return;
+                const pageLabel = [data.body.userName, data.body.title].filter(Boolean).join(' - ');
+                _loadedFileName[index] = `${pageLabel}\n${name}`;
+                if (label) label.textContent = `${pageLabel}\n${name}`;
+              })
+              .catch(() => {}); // CORSブロック時は静かに無視
+          }
           input.style.borderColor = 'var(--ok)';
           setTimeout(() => {
             input.style.transition = 'border-color 0.6s ease';
