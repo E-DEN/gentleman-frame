@@ -365,6 +365,7 @@ let _autoResyncEnabled = false;
 let _autoResyncInterval = null;
 // マスク枠フェードイン: -1=即全表示, 0=動画待ち, >0=フェード開始timestamp
 let _maskBorderFadeStart = -1;
+let _fgFadeStart = -1; // 前景フェードイン開始時刻 (-1:常時表示, 0:非表示待機, >0:フェード中)
 
 function _scheduleResync(initialDelay = 200) {
   clearTimeout(_resyncTimer);
@@ -457,9 +458,9 @@ function _buildBorderGrad(ctx, m, phase, anim, bright) {
 // ============================================================
 //  レンダリングループ
 // ============================================================
-// renderCvs (desynchronized) への描画は setInterval で compositor 非依存に駆動。
-// DOM 更新と displayCtx blit だけ rAF で行い、テアリングを防ぐ。
-let _renderIntervalId = null;
+// _renderFrame と displayCtx blit を同一 rAF コールバック内でアトミックに実行し、
+// setInterval との競合によるティアリングを防ぐ。
+let _renderIntervalId = null; // 互換用（現在は未使用）
 
 function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
@@ -495,6 +496,9 @@ function _renderFrame() {
   const pixelAmt = parseFloat(elFilterPixel.value);
 
   // --- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ---
+  const fgAlpha = _fgFadeStart < 0 ? 1
+    : _fgFadeStart === 0 ? 0
+    : Math.min(1, (performance.now() - _fgFadeStart) / 200);
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
     offCtx.drawImage(getMediaSrc(1), 0, 0, W, H);
@@ -530,15 +534,19 @@ function _renderFrame() {
       ctx.save();
       if (!maskHidden) { buildMaskPath(ctx, m); ctx.clip(); }
       ctx.filter = `blur(${bp}px)`;
+      ctx.globalAlpha = fgAlpha;
       if (pixelAmt >= 2) {
         ctx.drawImage(offCvs, 0, 0);
       } else {
         ctx.drawImage(getMediaSrc(1), -bp, -bp, W + bp * 2, H + bp * 2);
       }
       ctx.filter = 'none';
+      ctx.globalAlpha = 1;
       ctx.restore();
     } else {
+      ctx.save(); ctx.globalAlpha = fgAlpha;
       ctx.drawImage(offCvs, 0, 0);
+      ctx.globalAlpha = 1; ctx.restore();
     }
   } else if (loaded[0] && !visHidden[1] && blurAmt > 0 && !maskHidden) {
     // 前景なし: マスク内の背景をすりガラス風にぼかす（端の薄れ防止のためオーバードロー）
@@ -756,12 +764,18 @@ function _renderFrame() {
   // --- マスク枠（フィルターの上に描画）---
   const bw = parseFloat(elBorderW.value);
   if (bw > 0 && !maskHidden && !visHidden[1]) {
-    // フェードイン計算
-    let borderFadeA = 1;
-    if (_maskBorderFadeStart === 0) {
+    // フェードイン計算 — _fgFadeStart が動いている間は前景と同期、それ以外は _maskBorderFadeStart の独立フェード
+    let borderFadeA;
+    if (_fgFadeStart === 0) {
+      borderFadeA = 0;
+    } else if (_fgFadeStart > 0) {
+      borderFadeA = fgAlpha; // 前景と完全同期
+    } else if (_maskBorderFadeStart === 0) {
       borderFadeA = 0;
     } else if (_maskBorderFadeStart > 0) {
       borderFadeA = Math.min(1, (performance.now() - _maskBorderFadeStart) / 500);
+    } else {
+      borderFadeA = 1;
     }
     if (borderFadeA > 0) {
       const anim = elBorderAnim.value;
@@ -813,16 +827,10 @@ function _renderFrame() {
   } else if (!S.playing || _compositeSeekPending) {
     _compositeLastRaf = null;
   }
-
-  // --- 進捗バー ---
-  updateProgress();
-  syncMaskDropOverlay();
-
-  // 描画結果を vsync aligned なタイミングで表示 canvas にブリット
-  displayCtx.drawImage(renderCvs, 0, 0);
 }
 
 function render() {
+  _renderFrame();
   updateProgress();
   syncMaskDropOverlay();
   displayCtx.drawImage(renderCvs, 0, 0);
@@ -830,9 +838,7 @@ function render() {
 }
 
 function _startRenderLoop() {
-  if (_renderIntervalId) clearInterval(_renderIntervalId);
-  // ~60fps で renderCvs に描画 (compositor スケジュールに依存しない)
-  _renderIntervalId = setInterval(_renderFrame, 16);
+  if (_renderIntervalId) { clearInterval(_renderIntervalId); _renderIntervalId = null; }
   requestAnimationFrame(render);
 }
 
@@ -1019,6 +1025,7 @@ async function loadVideoFromURL(index, url) {
       _setDropSpinner(index, false);
       _restoreBtn();
       if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
+      if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
       vid[index].volume = (parseFloat(document.getElementById(`vol${index + 1}`).value) / 100) ** 2;
       if (index === 0) setCanvasAspectRatio(vid[0].videoWidth, vid[0].videoHeight);
       _setZoneLoaded(zone, false);
@@ -1091,6 +1098,7 @@ function loadVideo(index, file, handle = null) {
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
     if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
+    if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
     vid[index].volume = (parseFloat(document.getElementById(`vol${index + 1}`).value) / 100) ** 2;
     // index 0（背景）がロードされたらアスペクト比を更新
     if (index === 0) {
@@ -3157,13 +3165,7 @@ function rebuildLangDialog() {
     }
   });
   list.appendChild(addBtn);
-  // レガシー呼び出し元との互換性のため非表示 select を同期
-  const legacySel = document.getElementById('langSelect');
-  if (legacySel) legacySel.value = _lang;
 }
-document.getElementById('langSelect').addEventListener('change', () =>
-  applyLang(document.getElementById('langSelect').value)
-);
 rebuildLangDialog();
 
 // アイコン初期描画 + 言語設定
@@ -3341,7 +3343,7 @@ function applySettings(d) {
     filterSaturation: d.filterSaturation, filterVignette: d.filterVignette,
     filterCA: d.filterCA,
     filterTemp: d.filterTemp, filterTint: d.filterTint ?? 0, filterSharpness: d.filterSharpness ?? 0,
-    filterMatte: d.filterMatte ?? d.filterFade, filterGrain: d.filterGrain,
+    filterMatte: d.filterMatte, filterGrain: d.filterGrain,
     filterPixel: d.filterPixel,
     filterFlare: d.filterFlare,
     filterBars: d.filterBars,
@@ -3352,10 +3354,6 @@ function applySettings(d) {
     el.value = vals[id];
     el.dispatchEvent(new Event('input'));
   });
-  // ミラー
-  if (d.filterMirror != null) {
-    // レガシー: 無視
-  }
   if (d.borderColor) {
     document.getElementById('borderColor').value = d.borderColor;
     document.getElementById('borderColorSwatch').style.background = d.borderColor;
@@ -3647,16 +3645,20 @@ function renderPresets() {
       _stopBitmapCapture(0); _stopBitmapCapture(1);
       // 枠は全動画のロード完了まで非表示にする
       _maskBorderFadeStart = 0;
+      _fgFadeStart = 0;
       let needsRender = false;
+      let vid1HasSource = false;
       for (const i of [0, 1]) {
         const handle = p.data.presetId
           ? await _IDB.get(`preset_${p.data.presetId}_${i}`).catch(() => null)
           : null;
         if (handle) {
+          if (i === 1) vid1HasSource = true;
           await loadVideoFromHandle(i, handle);
         } else {
           const savedUrl = p.data[`vid${i}Url`];
           if (savedUrl) {
+            if (i === 1) vid1HasSource = true;
             const urlInput = document.getElementById(`urlInput${i + 1}`);
             if (urlInput) urlInput.value = savedUrl;
             await loadVideoFromURL(i, savedUrl);
@@ -3668,8 +3670,9 @@ function renderPresets() {
           }
         }
       }
-      // vid1 URL がなかった場合も枠フェードインを開始する
-      if (_maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
+      // vid1 がない場合のみここで枠フェードイン開始（vid1 がある場合は onloadedmetadata と同時に開始）
+      if (!vid1HasSource && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
+      // _fgFadeStart は onloadedmetadata で vid1 実際のロード完了時にのみセットされる
       if (needsRender) renderPresets();
     });
   });
@@ -3832,10 +3835,6 @@ const _doPresetAdd = async () => {
 };
 const _bindPresetAddBtn = () => {};
 document.getElementById('presetAddBtn').addEventListener('click', () => _doPresetAdd());
-document.getElementById('presetList').addEventListener('click', e => {
-  // 旧来の互換（念のため）
-});
-
 // F2 リネーム: 最後にクリックされた対象（フォルダ or プリセット）をインデックスで追跡
 let _f2Target = null; // { type: 'folder'|'preset', idx: number }
 document.getElementById('presetList').addEventListener('mousedown', e => {
@@ -4365,9 +4364,7 @@ document.getElementById('canvasWrap').addEventListener('dblclick', () => {
 (function () {
   const STORAGE_KEY = 'gf-card-collapsed';
   const getSaved = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; } };
-  // vid1/vid2 → vid への旧キー移行
   const saved = getSaved();
-  if (saved.vid1 || saved.vid2) { saved.vid = true; delete saved.vid1; delete saved.vid2; localStorage.setItem(STORAGE_KEY, JSON.stringify(saved)); }
   document.querySelectorAll('.card[data-card-id]').forEach(card => {
     const id = card.dataset.cardId;
     const titleEl = card.querySelector('.card-title');
