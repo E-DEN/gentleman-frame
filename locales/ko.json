@@ -49,6 +49,7 @@
     "brightness": "밝기",
     "contrast": "대비",
     "saturation": "채도",
+    "filter-hue": "색상",
     "ca": "색수차",
     "vignette": "비네트",
     "filter-temp": "색온도",
