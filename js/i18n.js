@@ -52,7 +52,7 @@ function t(key) {
 // ── Built-in: Japanese ─────────────────────────────────────
 registerLang('ja', '日本語', {
   'mode-dark':'ダークモード','mode-light':'ライトモード',
-  'vid1-title':'背景','vid2-title':'前景',
+  'bg-title':'背景','fg-title':'前景',
   'mask-title':'マスク','filter-title':'フィルター','preset-title':'プリセット',
   'drop-label':'MP4をここにドロップ','drop-hint':'またはクリックして選択',
   'del-title':'削除','load-btn':'読込','mute-title':'ミュート',
@@ -134,7 +134,7 @@ registerLang('ja', '日本語', {
 // ── Built-in: English ──────────────────────────────────────
 registerLang('en', 'English', {
   'mode-dark':'Dark Mode','mode-light':'Light Mode',
-  'vid1-title':'Background','vid2-title':'Foreground',
+  'bg-title':'Background','fg-title':'Foreground',
   'mask-title':'Mask','filter-title':'Filters','preset-title':'Presets',
   'drop-label':'Drop MP4 here','drop-hint':'or click to select',
   'del-title':'Remove','load-btn':'Load','mute-title':'Mute',
@@ -216,8 +216,8 @@ registerLang('en', 'English', {
 // ── Built-in: Chinese Simplified ──────────────────────────
 registerLang('zh', '中文', {
   'mode-dark':'深色模式','mode-light':'浅色模式',
-  'vid1-title':'背景','vid2-title':'前景',
-  'mask-title':'遮罩','filter-title':'滤镜','preset-title':'预设',
+  'bg-title':'背景','fg-title':'前景',
+  'mask-title':'遮罩',,'filter-title':'滤镜','preset-title':'预设',
   'drop-label':'将 MP4 拖放到此处','drop-hint':'或点击选择',
   'del-title':'删除','load-btn':'加载','mute-title':'静音',
   'vol':'音量','offset':'偏移','swap-title':'交换背景与前景',
