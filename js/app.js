@@ -989,12 +989,18 @@ async function loadVideoFromURL(index, url) {
           }, 1800);
           resolve();
         };
-        img[index].onerror = () => {
+        const _imgFail = () => {
           zone.classList.remove('loading');
           _setDropSpinner(index, false);
           if (errEl) errEl.textContent = t('url-cors-err');
           input.style.borderColor = 'red';
           reject(new Error(t('url-cors-err')));
+        };
+        img[index].onerror = () => {
+          // CORS失敗 → プロキシ経由で再試行
+          const proxyUrl = `${_MY_PROXY}/?url=${encodeURIComponent(url)}`;
+          img[index].onerror = _imgFail;
+          img[index].src = proxyUrl;
         };
         img[index].crossOrigin = 'anonymous';
         img[index].src = url;

@@ -29,6 +29,22 @@ const ALLOWED_HOSTS = [
   'filesq.iwara.tv',
 ];
 
+// 画像直リン用に追加で許可するホスト（ワイルドカードなし、末尾一致）
+const IMAGE_ALLOWED_HOSTS = [
+  'i.pximg.net',
+  'i-f.pximg.net',
+  'cdnw.net',
+  'user0514.cdnw.net',
+  'imgur.com',
+  'i.imgur.com',
+];
+
+// Referer が必要なホスト
+const REFERER_MAP = {
+  'i.pximg.net': 'https://www.pixiv.net/',
+  'i-f.pximg.net': 'https://www.pixiv.net/',
+};
+
 // SHA-1 hex (Web Crypto API)
 async function sha1hex(str) {
   const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str));
@@ -142,13 +158,16 @@ export default {
     let targetUrl;
     try { targetUrl = new URL(target); } catch { return new Response('Invalid URL', { status: 400, headers: CORS_HEADERS }); }
 
-    if (!ALLOWED_HOSTS.some(h => targetUrl.hostname === h || targetUrl.hostname.endsWith('.' + h))) {
+    const allAllowed = [...ALLOWED_HOSTS, ...IMAGE_ALLOWED_HOSTS];
+    if (!allAllowed.some(h => targetUrl.hostname === h || targetUrl.hostname.endsWith('.' + h))) {
       return new Response(`Host not allowed: ${targetUrl.hostname}`, { status: 403, headers: CORS_HEADERS });
     }
 
     const forwardHeaders = new Headers();
     const xv = request.headers.get('X-Version');
     if (xv) forwardHeaders.set('X-Version', xv);
+    const referer = REFERER_MAP[targetUrl.hostname];
+    if (referer) forwardHeaders.set('Referer', referer);
 
     const res = await fetch(targetUrl.toString(), { headers: forwardHeaders });
     const body = await res.arrayBuffer();
