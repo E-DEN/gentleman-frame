@@ -14,6 +14,7 @@
  * エンドポイント:
  *   GET /resolve?url=<encoded-iwara-page-url>  → { url, title, author }
  *   GET /?url=<encoded-url>                    → CORS プロキシ (汎用)
+ *   GET /?url=<pximg-url>                      → CORS プロキシ (Referer付き)
  */
 
 const CORS_HEADERS = {
@@ -137,54 +138,6 @@ export default {
     }
 
     const reqUrl = new URL(request.url);
-
-    // /pixiv-info?id=<illust-id>
-    // Pixiv Ajax API blocks Cloudflare datacenter IPs (403).
-    // Workaround: scrape OGP / JSON-LD from the public artwork HTML page.
-    if (reqUrl.pathname === '/pixiv-info') {
-      const illustId = reqUrl.searchParams.get('id');
-      if (!illustId || !/^\d+$/.test(illustId)) return jsonResp({ error: 'Missing or invalid ?id=' }, 400);
-      try {
-        const pageRes = await fetch(`https://www.pixiv.net/artworks/${illustId}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'ja,en;q=0.9',
-          },
-        });
-        if (!pageRes.ok) return jsonResp({ title: '', author: '' });
-        const html = await pageRes.text();
-
-        // Try JSON-LD first (most reliable)
-        let title = '', author = '';
-        const ldMatch = html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/i);
-        if (ldMatch) {
-          try {
-            const ld = JSON.parse(ldMatch[1]);
-            title  = ld.name || ld.title || '';
-            author = ld.author?.name || '';
-          } catch {}
-        }
-
-        // Fallback: OGP meta tags
-        if (!title) {
-          const ogTitle = html.match(/<meta\s+(?:property="og:title"|name="og:title")\s+content="([^"]+)"/i)
-                       || html.match(/<meta\s+content="([^"]+)"\s+property="og:title"/i);
-          if (ogTitle) title = ogTitle[1].replace(/\s*[|｜]\s*pixiv.*$/i, '').trim();
-        }
-        if (!author) {
-          const ogDesc = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i)
-                      || html.match(/<meta\s+content="([^"]+)"\s+property="og:description"/i);
-          if (ogDesc) author = ogDesc[1].trim();
-        }
-
-        return new Response(JSON.stringify({ title, author }), {
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' },
-        });
-      } catch (e) {
-        return jsonResp({ title: '', author: '' });
-      }
-    }
 
     // /resolve?url=<page-url>
     if (reqUrl.pathname === '/resolve') {
