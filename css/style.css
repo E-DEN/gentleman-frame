@@ -378,6 +378,7 @@
     .card-title-label:hover .card-toggle { color: var(--accent); }
     .card--collapsed > :not(.card-title) { display: none !important; }
     .card--collapsed .card-title { margin-bottom: 0; }
+    .card--collapsed { padding: 4px 14px; }
 
     /* ---- Quick filter preset buttons ---- */
     .fqp-btn {
