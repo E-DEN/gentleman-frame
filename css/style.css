@@ -323,9 +323,8 @@
       font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      padding: 6px 0 6px;
+      padding: 6px 0 4px;
       margin-bottom: 4px;
-      border-bottom: 1px solid var(--border);
     }
     .vid-section-header span { flex: 1; }
     .vid-swap-sep {
