@@ -489,7 +489,7 @@ function _renderFrame() {
   } else {
     ctx.fillStyle = _cachedBg;
     ctx.fillRect(0, 0, W, H);
-    if (!loaded[0] && !visHidden[0]) drawHint(ctx, W / 2, H / 2 - 10, t('hint-bg'));
+    if (!loaded[0] && !visHidden[0] && _maskBorderFadeStart !== 0) drawHint(ctx, W / 2, H / 2 - 10, t('hint-bg'));
   }
 
   const blurAmt = parseFloat(elBlurAmt.value);
@@ -548,17 +548,35 @@ function _renderFrame() {
       ctx.drawImage(offCvs, 0, 0);
       ctx.globalAlpha = 1; ctx.restore();
     }
-  } else if (loaded[0] && !visHidden[1] && blurAmt > 0 && !maskHidden) {
-    // 前景なし: マスク内の背景をすりガラス風にぼかす（端の薄れ防止のためオーバードロー）
-    const bp = blurAmt * 2;
-    ctx.save();
-    buildMaskPath(ctx, m);
-    ctx.clip();
-    ctx.filter = `blur(${bp}px)`;
-    ctx.drawImage(getMediaSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
-    ctx.filter = 'none';
-    ctx.restore();
-  } else if (!loaded[1] && !visHidden[1]) {
+  } else if (loaded[0] && !visHidden[1] && !maskHidden && _fgFadeStart !== 0) {
+    // 前景なし: マスク内の背景にぼかし/ピクセル化をすりガラス風に適用
+    // _fgFadeStart===0 (ロード中) は表示しない
+    if (pixelAmt >= 1 && blurAmt <= 0) {
+      // ピクセル化 — postCvs で縮小→ctx.clip()内でフルサイズ拡大（destination-inのAA縁を回避）
+      const pSize = Math.round(pixelAmt * 4);
+      const pw = Math.ceil(W / pSize);
+      const ph = Math.ceil(H / pSize);
+      postCtx.clearRect(0, 0, W, H);
+      postCtx.drawImage(getMediaSrc(0), 0, 0, pw, ph);
+      ctx.save();
+      buildMaskPath(ctx, m);
+      ctx.clip();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
+      ctx.imageSmoothingEnabled = true;
+      ctx.restore();
+    } else if (blurAmt > 0) {
+      // ぼかし (端の薄れ防止のためオーバードロー)
+      const bp = blurAmt * 2;
+      ctx.save();
+      buildMaskPath(ctx, m);
+      ctx.clip();
+      ctx.filter = `blur(${bp}px)`;
+      ctx.drawImage(getMediaSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+  } else if (!loaded[1] && !visHidden[1] && _fgFadeStart !== 0) {
     drawHint(ctx, W / 2, H / 2 + 14, t('hint-fg'));
   }
 
@@ -2836,7 +2854,7 @@ function applyResize(hid, dx, dy, shiftKey) {
     if (w < MIN) { w = MIN; if (hid.includes('l')) x = sm.x + sm.w - MIN; }
     if (h < MIN) { h = MIN; if (hid.includes('t')) y = sm.y + sm.h - MIN; }
   }
-  S.mask.x = x; S.mask.y = y; S.mask.w = w; S.mask.h = h;
+  S.mask.x = Math.round(x); S.mask.y = Math.round(y); S.mask.w = Math.round(w); S.mask.h = Math.round(h);
   // スライダーを同期
   const elMaskW = document.getElementById('maskW');
   const elMaskH = document.getElementById('maskH');
