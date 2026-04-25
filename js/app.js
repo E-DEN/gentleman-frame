@@ -266,7 +266,7 @@ function setCanvasAspectRatio(w, h) {
 
   _syncAllBuffers(w, h);
 
-  if (!_canvasInitialized || arChangedBig) {
+  if (!_canvasInitialized || arChangedBig || _pendingMask) {
     // 初回 or AR 大幅変化: pending があればそちら、なければデフォルト中央
     _canvasInitialized = true;
     const pm = _pendingMask;
@@ -1005,6 +1005,8 @@ async function loadVideoFromURL(index, url) {
     setStatus(t('vid-loading'));
     zone.classList.remove('loaded');
     _pendingLoad = true;
+    _stopBitmapCapture(index);
+    loaded[index] = false;
     vid[index].removeAttribute('crossorigin');
     vid[index].src = resolvedUrl;
     vid[index].load();
@@ -1078,6 +1080,8 @@ function loadVideo(index, file, handle = null) {
   zone.classList.add('loading');
   _setDropSpinner(index, true);
   const url = URL.createObjectURL(file);
+  _stopBitmapCapture(index);
+  loaded[index] = false;
   vid[index].src = url;
   vid[index].load();
   vid[index].onloadedmetadata = () => {
@@ -3380,10 +3384,14 @@ function applySettings(d) {
       srcW: d.bufW ? +d.bufW : null,  // 保存時のバッファ幅 (旧プリセットは null)
       srcH: d.bufH ? +d.bufH : null,
     };
-    // バッファ確定済みなら即座にビュー更新（_pendingMask は次の動画ロード時のために保持）
+    // bufW/bufH があれば正しい AR で即座に適用、なければ現バッファで直接適用
     if (_bufferSynced) {
-      _applyMaskFromPm(_pendingMask, canvas.width, canvas.height);
-      _syncMaskSliders();
+      if (d.bufW && d.bufH) {
+        setCanvasAspectRatio(+d.bufW, +d.bufH); // _pendingMask も内部で消費される
+      } else {
+        _applyMaskFromPm(_pendingMask, canvas.width, canvas.height);
+        _syncMaskSliders();
+      }
     }
   }
   if (d.arLock != null) {
@@ -3634,6 +3642,11 @@ function renderPresets() {
       _activePresetIdx = idx;
       _f2Target = { type: 'preset', idx };
       renderPresets();
+      // 新しい動画を読み込む前に両レイヤーをクリア（旧動画が残らないように）
+      loaded[0] = false; loaded[1] = false;
+      _stopBitmapCapture(0); _stopBitmapCapture(1);
+      // 枠は全動画のロード完了まで非表示にする
+      _maskBorderFadeStart = 0;
       let needsRender = false;
       for (const i of [0, 1]) {
         const handle = p.data.presetId
@@ -3655,6 +3668,8 @@ function renderPresets() {
           }
         }
       }
+      // vid1 URL がなかった場合も枠フェードインを開始する
+      if (_maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
       if (needsRender) renderPresets();
     });
   });
