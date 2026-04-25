@@ -4301,7 +4301,9 @@ document.getElementById('canvasWrap').addEventListener('dblclick', () => {
 (function () {
   const STORAGE_KEY = 'gf-card-collapsed';
   const getSaved = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; } };
+  // vid1/vid2 → vid への旧キー移行
   const saved = getSaved();
+  if (saved.vid1 || saved.vid2) { saved.vid = true; delete saved.vid1; delete saved.vid2; localStorage.setItem(STORAGE_KEY, JSON.stringify(saved)); }
   document.querySelectorAll('.card[data-card-id]').forEach(card => {
     const id = card.dataset.cardId;
     const titleEl = card.querySelector('.card-title');
