@@ -367,7 +367,7 @@ let _autoResyncInterval = null;
 let _maskBorderFadeStart = -1;
 let _fgFadeStart = -1; // 前景フェードイン開始時刻 (-1:常時表示, 0:非表示待機, >0:フェード中)
 
-function _scheduleResync(initialDelay = 200) {
+function _scheduleResync(initialDelay = 100) {
   clearTimeout(_resyncTimer);
   _resyncTimer = setTimeout(_doResync, initialDelay);
 }
@@ -379,21 +379,22 @@ async function _doResync() {
   const [o1, o2] = _getOffsets();
   const t0 = vid[0].currentTime - o1;
   const diff = vid[1].currentTime - (t0 + o2); // 正=vid[1]が進みすぎ、負=遅れ
-  if (Math.abs(diff) > 0.500) {
+  if (Math.abs(diff) > 0.300) {
     // 大きなズレ: フルシークで再同期
     vid[1].playbackRate = 1.0;
     await _applyCompositeT(t0);
-  } else if (Math.abs(diff) > 0.040) {
-    // 中ズレ: playbackRate で滑らかに追いつかせる（シークしない）
+  } else if (Math.abs(diff) > 0.016) {
+    // 中ズレ(1フレーム超): playbackRate で滑らかに追いつかせる
     // vid[1] が遅れている(diff<0) → 少し速く。進みすぎ(diff>0) → 少し遅く。
-    vid[1].playbackRate = diff < 0 ? 1.10 : 0.92;
-    _resyncTimer = setTimeout(_doResync, 600);
+    const rate = diff < 0 ? 1.08 : 0.94;
+    vid[1].playbackRate = rate;
+    _resyncTimer = setTimeout(_doResync, 300);
     return;
   } else {
-    // ズレ十分小さい: 速度を戻す
+    // 1フレーム以内: 速度を戻す
     vid[1].playbackRate = 1.0;
   }
-  _resyncTimer = setTimeout(_doResync, 2000);
+  _resyncTimer = setTimeout(_doResync, 1500);
 }
 
 // バックグラウンド復帰時に即座再同期（動画が進んでいる場合のみ。復帰後のズレが大きいことがあるため）
@@ -2044,7 +2045,10 @@ async function _applyCompositeT(T) {
       vid[i].play().catch(() => {});
     }
   });
-  if (loaded[0] && loaded[1] && mediaType[0] === 'video' && mediaType[1] === 'video') _scheduleResync();
+  if (loaded[0] && loaded[1] && mediaType[0] === 'video' && mediaType[1] === 'video') {
+    // play()直後の起動ズレを素早く補正するため、短いバースト検査
+    _scheduleResync(80);
+  }
 }
 
 async function syncPlay() {
