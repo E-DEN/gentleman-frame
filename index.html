@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja" data-theme="dark">
 <head>
   <meta charset="UTF-8">
@@ -108,8 +108,60 @@
         <div class="vid-section-header">
           <span data-i18n="bg-title">背景</span>
           <div class="vid-section-btns">
-            <button class="preset-item-del icon-btn--vis" id="visBtn1" data-i18n-title="bg-vis-title" title="背景を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
-            <button class="preset-item-del icon-btn--reset" id="resetBtn1" data-i18n-title="bg-clear-title" title="背景をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
+            <button class="preset-item-del icon-btn--vis" id="visBtn0" data-i18n-title="bg-vis-title" title="背景を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
+            <button class="preset-item-del icon-btn--reset" id="resetBtn0" data-i18n-title="bg-clear-title" title="背景をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
+          </div>
+        </div>
+        <div class="drop-zone" id="drop0" role="button" tabindex="0">
+        <div class="drop-loading-overlay" style="display:none"></div>
+          <button class="drop-delete" id="del0" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
+          <a class="drop-link" id="dropLink0" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
+          <div class="drop-icon"><i data-lucide="upload"></i></div>
+          <div class="drop-text">
+            <div class="drop-label1" data-i18n="drop-label">MP4をここにドロップ</div>
+            <div class="drop-hint" style="font-size:10px;" data-i18n="drop-hint">またはクリックして選択</div>
+          </div>
+          <input type="file" id="file0" accept="video/*,image/*" style="display:none">
+        </div>
+        <div id="videoControls0">
+        <div class="url-row">
+          <label for="urlInput0" class="url-label">URL</label>
+          <input type="text" class="url-input" id="urlInput0" placeholder="https://www.iwara.tv/video/..." autocomplete="off" spellcheck="false">
+          <button class="url-load-btn" id="urlLoadBtn0" data-i18n="load-btn">読込</button>
+        </div>
+        <div id="urlErr0" class="url-err"></div>
+        <div class="ctrl-row">
+          <label><span data-i18n="vol">音量</span><button class="mute-btn" id="mute0" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button></label>
+          <input type="range" id="vol0" min="0" max="100" value="25">
+          <input type="text" class="ctrl-val" id="vol0Val" value="25" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="ctrl-row">
+          <label data-i18n="offset">オフセット</label>
+          <input type="range" id="offset0" min="-10" max="10" value="0" step="0.01">
+          <input type="text" class="ctrl-val" id="offset0Val" value="+0.00" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="offset-btns">
+          <button class="offset-btn" data-id="offset0" data-d="-0.1">-0.1</button>
+          <button class="offset-btn" data-id="offset0" data-d="-0.01">-0.01</button>
+          <button class="offset-btn" data-id="offset0" data-d="0">0</button>
+          <button class="offset-btn" data-id="offset0" data-d="+0.01">+0.01</button>
+          <button class="offset-btn" data-id="offset0" data-d="+0.1">+0.1</button>
+        </div>
+        </div>
+      </div>
+
+      <!-- 入れ替えセパレーター -->
+      <div class="vid-swap-sep">
+        <button class="vid-swap-btn" id="swapBtn" data-i18n-title="swap-title" title="背景・前景入れ替え"><i data-lucide="arrow-up-down"></i></button>
+      </div>
+
+      <!-- 前景（動画2） -->
+      <div class="vid-section">
+        <div class="vid-section-header">
+          <span data-i18n="fg-title">前景</span>
+          <div class="vid-section-btns">
+            <button class="preset-item-del icon-btn--vis" id="visBtn1" data-i18n-title="fg-vis-title" title="前景を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
+            <button class="preset-item-del icon-btn--reset" id="resetBtn1" data-i18n-title="fg-clear-title" title="前景をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
           </div>
         </div>
         <div class="drop-zone" id="drop1" role="button" tabindex="0">
@@ -118,7 +170,7 @@
           <a class="drop-link" id="dropLink1" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
           <div class="drop-icon"><i data-lucide="upload"></i></div>
           <div class="drop-text">
-            <div class="drop-label1" data-i18n="drop-label">MP4をここにドロップ</div>
+            <div class="drop-label2" data-i18n="drop-label">MP4をここにドロップ</div>
             <div class="drop-hint" style="font-size:10px;" data-i18n="drop-hint">またはクリックして選択</div>
           </div>
           <input type="file" id="file1" accept="video/*,image/*" style="display:none">
@@ -146,58 +198,6 @@
           <button class="offset-btn" data-id="offset1" data-d="0">0</button>
           <button class="offset-btn" data-id="offset1" data-d="+0.01">+0.01</button>
           <button class="offset-btn" data-id="offset1" data-d="+0.1">+0.1</button>
-        </div>
-        </div>
-      </div>
-
-      <!-- 入れ替えセパレーター -->
-      <div class="vid-swap-sep">
-        <button class="vid-swap-btn" id="swapBtn" data-i18n-title="swap-title" title="背景・前景入れ替え"><i data-lucide="arrow-up-down"></i></button>
-      </div>
-
-      <!-- 前景（動画2） -->
-      <div class="vid-section">
-        <div class="vid-section-header">
-          <span data-i18n="fg-title">前景</span>
-          <div class="vid-section-btns">
-            <button class="preset-item-del icon-btn--vis" id="visBtn2" data-i18n-title="fg-vis-title" title="前景を表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button>
-            <button class="preset-item-del icon-btn--reset" id="resetBtn2" data-i18n-title="fg-clear-title" title="前景をクリア" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button>
-          </div>
-        </div>
-        <div class="drop-zone" id="drop2" role="button" tabindex="0">
-        <div class="drop-loading-overlay" style="display:none"></div>
-          <button class="drop-delete" id="del2" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
-          <a class="drop-link" id="dropLink2" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
-          <div class="drop-icon"><i data-lucide="upload"></i></div>
-          <div class="drop-text">
-            <div class="drop-label2" data-i18n="drop-label">MP4をここにドロップ</div>
-            <div class="drop-hint" style="font-size:10px;" data-i18n="drop-hint">またはクリックして選択</div>
-          </div>
-          <input type="file" id="file2" accept="video/*,image/*" style="display:none">
-        </div>
-        <div id="videoControls2">
-        <div class="url-row">
-          <label for="urlInput2" class="url-label">URL</label>
-          <input type="text" class="url-input" id="urlInput2" placeholder="https://www.iwara.tv/video/..." autocomplete="off" spellcheck="false">
-          <button class="url-load-btn" id="urlLoadBtn2" data-i18n="load-btn">読込</button>
-        </div>
-        <div id="urlErr2" class="url-err"></div>
-        <div class="ctrl-row">
-          <label><span data-i18n="vol">音量</span><button class="mute-btn" id="mute2" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button></label>
-          <input type="range" id="vol2" min="0" max="100" value="25">
-          <input type="text" class="ctrl-val" id="vol2Val" value="25" spellcheck="false" autocomplete="off">
-        </div>
-        <div class="ctrl-row">
-          <label data-i18n="offset">オフセット</label>
-          <input type="range" id="offset2" min="-10" max="10" value="0" step="0.01">
-          <input type="text" class="ctrl-val" id="offset2Val" value="+0.00" spellcheck="false" autocomplete="off">
-        </div>
-        <div class="offset-btns">
-          <button class="offset-btn" data-id="offset2" data-d="-0.1">-0.1</button>
-          <button class="offset-btn" data-id="offset2" data-d="-0.01">-0.01</button>
-          <button class="offset-btn" data-id="offset2" data-d="0">0</button>
-          <button class="offset-btn" data-id="offset2" data-d="+0.01">+0.01</button>
-          <button class="offset-btn" data-id="offset2" data-d="+0.1">+0.1</button>
         </div>
         </div>
       </div>

@@ -928,9 +928,9 @@ async function resolveIwaraURL(pageUrl) {
 
 async function loadVideoFromURL(index, url) {
   if (!url) return;
-  const input    = document.getElementById(`urlInput${index + 1}`);
-  const btn      = document.getElementById(`urlLoadBtn${index + 1}`);
-  const zone = document.getElementById(`drop${index + 1}`);
+  const input    = document.getElementById(`urlInput${index}`);
+  const btn      = document.getElementById(`urlLoadBtn${index}`);
+  const zone = document.getElementById(`drop${index}`);
   const canvasOverlay = document.getElementById('canvasLoadOverlay');
   const canvasMsg     = document.getElementById('canvasLoadMsg');
   const setStatus = (msg) => {
@@ -948,7 +948,7 @@ async function loadVideoFromURL(index, url) {
   let _pendingLoad = false;
   const _restoreBtn = () => { btn.classList.remove('loading'); btn.textContent = t('load-btn'); btn.disabled = false; };
   try {
-    const errEl = document.getElementById(`urlErr${index + 1}`);
+    const errEl = document.getElementById(`urlErr${index}`);
     if (errEl) errEl.textContent = '';
     input.style.borderColor = '';
 
@@ -979,7 +979,7 @@ async function loadVideoFromURL(index, url) {
           if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
           _setZoneLoaded(zone, false);
           _setZoneLoaded(zone, true);
-          const label = zone.querySelector(`.drop-label${index + 1}`);
+          const label = zone.querySelector(`.drop-label${index}`);
           if (label) label.textContent = name;
           input.style.transition = 'border-color 0.1s';
           input.style.borderColor = 'var(--ok)';
@@ -1046,11 +1046,11 @@ async function loadVideoFromURL(index, url) {
       _restoreBtn();
       if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
       if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
-      vid[index].volume = (parseFloat(document.getElementById(`vol${index + 1}`).value) / 100) ** 2;
+      vid[index].volume = (parseFloat(document.getElementById(`vol${index}`).value) / 100) ** 2;
       if (index === 0) setCanvasAspectRatio(vid[0].videoWidth, vid[0].videoHeight);
       _setZoneLoaded(zone, false);
       _setZoneLoaded(zone, true);
-      const label = zone.querySelector(`.drop-label${index + 1}`);
+      const label = zone.querySelector(`.drop-label${index}`);
       if (label) label.textContent = name;
       input.style.transition = 'border-color 0.1s';
       input.style.borderColor = 'var(--ok)';
@@ -1065,7 +1065,7 @@ async function loadVideoFromURL(index, url) {
       _setDropSpinner(index, false);
       _restoreBtn();
       input.style.borderColor = 'red';
-      const errEl = document.getElementById(`urlErr${index + 1}`);
+      const errEl = document.getElementById(`urlErr${index}`);
       if (errEl) errEl.textContent = t('url-cors-err');
     };
     input.style.borderColor = '';
@@ -1074,18 +1074,18 @@ async function loadVideoFromURL(index, url) {
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
     input.style.borderColor = 'red';
-    const errEl = document.getElementById(`urlErr${index + 1}`);
+    const errEl = document.getElementById(`urlErr${index}`);
     if (errEl) errEl.textContent = e.message;
   } finally {
     if (!_pendingLoad) _restoreBtn();
   }
 }
 
-[1, 2].forEach(n => {
+[0, 1].forEach(n => {
   const btn   = document.getElementById(`urlLoadBtn${n}`);
   const input = document.getElementById(`urlInput${n}`);
-  btn.addEventListener('click', () => loadVideoFromURL(n - 1, input.value.trim()));
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') loadVideoFromURL(n - 1, input.value.trim()); });
+  btn.addEventListener('click', () => loadVideoFromURL(n, input.value.trim()));
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') loadVideoFromURL(n, input.value.trim()); });
 });
 
 function loadVideo(index, file, handle = null) {
@@ -1097,12 +1097,12 @@ function loadVideo(index, file, handle = null) {
   // URL欄・ページリンクをリセット
   _loadedPageUrl[index]  = '';
   _updateDropLink(index);
-  const _vi = document.getElementById(`urlInput${index + 1}`);
-  const _ve = document.getElementById(`urlErr${index + 1}`);
+  const _vi = document.getElementById(`urlInput${index}`);
+  const _ve = document.getElementById(`urlErr${index}`);
   if (_vi) { _vi.value = ''; _vi.style.borderColor = ''; }
   if (_ve)   _ve.textContent = '';
   // ロード中見た目
-  const zone = document.getElementById(`drop${index + 1}`);
+  const zone = document.getElementById(`drop${index}`);
   zone.classList.remove('loaded');
   zone.classList.add('loading');
   _setDropSpinner(index, true);
@@ -1119,14 +1119,14 @@ function loadVideo(index, file, handle = null) {
     _setDropSpinner(index, false);
     if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
     if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
-    vid[index].volume = (parseFloat(document.getElementById(`vol${index + 1}`).value) / 100) ** 2;
+    vid[index].volume = (parseFloat(document.getElementById(`vol${index}`).value) / 100) ** 2;
     // index 0（背景）がロードされたらアスペクト比を更新
     if (index === 0) {
       setCanvasAspectRatio(vid[0].videoWidth, vid[0].videoHeight);
     }
     _setZoneLoaded(zone, false);
     _setZoneLoaded(zone, true);
-    const label = zone.querySelector(`.drop-label${index + 1}`);
+    const label = zone.querySelector(`.drop-label${index}`);
     if (label) label.textContent = file.name;
   };
   vid[index].onerror = () => { zone.classList.remove('loading'); _setDropSpinner(index, false); };
@@ -1144,7 +1144,7 @@ function loadImage(index, file, handle = null) {
   loaded[index] = false;
   mediaType[index] = 'image';
   updateMediaControls(index);
-  const zone = document.getElementById(`drop${index + 1}`);
+  const zone = document.getElementById(`drop${index}`);
   zone.classList.remove('loaded');
   zone.classList.add('loading');
   _setDropSpinner(index, true);
@@ -1156,7 +1156,7 @@ function loadImage(index, file, handle = null) {
     if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
     _setZoneLoaded(zone, false);
     _setZoneLoaded(zone, true);
-    const label = zone.querySelector(`.drop-label${index + 1}`);
+    const label = zone.querySelector(`.drop-label${index}`);
     if (label) label.textContent = file.name;
   };
   img[index].onerror = () => { zone.classList.remove('loading'); _setDropSpinner(index, false); };
@@ -1164,19 +1164,19 @@ function loadImage(index, file, handle = null) {
 }
 
 function updateMediaControls(index) {
-  const ctrl = document.getElementById(`videoControls${index + 1}`);
+  const ctrl = document.getElementById(`videoControls${index}`);
   if (ctrl) ctrl.style.display = mediaType[index] === 'image' ? 'none' : '';
 }
 
 function _setDropSpinner(index, on) {
-  const overlay = document.querySelector(`#drop${index + 1} .drop-loading-overlay`);
+  const overlay = document.querySelector(`#drop${index} .drop-loading-overlay`);
   if (!overlay) return;
   overlay.style.display = on ? 'flex' : 'none';
 }
 
 function _updateDropLink(index) {
-  const link = document.getElementById(`dropLink${index + 1}`);
-  const zone = document.getElementById(`drop${index + 1}`);
+  const link = document.getElementById(`dropLink${index}`);
+  const zone = document.getElementById(`drop${index}`);
   const url  = _loadedPageUrl && _loadedPageUrl[index];
   if (!link) return;
   if (url) {
@@ -1203,8 +1203,8 @@ async function loadVideoFromHandle(index, handle) {
 }
 
 function setupDropZone(index) {
-  const zone  = document.getElementById(`drop${index + 1}`);
-  const input = document.getElementById(`file${index + 1}`);
+  const zone  = document.getElementById(`drop${index}`);
+  const input = document.getElementById(`file${index}`);
 
   async function pickFile() {
     if (window.showOpenFilePicker) {
@@ -1276,14 +1276,14 @@ function setupDropZone(index) {
 //  動画コントロールリセット
 // ============================================================
 [0, 1].forEach(i => {
-  document.getElementById(`resetBtn${i + 1}`).addEventListener('click', () => {
+  document.getElementById(`resetBtn${i}`).addEventListener('click', () => {
     const resetSlider = id => {
       const el = document.getElementById(id);
       el.value = el.defaultValue;
       el.dispatchEvent(new Event('input'));
     };
-    resetSlider(`vol${i + 1}`);
-    resetSlider(`offset${i + 1}`);
+    resetSlider(`vol${i}`);
+    resetSlider(`offset${i}`);
     clearVideo(i);
   });
 });
@@ -1298,7 +1298,7 @@ function _syncVidHiddenOverlay() {
 }
 
 [0, 1].forEach(i => {
-  const btn = document.getElementById(`visBtn${i + 1}`);
+  const btn = document.getElementById(`visBtn${i}`);
   btn.addEventListener('click', () => {
     visHidden[i] = !visHidden[i];
     btn.innerHTML = visHidden[i]
@@ -1321,7 +1321,7 @@ document.getElementById('vidVisAllBtn').addEventListener('click', () => {
   [0, 1].forEach(i => {
     if (visHidden[i] !== next) {
       visHidden[i] = next;
-      const btn = document.getElementById(`visBtn${i + 1}`);
+      const btn = document.getElementById(`visBtn${i}`);
       btn.innerHTML = next ? '<i data-lucide="eye-off"></i>' : '<i data-lucide="eye"></i>';
       lucide.createIcons({ nodes: [btn] });
     }
@@ -1334,7 +1334,7 @@ document.getElementById('vidVisAllBtn').addEventListener('click', () => {
 
 // 全体リセット
 document.getElementById('vidResetAllBtn').addEventListener('click', () => {
-  [0, 1].forEach(i => document.getElementById(`resetBtn${i + 1}`).click());
+  [0, 1].forEach(i => document.getElementById(`resetBtn${i}`).click());
 });
 
 // ============================================================
@@ -1357,21 +1357,21 @@ function clearVideo(index) {
   _loadedFileName[index] = '';
   _loadedPageUrl[index]  = '';
   _updateDropLink(index);
-  const zone  = document.getElementById(`drop${index + 1}`);
-  const input = document.getElementById(`file${index + 1}`);
-  const label = zone.querySelector(`.drop-label${index + 1}`);
+  const zone  = document.getElementById(`drop${index}`);
+  const input = document.getElementById(`file${index}`);
+  const label = zone.querySelector(`.drop-label${index}`);
   zone.classList.remove('loaded');
   zone.style.animation = '';
   if (label) label.textContent = DEFAULT_LABELS()[index];
   input.value = '';
-  const urlInput = document.getElementById(`urlInput${index + 1}`);
-  const urlErr   = document.getElementById(`urlErr${index + 1}`);
+  const urlInput = document.getElementById(`urlInput${index}`);
+  const urlErr   = document.getElementById(`urlErr${index}`);
   if (urlInput) { urlInput.value = ''; urlInput.style.borderColor = ''; }
   if (urlErr)   urlErr.textContent = '';
   updateMediaControls(index);
 }
 [0, 1].forEach(i => {
-  document.getElementById(`del${i + 1}`).addEventListener('click', e => {
+  document.getElementById(`del${i}`).addEventListener('click', e => {
     e.stopPropagation();
     clearVideo(i);
   });
@@ -2007,8 +2007,8 @@ function setPlaying(playing) {
 
 function _getOffsets() {
   return [
+    parseFloat(document.getElementById('offset0').value) || 0,
     parseFloat(document.getElementById('offset1').value) || 0,
-    parseFloat(document.getElementById('offset2').value) || 0,
   ];
 }
 
@@ -2185,8 +2185,8 @@ function bindSlider(id, valId, fmt, onChange) {
   lucide.createIcons({ nodes: [resetBtn] });
 }
 
-bindSlider('vol1',    'vol1Val',    v => `${Math.round(v)}`,    v => { vid[0].volume = (v / 100) ** 2; });
-bindSlider('vol2',    'vol2Val',    v => `${Math.round(v)}`,    v => { vid[1].volume = (v / 100) ** 2; });
+bindSlider('vol0',    'vol0Val',    v => `${Math.round(v)}`,    v => { vid[0].volume = (v / 100) ** 2; });
+bindSlider('vol1',    'vol1Val',    v => `${Math.round(v)}`,    v => { vid[1].volume = (v / 100) ** 2; });
 
 // ---- マスターボリューム (transport overlay) ----
 {
@@ -2205,8 +2205,8 @@ bindSlider('vol2',    'vol2Val',    v => `${Math.round(v)}`,    v => { vid[1].vo
   };
   const _applyMaster = () => {
     const g = _masterMuted ? 0 : _masterVol / 100;
-    vid[0].volume = g * (parseFloat(document.getElementById('vol1').value) / 100) ** 2;
-    vid[1].volume = g * (parseFloat(document.getElementById('vol2').value) / 100) ** 2;
+    vid[0].volume = g * (parseFloat(document.getElementById('vol0').value) / 100) ** 2;
+    vid[1].volume = g * (parseFloat(document.getElementById('vol1').value) / 100) ** 2;
     const iconName = _masterMuted || _masterVol === 0 ? 'volume-x' : _masterVol < 50 ? 'volume-1' : 'volume-2';
     masterMuteBtn.innerHTML = `<i data-lucide="${iconName}"></i>`;
     lucide.createIcons({ nodes: [masterMuteBtn] });
@@ -2251,6 +2251,13 @@ bindSlider('vol2',    'vol2Val',    v => `${Math.round(v)}`,    v => { vid[1].vo
         volTrack.classList.remove('dragging');
       }
     });
+    volTrack.addEventListener('wheel', e => {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      _masterVol = Math.min(100, Math.max(0, _masterVol - Math.sign(e.deltaY) * step));
+      _masterMuted = false;
+      _applyMaster();
+    }, { passive: false });
   }
   if (masterMuteBtn) {
     masterMuteBtn.addEventListener('click', e => {
@@ -2260,8 +2267,8 @@ bindSlider('vol2',    'vol2Val',    v => `${Math.round(v)}`,    v => { vid[1].vo
     });
   }
 }
+bindSlider('offset0', 'offset0Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, null);
 bindSlider('offset1', 'offset1Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, null);
-bindSlider('offset2', 'offset2Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, null);
 bindSlider('maskW',   'maskWVal',   v => `${Math.round(v)}`,    v => {
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
   S.mask.w = v;
@@ -2584,9 +2591,9 @@ document.querySelectorAll('.fqp-btn').forEach(btn => {
 // ミュートボタン
 const _muteVolume = [null, null]; // ミュート前の音量を保持
 [0, 1].forEach(i => {
-  const btn   = document.getElementById(`mute${i + 1}`);
-  const volEl = document.getElementById(`vol${i + 1}`);
-  const valEl = document.getElementById(`vol${i + 1}Val`);
+  const btn   = document.getElementById(`mute${i}`);
+  const volEl = document.getElementById(`vol${i}`);
+  const valEl = document.getElementById(`vol${i}Val`);
   btn.addEventListener('click', () => {
     vid[i].muted = !vid[i].muted;
     btn.classList.toggle('muted', vid[i].muted);
@@ -2716,16 +2723,16 @@ function swapVideos() {
   [visHidden[0],       visHidden[1]]       = [visHidden[1],       visHidden[0]];
 
   // ボリュームを再割当て（スライダーと入れ替え前後の整合）
-  if (mediaType[0] === 'video') vid[0].volume = (parseFloat(document.getElementById('vol1').value) / 100) ** 2;
-  if (mediaType[1] === 'video') vid[1].volume = (parseFloat(document.getElementById('vol2').value) / 100) ** 2;
+  if (mediaType[0] === 'video') vid[0].volume = (parseFloat(document.getElementById('vol0').value) / 100) ** 2;
+  if (mediaType[1] === 'video') vid[1].volume = (parseFloat(document.getElementById('vol1').value) / 100) ** 2;
 
   // 動画専用コントロールの表示/非表示
   updateMediaControls(0);
   updateMediaControls(1);
 
   // ドロップゾーン入れ替え
-  const zone1 = document.getElementById('drop1');
-  const zone2 = document.getElementById('drop2');
+  const zone1 = document.getElementById('drop0');
+  const zone2 = document.getElementById('drop1');
   const lbl1  = zone1.querySelector('.drop-label1');
   const lbl2  = zone2.querySelector('.drop-label2');
   [lbl1.textContent, lbl2.textContent] = [lbl2.textContent, lbl1.textContent];
@@ -2740,16 +2747,16 @@ function swapVideos() {
   _updateDropLink(1);
 
   // Swap URL inputs
+  const urlInput0 = document.getElementById('urlInput0');
   const urlInput1 = document.getElementById('urlInput1');
-  const urlInput2 = document.getElementById('urlInput2');
-  if (urlInput1 && urlInput2) {
-    [urlInput1.value, urlInput2.value] = [urlInput2.value, urlInput1.value];
+  if (urlInput0 && urlInput1) {
+    [urlInput0.value, urlInput1.value] = [urlInput1.value, urlInput0.value];
+    urlInput0.style.borderColor = '';
     urlInput1.style.borderColor = '';
-    urlInput2.style.borderColor = '';
+    const urlErr0 = document.getElementById('urlErr0');
     const urlErr1 = document.getElementById('urlErr1');
-    const urlErr2 = document.getElementById('urlErr2');
+    if (urlErr0) urlErr0.textContent = '';
     if (urlErr1) urlErr1.textContent = '';
-    if (urlErr2) urlErr2.textContent = '';
   }
   ['vol', 'offset'].forEach(key => {
     const r1 = document.getElementById(`${key}1`);
@@ -3300,10 +3307,10 @@ applyLang(_lang);
 
 function collectSettings() {
   return {
+    vol0:          document.getElementById('vol0').value,
+    offset0:       document.getElementById('offset0').value,
     vol1:          document.getElementById('vol1').value,
     offset1:       document.getElementById('offset1').value,
-    vol2:          document.getElementById('vol2').value,
-    offset2:       document.getElementById('offset2').value,
     maskX:         S.mask.x,
     maskY:         S.mask.y,
     maskW:         S.mask.w,
@@ -3345,8 +3352,8 @@ function collectSettings() {
 
 function applySettings(d) {
   const sliders = [
+    ['vol0','vol0Val'],['offset0','offset0Val'],
     ['vol1','vol1Val'],['offset1','offset1Val'],
-    ['vol2','vol2Val'],['offset2','offset2Val'],
     ['maskW','maskWVal'],['maskH','maskHVal'],
     ['borderW','borderWVal'],['borderOpacity','borderOpacityVal'],['blurAmt','blurAmtVal'],
     ['filterBrightness','filterBrightnessVal'],['filterContrast','filterContrastVal'],
@@ -3360,8 +3367,8 @@ function applySettings(d) {
     ['filterBars','filterBarsVal'],
   ];
   const vals = {
+    vol0: d.vol0, offset0: d.offset0,
     vol1: d.vol1, offset1: d.offset1,
-    vol2: d.vol2, offset2: d.offset2,
     maskW: d.maskW, maskH: d.maskH,
     borderW: d.borderW, borderOpacity: d.borderOpacity, blurAmt: d.blurAmt,
     filterBrightness: d.filterBrightness, filterContrast: d.filterContrast,
@@ -3685,7 +3692,7 @@ function renderPresets() {
           const savedUrl = p.data[`vid${i}Url`];
           if (savedUrl) {
             if (i === 1) vid1HasSource = true;
-            const urlInput = document.getElementById(`urlInput${i + 1}`);
+            const urlInput = document.getElementById(`urlInput${i}`);
             if (urlInput) urlInput.value = savedUrl;
             await loadVideoFromURL(i, savedUrl);
             const resolved = _loadedFileName[i];
@@ -4122,10 +4129,10 @@ function _packPreset(d) {
   const bits = [];
   const w = (raw, n) => { const v = Math.round(+raw||0); for (let i=n-1;i>=0;i--) bits.push((v>>i)&1); };
   const cl = (v,lo,hi) => Math.max(lo, Math.min(hi, +v||0));
+  w(cl(d.vol0,0,100),                       7);
   w(cl(d.vol1,0,100),                       7);
-  w(cl(d.vol2,0,100),                       7);
-  w((cl(d.offset1,-10,10)+10)*100,         11); // 0-2000 (step 0.01)
-  w((cl(d.offset2,-10,10)+10)*100,         11);
+  w((cl(d.offset0,-10,10)+10)*100,         11); // 0-2000 (step 0.01)
+  w((cl(d.offset1,-10,10)+10)*100,         11);
   w(cl(d.maskX,0,1023),                    10);
   w(cl(d.maskY,0,511),                      9);
   w(cl(d.maskW,0,1023),                    10);
@@ -4154,8 +4161,8 @@ function _unpackPreset(bytes) {
   const r=n=>{let v=0;for(let i=0;i<n;i++)v=(v<<1)|(bits[pos++]||0);return v;};
   const f=v=>v%1===0?String(v):String(+v.toFixed(2));
   return {
-    vol1:String(r(7)), vol2:String(r(7)),
-    offset1:f(r(11)/100-10), offset2:f(r(11)/100-10),
+    vol0:String(r(7)), vol1:String(r(7)),
+    offset0:f(r(11)/100-10), offset1:f(r(11)/100-10),
     maskX:r(10), maskY:r(9), maskW:r(10), maskH:r(9),
     maskShape:_MSHAPES[r(3)]||'circle',
     borderW:f(r(7)/10), borderOpacity:String(r(7)),
