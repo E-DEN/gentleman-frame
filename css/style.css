@@ -1191,30 +1191,24 @@
       font-size: 11px;
       font-family: inherit;
       cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
+      transition: flex-grow 0.25s ease, border-color 0.15s, color 0.15s, background 0.15s, opacity 0.15s;
       white-space: nowrap;
+      overflow: hidden;
     }
     .preset-action-btn:hover { border-color: var(--accent); color: var(--accent); }
     .preset-action-btn.drag-over {
       border-color: var(--accent); border-style: solid; color: var(--accent);
       background: color-mix(in srgb, var(--accent) 15%, transparent);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
-      transform: scale(1.03);
     }
     /* DnD中は「新しいプリセット」ボタンを無効化、「新しいフォルダ」ボタンはフォルダDnD中も無効化 */
     body.preset-dragging #presetAddBtn { pointer-events: none; opacity: 0.4; }
     body.preset-dragging.dragging-folder #presetAddFolderBtn { pointer-events: none; opacity: 0.4; }
-    /* DnD中はフォルダボタンを強調 */
+    /* DnD中: フォルダボタンにホバーで拡張 */
     body.preset-dragging:not(.dragging-folder) #presetAddFolderBtn {
-      border-color: var(--accent);
-      border-style: dashed;
-      color: var(--accent);
       opacity: 1;
-      animation: folder-btn-pulse 1.4s ease-in-out infinite;
     }
-    @keyframes folder-btn-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 30%, transparent); }
-      50%       { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent); }
+    body.preset-dragging:not(.dragging-folder) #presetAddFolderBtn.drag-over {
+      flex-grow: 3;
     }
 
     /* ===== Toast ===== */
