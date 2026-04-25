@@ -3626,7 +3626,6 @@ function renderPresets() {
         list2[idx].data = newData;
         savePresets(list2);
         renderPresets();
-        _presetStatusMsg(t('preset-saved').replace('{name}', p.name));
       }, 'preset-del-popup-ok--save');
     });
   });
@@ -3737,7 +3736,6 @@ const _doPresetAdd = async () => {
   }
   savePresets(list);
   renderPresets();
-  _presetStatusMsg(t('preset-saved').replace('{name}', name));
   // 追加したプリセット名をすぐ編集状態に
   requestAnimationFrame(() => {
     const items = document.querySelectorAll('.preset-item');

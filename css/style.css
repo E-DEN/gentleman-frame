@@ -550,11 +550,19 @@
       padding: 5px 6px;
       resize: vertical;
       font-family: monospace;
-      white-space: pre;
-      overflow-wrap: normal;
-      overflow-x: auto;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      overflow-x: hidden;
+      overflow-y: auto;
       align-self: flex-start;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
     }
+    .preset-code-textarea::-webkit-scrollbar { width: 4px; height: 4px; }
+    .preset-code-textarea::-webkit-scrollbar-track { background: transparent; }
+    .preset-code-textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .preset-code-textarea::-webkit-scrollbar-corner { background: transparent; }
+    .preset-code-textarea::-webkit-resizer { background: transparent; }
     .preset-code-load-btn {
       align-self: flex-start;
     }
@@ -1698,7 +1706,14 @@
       resize: vertical;
       width: 100%;
       box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
     }
+    .lang-import-textarea::-webkit-scrollbar { width: 4px; height: 4px; }
+    .lang-import-textarea::-webkit-scrollbar-track { background: transparent; }
+    .lang-import-textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .lang-import-textarea::-webkit-scrollbar-corner { background: transparent; }
+    .lang-import-textarea::-webkit-resizer { background: transparent; }
     .lang-import-textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
     .lang-import-actions {
       display: flex;
