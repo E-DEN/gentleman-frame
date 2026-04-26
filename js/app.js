@@ -843,6 +843,11 @@ function _renderFrame() {
     } else if (_compositeLastRaf !== null) {
       // 遅延フェーズ（負のオフセット）: ウォールクロックで追跡
       _compositeT += (_rafNow - _compositeLastRaf) / 1000;
+      // refDur を超えないようにクランプ
+      const [_o1, _o2] = _getOffsets();
+      const _refDur = (loaded[0] && mediaType[0] === 'video' && vid[0].duration) ? vid[0].duration - _o1
+                    : (loaded[1] && mediaType[1] === 'video' && vid[1].duration) ? vid[1].duration - _o2 : 0;
+      if (_refDur > 0) _compositeT = Math.min(_compositeT, _refDur);
     }
     _compositeLastRaf = _rafNow;
   } else if (!S.playing || _compositeSeekPending) {
@@ -3065,7 +3070,7 @@ function updateProgress() {
   const pct = Math.min(1, Math.max(0, _compositeT / refDur));
   elProgressFill.style.width = `${pct * 100}%`;
   elProgressThumb.style.left = `${pct * 100}%`;
-  elTimeLabel.textContent = `${fmtTime(_compositeT)} / ${fmtTime(refDur)}`;
+  elTimeLabel.textContent = `${fmtTime(Math.min(_compositeT, refDur))} / ${fmtTime(refDur)}`;
 }
 
 // シークバードラッグ
