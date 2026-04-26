@@ -101,6 +101,17 @@
       will-change: transform;
     }
 
+    .canvas-hint {
+      display: none;
+      font-size: 13px;
+      line-height: 1.8;
+      color: rgba(255,255,255,0.35);
+      pointer-events: none;
+      user-select: none;
+    }
+    [data-theme="light"] .canvas-hint { color: rgba(0,0,0,0.35); }
+    .canvas-hint.visible { display: block; }
+
     /* ===== Transport Overlay ===== */
     .transport {
       position: absolute;

@@ -489,11 +489,10 @@ function _renderFrame() {
   // --- 背景 動画/画像（レイヤー 1）---
   if (loaded[0] && !visHidden[0]) {
     try { ctx.drawImage(getMediaSrc(0), 0, 0, W, H); }
-    catch (e) { ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H); drawHint(ctx,W/2,H/2,t('cors-err')); }
+    catch (e) { ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H); }
   } else {
     ctx.fillStyle = _cachedBg;
     ctx.fillRect(0, 0, W, H);
-    if (!loaded[0] && !visHidden[0] && _maskBorderFadeStart !== 0) drawHint(ctx, W / 2, H / 2 - 10, t('hint-bg'));
   }
 
   const blurAmt = parseFloat(elBlurAmt.value);
@@ -580,8 +579,6 @@ function _renderFrame() {
       ctx.filter = 'none';
       ctx.restore();
     }
-  } else if (!loaded[1] && !visHidden[1] && _fgFadeStart !== 0) {
-    drawHint(ctx, W / 2, H / 2 + 14, t('hint-fg'));
   }
 
   // --- 色収差（放射状、スケールベース）---
@@ -860,6 +857,7 @@ function render() {
   _renderFrame();
   updateProgress();
   syncMaskDropOverlay();
+  _updateCanvasHints();
   displayCtx.drawImage(renderCvs, 0, 0);
   requestAnimationFrame(render);
 }
@@ -869,15 +867,20 @@ function _startRenderLoop() {
   requestAnimationFrame(render);
 }
 
-function drawHint(c, x, y, text) {
-  const isDark = document.documentElement.dataset.theme !== 'light';
-  c.save();
-  c.fillStyle = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
-  c.font = '14px Segoe UI, sans-serif';
-  c.textAlign = 'center';
-  c.textBaseline = 'middle';
-  c.fillText(text, x, y);
-  c.restore();
+const _hintBgEl = document.getElementById('hintBg');
+const _hintFgEl = document.getElementById('hintFg');
+let _hintStatePrev = '';
+function _updateCanvasHints() {
+  const anyLoaded = loaded[0] || loaded[1];
+  const showBg = !anyLoaded && !visHidden[0];
+  const showFg = !anyLoaded && !visHidden[1];
+  const state = `${showBg}|${showFg}`;
+  if (state === _hintStatePrev) return; // 変化なければ DOM 操作しない
+  _hintStatePrev = state;
+  _hintBgEl.textContent = showBg ? t('hint-bg') : '';
+  _hintFgEl.textContent = showFg ? t('hint-fg') : '';
+  _hintBgEl.classList.toggle('visible', showBg);
+  _hintFgEl.classList.toggle('visible', showFg);
 }
 
 function buildMaskPath(c, m) {
@@ -1148,8 +1151,10 @@ function loadVideo(index, file, handle = null) {
     _startBitmapCapture(index);
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
+    if (index === 0 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
     if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
     if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
+    _hintStatePrev = ''; // ヒント状態を強制再評価
     vid[index].volume = (parseFloat(document.getElementById(`vol${index}`).value) / 100) ** 2;
     // index 0（背景）がロードされたらアスペクト比を更新
     if (index === 0) {
@@ -1181,11 +1186,13 @@ function loadImage(index, file, handle = null) {
   const url = URL.createObjectURL(file);
   img[index].onload = () => {
     loaded[index] = true;
+    mediaType[index] = 'image';
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
-    if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
+    if (index === 0) { setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight); if (_maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now(); }
     if (index === 1 && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
     if (index === 1 && _fgFadeStart === 0) _fgFadeStart = performance.now();
+    _hintStatePrev = ''; // ヒント状態を強制再評価
     _setZoneLoaded(zone, false);
     _setZoneLoaded(zone, true);
     const label = zone.querySelector(`.drop-label${index}`);
