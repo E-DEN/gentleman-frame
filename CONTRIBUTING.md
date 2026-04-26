@@ -2,7 +2,7 @@
 
 ## アーキテクチャ概要
 
-```
+```text
 gentleman-frame/
 ├── index.html          # フロントエンド（ビルドステップなし）
 ├── js/
