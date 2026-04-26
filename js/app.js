@@ -1341,6 +1341,11 @@ function _syncVidHiddenOverlay() {
       ? '<i data-lucide="eye-off"></i>'
       : '<i data-lucide="eye"></i>';
     lucide.createIcons({ nodes: [btn] });
+    // 非表示にしたらミュート
+    if (visHidden[i] && !vid[i].muted) {
+      vid[i].muted = true;
+      document.getElementById(`mute${i}`).classList.add('muted');
+    }
     // 全体ボタンのアイコンを同期
     const allHidden = visHidden[0] && visHidden[1];
     const allBtn = document.getElementById('vidVisAllBtn');
@@ -1360,6 +1365,11 @@ document.getElementById('vidVisAllBtn').addEventListener('click', () => {
       const btn = document.getElementById(`visBtn${i}`);
       btn.innerHTML = next ? '<i data-lucide="eye-off"></i>' : '<i data-lucide="eye"></i>';
       lucide.createIcons({ nodes: [btn] });
+      // 非表示にしたらミュート
+      if (next && !vid[i].muted) {
+        vid[i].muted = true;
+        document.getElementById(`mute${i}`).classList.add('muted');
+      }
     }
   });
   const allBtn = document.getElementById('vidVisAllBtn');
