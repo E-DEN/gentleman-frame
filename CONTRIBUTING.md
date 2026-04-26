@@ -1,0 +1,99 @@
+﻿# Contributing to Gentleman Frame
+
+## アーキテクチャ概要
+
+```
+gentleman-frame/
+├── index.html          # フロントエンド（ビルドステップなし）
+├── js/
+│   ├── app.js          # メインロジック
+│   └── i18n.js         # 多言語対応（ja / en / zh）
+├── locales/
+│   └── ko.json         # 韓国語辞書
+├── css/style.css
+└── server/
+    ├── cors-worker.js  # Cloudflare Worker（本番 CORS プロキシ）
+    ├── resolver.mjs    # iwara API リゾルバ（Worker・ローカル共通）
+    └── proxy.js        # ローカル開発用プロキシ（Node.js）
+```
+
+## インフラ構成
+
+| 役割 | サービス | デプロイ方法 |
+| --- | --- | --- |
+| フロントエンド配信 | Cloudflare Pages | `main` ブランチへの push で**自動デプロイ** |
+| CORS プロキシ / iwara リゾルバ | Cloudflare Worker (`gf-proxy`) | **手動デプロイ**（下記参照） |
+
+### ブランチ運用
+
+- `develop` — 開発ブランチ
+- `main` — 本番ブランチ（Cloudflare Pages が自動ビルド）
+
+```bash
+git checkout main
+git merge develop
+git push origin main
+git checkout develop
+```
+
+## デプロイ手順
+
+### フロントエンド（Pages）
+
+`main` へ push するだけで自動デプロイされます。
+
+### Cloudflare Worker
+
+`server/cors-worker.js` または `server/resolver.mjs` を変更した場合のみ手動デプロイが必要です。
+
+```bash
+npx wrangler deploy server/cors-worker.js --name gf-proxy --compatibility-date 2024-01-01
+```
+
+> [!NOTE]
+> Worker を再デプロイしないと `resolver.mjs` の変更は本番に反映されません。
+
+---
+
+## ローカル開発
+
+### 必要なもの
+
+| ツール | バージョン | 用途 |
+| --- | --- | --- |
+| [Node.js](https://nodejs.org/) | v18 以上（動作確認: v22） | ローカルプロキシサーバー |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | 最新推奨 | iwara URL 解決 |
+| VS Code [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) 等 | - | フロントエンド配信 |
+
+> 外部 npm パッケージは不要です（Node.js 標準モジュールのみ使用）。
+
+### 起動手順
+
+```bash
+# 1. ローカルプロキシを起動（ポート 8788）
+node server/proxy.js
+
+# 2. index.html を Live Server などで開く
+#    → http://127.0.0.1:5500/index.html 等
+```
+
+`localhost` または `127.0.0.1` でアクセスすると、プロキシ URL が自動でローカル（`http://localhost:8788`）に切り替わります。本番（`gentleman-frame.pages.dev`）では Cloudflare Worker が使われます。
+
+### ローカルプロキシのエンドポイント
+
+| エンドポイント | 説明 |
+| --- | --- |
+| `/?url=<URL>` | CORS プロキシ（pximg.net 等） |
+| `/pixiv-info?id=<illustId>` | Pixiv 作者名・タイトル取得 |
+| `/resolve?url=<iwaraURL>` | iwara 動画 → CDN URL 解決（yt-dlp 使用） |
+
+---
+
+## 多言語対応（i18n）
+
+新しいキーを追加する場合は **4箇所すべて** に追加してください。
+
+| ファイル | 対象言語 |
+| --- | --- |
+| `js/i18n.js` | `ja` / `en` / `zh` |
+| `locales/ko.json` | `ko` |
