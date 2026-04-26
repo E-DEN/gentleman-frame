@@ -117,3 +117,9 @@ Cloudflare のインフラは送信元 IP アドレスおよびアクセス日�
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## バグ報告・機能要望
+
+[GitHub Issues](https://github.com/E-DEN/gentleman-frame/issues/new/choose) からお願いします。
