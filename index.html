@@ -82,11 +82,6 @@
         <div class="transport-row">
           <button class="tbtn" id="playBtn" title="再生/一時停止"><i data-lucide="play"></i></button>
           <button class="tbtn" id="stopBtn" title="停止"><i data-lucide="square"></i></button>
-          <div class="progress-track" id="progressTrack">
-            <div class="progress-fill" id="progressFill"></div>
-            <div class="progress-thumb" id="progressThumb"></div>
-          </div>
-          <div class="time-label" id="timeLabel">0:00 / 0:00</div>
           <div class="transport-vol">
             <div class="transport-vol-popup">
               <div class="vol-track-wrap">
@@ -98,6 +93,13 @@
             </div>
             <button class="tbtn transport-mute-btn" id="masterMuteBtn" title="ミュート"><i data-lucide="volume-2"></i></button>
           </div>
+          <div class="progress-track" id="progressTrack">
+            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-thumb" id="progressThumb"></div>
+          </div>
+          <div class="time-label" id="timeLabel">0:00 / 0:00</div>
+          <button class="tbtn" id="resyncBtn" data-i18n-title="resync" title="リシンク"><i data-lucide="refresh-cw"></i></button>
+          <button class="tbtn" id="screenshotBtn" title="スクリーンショット保存"><i data-lucide="camera"></i></button>
           <button class="tbtn" id="theaterBtn" title="シアターモード（パネル非表示）"><i data-lucide="panel-right-close"></i></button>
           <button class="tbtn" id="fullscreenBtn" title="フルスクリーン"><i data-lucide="maximize"></i></button>
         </div>

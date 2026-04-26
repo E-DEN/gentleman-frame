@@ -81,6 +81,7 @@
     "theater-close": "패널 표시",
     "fs-open": "전체화면",
     "fs-close": "전체화면 종료",
+    "resync": "리싱크",
     "preset-default": "프리셋",
     "preset-empty": "프리셋이 없습니다",
     "preset-add-title": "프리셋 만들기",

@@ -377,14 +377,31 @@ async function _doResync() {
   if (!S.playing || _compositeSeekPending) return;
   if (!loaded[0] || !loaded[1]) return;
   if (mediaType[0] !== 'video' || mediaType[1] !== 'video') return;
-  if (vid[0].paused || vid[1].paused) return;
+  // play() 呼び出し直後はまだ paused のままのことがある → リスケジュールして待つ
+  if (vid[0].paused || vid[1].paused) {
+    _resyncTimer = setTimeout(_doResync, 80);
+    return;
+  }
   const [o1, o2] = _getOffsets();
   const t0 = vid[0].currentTime - o1;
   const diff = vid[1].currentTime - (t0 + o2); // 正=vid[1]が進みすぎ、負=遅れ
-  if (Math.abs(diff) > 0.300) {
-    // 大きなズレ: フルシークで再同期
+  if (Math.abs(diff) > 0.080) {
+    // 80ms超のズレ: vid[0] は継続再生させ、vid[1] だけをシークして補正
+    // play() 直後の起動ズレ(30〜100ms)も含めて即スナップ
     vid[1].playbackRate = 1.0;
-    await _applyCompositeT(t0);
+    vid[1].pause();
+    vid[1].currentTime = Math.max(0, Math.min(vid[1].duration || 0, vid[0].currentTime - o1 + o2));
+    await new Promise(res => {
+      vid[1].addEventListener('seeked', res, { once: true });
+    });
+    if (S.playing && !_compositeSeekPending) {
+      // シーク中に vid[0] が進んだ分の残差を playbackRate で吸収
+      const postDiff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
+      vid[1].playbackRate = postDiff < -0.016 ? 1.08 : postDiff > 0.016 ? 0.94 : 1.0;
+      vid[1].play().catch(() => {});
+      _resyncTimer = setTimeout(_doResync, 300);
+    }
+    return;
   } else if (Math.abs(diff) > 0.016) {
     // 中ズレ(1フレーム超): playbackRate で滑らかに追いつかせる
     // vid[1] が遅れている(diff<0) → 少し速く。進みすぎ(diff>0) → 少し遅く。
@@ -4522,6 +4539,38 @@ const panel      = document.querySelector('.panel');
 const theaterBtn = document.getElementById('theaterBtn');
 const fsBtn      = document.getElementById('fullscreenBtn');
 
+// ---- スクリーンショット保存 ----
+document.getElementById('resyncBtn').addEventListener('click', async () => {
+  await _applyCompositeT(_compositeT);
+  // 一時停止中は requestVideoFrameCallback が起動しないことがあるため、
+  // シーク完了後に createImageBitmap で _vidBitmap を強制リフレッシュしてキャンバスに即反映
+  if (!S.playing && 'createImageBitmap' in window) {
+    await Promise.all([0, 1].map(async i => {
+      if (!loaded[i] || mediaType[i] !== 'video') return;
+      try {
+        const bmp = await createImageBitmap(vid[i]);
+        if (_vidBitmap[i]) _vidBitmap[i].close();
+        _vidBitmap[i] = bmp;
+      } catch (e) {}
+    }));
+  }
+});
+
+document.getElementById('screenshotBtn').addEventListener('click', () => {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const filename = `gentleman-frame_${ts}.png`;
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+});
+
 function setTheater(enable) {
   appBody.classList.toggle('theater', enable);
   panel.classList.toggle('collapsed', enable);
@@ -4577,6 +4626,7 @@ document.addEventListener('fullscreenchange', () => {
   const isFs = !!document.fullscreenElement;
   fsBtn.innerHTML = isFs ? '<i data-lucide="minimize"></i>' : '<i data-lucide="maximize"></i>';
   fsBtn.title = t(isFs ? 'fs-close' : 'fs-open');
+  theaterBtn.style.display = isFs ? 'none' : '';
   if (!isFs) {
     setTheater(_wasTheaterBeforeFs);
     clearTimeout(_fsIdleTimer);
