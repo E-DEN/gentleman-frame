@@ -2197,15 +2197,16 @@ async function syncPlay() {
   });
   if (!needsSeek) {
     // Fast resume: seek 不要、即 play()
+    // playbackRate を先に全部セットしてから play() を一斉発火（ズレ最小化）
     clearTimeout(_resyncTimer);
     _playDelayTimers.forEach(t => clearTimeout(t));
     _playDelayTimers = [];
     _compositeLastRaf = null;
     _compositeSeekPending = false;
-    const [_o1, _o2] = [o1, o2];
-    [_o1, _o2].forEach((o, i) => {
+    [0, 1].forEach(i => { if (loaded[i] && mediaType[i] === 'video') vid[i].playbackRate = 1.0; });
+    [0, 1].forEach(i => {
       if (!loaded[i] || mediaType[i] !== 'video') return;
-      vid[i].playbackRate = 1.0;
+      const o = i === 0 ? o1 : o2;
       if (_compositeT + o < 0) {
         const t = setTimeout(() => { if (S.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(_compositeT + o) * 1000);
         _playDelayTimers.push(t);
@@ -2214,7 +2215,7 @@ async function syncPlay() {
       }
     });
     if (loaded[0] && loaded[1] && mediaType[0] === 'video' && mediaType[1] === 'video') {
-      _scheduleResync(80);
+      _scheduleResync(30); // 早めに初回resyncを実施してズレを素早く補正
     }
   } else {
     await _applyCompositeT(_compositeT);
