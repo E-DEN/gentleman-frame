@@ -2120,6 +2120,17 @@ maskDropOverlay.addEventListener('drop', e => {
 // ============================================================
 //  再生
 // ============================================================
+const _playFlashIcon = document.getElementById('playFlashIcon');
+function _showPlayFlash(playing) {
+  _playFlashIcon.classList.remove('flash');
+  // reflow で再トリガー
+  void _playFlashIcon.offsetWidth;
+  _playFlashIcon.innerHTML = playing
+    ? '<svg viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="white"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>';
+  _playFlashIcon.classList.add('flash');
+}
+
 function setPlaying(playing) {
   S.playing = playing;
   playBtn.innerHTML = `<i data-lucide="${playing ? 'pause' : 'play'}"></i>`;
@@ -2175,7 +2186,39 @@ async function _applyCompositeT(T) {
 
 async function syncPlay() {
   setPlaying(true);
-  await _applyCompositeT(_compositeT);
+  _showPlayFlash(true);
+  // 現在位置から再開する場合はシーク不要 → 即 play() で遅延を排除
+  const [o1, o2] = _getOffsets();
+  const needsSeek = [0, 1].some(i => {
+    if (!loaded[i] || mediaType[i] !== 'video') return false;
+    const o = i === 0 ? o1 : o2;
+    const vt = Math.max(0, Math.min(vid[i].duration, _compositeT + o));
+    return Math.abs(vid[i].currentTime - vt) >= 0.05;
+  });
+  if (!needsSeek) {
+    // Fast resume: seek 不要、即 play()
+    clearTimeout(_resyncTimer);
+    _playDelayTimers.forEach(t => clearTimeout(t));
+    _playDelayTimers = [];
+    _compositeLastRaf = null;
+    _compositeSeekPending = false;
+    const [_o1, _o2] = [o1, o2];
+    [_o1, _o2].forEach((o, i) => {
+      if (!loaded[i] || mediaType[i] !== 'video') return;
+      vid[i].playbackRate = 1.0;
+      if (_compositeT + o < 0) {
+        const t = setTimeout(() => { if (S.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(_compositeT + o) * 1000);
+        _playDelayTimers.push(t);
+      } else {
+        vid[i].play().catch(() => {});
+      }
+    });
+    if (loaded[0] && loaded[1] && mediaType[0] === 'video' && mediaType[1] === 'video') {
+      _scheduleResync(80);
+    }
+  } else {
+    await _applyCompositeT(_compositeT);
+  }
 }
 
 function syncPause() {
@@ -2185,6 +2228,7 @@ function syncPause() {
   _compositeLastRaf = null;
   [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].pause(); });
   setPlaying(false);
+  _showPlayFlash(false);
 }
 
 function syncStop() {
@@ -3032,8 +3076,8 @@ function startDrag(e, p) {
 let _canvasClickMoved = false;
 canvas.addEventListener('mousedown', e => {
   if (e.button === 2) return; // 右クリックは startDrag に渡さない
+  _canvasClickMoved = false;  // 追従モード中でもリセット（クリック再生のため）
   if (_maskFollowMode) return; // 追従モード中はドラッグ/ハンドル操作を無効化
-  _canvasClickMoved = false;
   startDrag(e, canvasCoords(e));
 });
 canvas.addEventListener('click', () => {

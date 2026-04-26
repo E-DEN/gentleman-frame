@@ -604,6 +604,28 @@
     .url-load-btn:hover { border-color: var(--accent); color: var(--accent); }
     .url-load-btn.loading { border-color: var(--accent); color: var(--accent); cursor: default; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- 再生/一時停止フラッシュ ---- */
+    @keyframes play-flash {
+      0%   { opacity: 0.85; transform: scale(0.7); }
+      30%  { opacity: 0.85; transform: scale(1.1); }
+      100% { opacity: 0;    transform: scale(1.3); }
+    }
+    #playFlashIcon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #playFlashIcon.flash {
+      animation: play-flash 0.5s ease-out forwards;
+    }
+    #playFlashIcon svg { width: 32px; height: 32px; color: #fff; }
     .url-spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 3px; }
     .url-load-status { font-size: 10px; color: var(--accent); min-height: 14px; margin-top: 2px; display: flex; align-items: center; gap: 4px; }
 
