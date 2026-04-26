@@ -2358,7 +2358,7 @@ function bindSlider(id, valId, fmt, onChange) {
   // --- 単体リセットボタン ---
   const resetBtn = document.createElement('button');
   resetBtn.className = 'ctrl-reset-btn';
-  resetBtn.title = 'リセット';
+  resetBtn.title = t('slider-reset');
   resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
   resetBtn.addEventListener('click', () => {
     el.value = el.defaultValue;

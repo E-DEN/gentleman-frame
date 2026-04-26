@@ -80,8 +80,8 @@
       <!-- トランスポートオーバーレイ -->
       <div class="transport">
         <div class="transport-row">
-          <button class="tbtn" id="playBtn" title="再生/一時停止"><i data-lucide="play"></i></button>
-          <button class="tbtn" id="stopBtn" title="停止"><i data-lucide="square"></i></button>
+          <button class="tbtn" id="playBtn" data-i18n-title="play-title" title="再生/一時停止"><i data-lucide="play"></i></button>
+          <button class="tbtn" id="stopBtn" data-i18n-title="stop-title" title="停止"><i data-lucide="square"></i></button>
           <div class="transport-vol">
             <div class="transport-vol-popup">
               <div class="vol-track-wrap">
@@ -91,7 +91,7 @@
                 </div>
               </div>
             </div>
-            <button class="tbtn transport-mute-btn" id="masterMuteBtn" title="ミュート"><i data-lucide="volume-2"></i></button>
+            <button class="tbtn transport-mute-btn" id="masterMuteBtn" data-i18n-title="mute-title" title="ミュート"><i data-lucide="volume-2"></i></button>
           </div>
           <div class="progress-track" id="progressTrack">
             <div class="progress-fill" id="progressFill"></div>
@@ -99,7 +99,7 @@
           </div>
           <div class="time-label" id="timeLabel">0:00 / 0:00</div>
           <button class="tbtn" id="resyncBtn" data-i18n-title="resync" title="リシンク"><i data-lucide="refresh-cw"></i></button>
-          <button class="tbtn" id="screenshotBtn" title="スクリーンショット保存"><i data-lucide="camera"></i></button>
+          <button class="tbtn" id="screenshotBtn" data-i18n-title="screenshot-title" title="スクリーンショット保存"><i data-lucide="camera"></i></button>
           <button class="tbtn" id="theaterBtn" title="シアターモード（パネル非表示）"><i data-lucide="panel-right-close"></i></button>
           <button class="tbtn" id="fullscreenBtn" title="フルスクリーン"><i data-lucide="maximize"></i></button>
         </div>
@@ -218,7 +218,7 @@
 
     <!-- マスク -->
     <div class="card" data-card-id="mask">
-      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="crop"></i><span data-i18n="mask-title">マスク</span></span><button class="preset-item-del icon-btn--vis" id="maskVisBtn" title="マスクを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="maskResetBtn" title="マスクをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="crop"></i><span data-i18n="mask-title">マスク</span></span><button class="preset-item-del icon-btn--vis" id="maskVisBtn" data-i18n-title="mask-vis-title" title="マスクを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="maskResetBtn" data-i18n-title="mask-reset-title" title="マスクをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
       <div class="ctrl-row">
         <label data-i18n="shape">形状</label>
         <div class="shape-group">
@@ -263,7 +263,7 @@
           <label data-i18n="border-col">枠の色</label>
           <input type="color" id="borderColor" value="#ffffff" style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
           <input type="hidden" id="borderAnim" value="none">
-          <button id="borderColorSwatch" class="border-color-swatch" title="色を選択"></button>
+          <button id="borderColorSwatch" class="border-color-swatch" data-i18n-title="border-col-pick" title="色を選択"></button>
           <div id="borderColorPopover" class="border-color-popover" style="display:none">
             <canvas id="bcpSvCanvas"  class="bcp-sv-canvas"  width="160" height="120"></canvas>
             <canvas id="bcpHueCanvas" class="bcp-hue-canvas" width="160" height="12"></canvas>
@@ -310,7 +310,7 @@
 
     <!-- カラーグレード / フィルター -->
     <div class="card" id="filterCard" data-card-id="filter">
-      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="sparkles"></i><span data-i18n="filter-title">フィルター</span></span><button class="preset-item-del icon-btn--vis" id="filterVisBtn" title="フィルターを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="filterResetBtn" title="フィルターをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="sparkles"></i><span data-i18n="filter-title">フィルター</span></span><button class="preset-item-del icon-btn--vis" id="filterVisBtn" data-i18n-title="filter-vis-title" title="フィルターを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="filterResetBtn" data-i18n-title="filter-reset-title" title="フィルターをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
       <div id="filterQuickPresets" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
         <button class="fqp-btn" data-fqp="cinema" data-i18n="fqp-cinema">シネマ</button>
         <button class="fqp-btn" data-fqp="retro" data-i18n="fqp-retro">レトロ</button>
