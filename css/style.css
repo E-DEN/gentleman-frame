@@ -1424,6 +1424,7 @@
     #canvasWrap:-webkit-full-screen .transport {
       opacity: 1;
       transition: opacity 0.15s ease;
+      border-radius: 0;
     }
     #canvasWrap:fullscreen .tbtn,
     #canvasWrap:fullscreen .progress-track,
