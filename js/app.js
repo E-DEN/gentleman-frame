@@ -3058,9 +3058,12 @@ document.addEventListener('touchend', () => { S.drag.active = false; S.drag.mode
 //  プログレスバー
 // ============================================================
 function fmtTime(sec) {
-  const m = Math.floor(sec / 60);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function updateProgress() {
