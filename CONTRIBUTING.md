@@ -98,3 +98,19 @@ node server/proxy.js
 | `js/i18n.js` | `ja` / `en` / `zh` |
 
 `locales/ko.json` は外部言語インポート機能のデモ用サンプルファイルです（ユーザーが独自言語JSONをD&D/インポートする際のフォーマット例）。新キーを追加する際は `ko.json` も合わせて更新することを推奨しますが、必須ではありません。
+
+---
+
+## TODO 管理
+
+小規模なタスクは [GitHub Projects](https://github.com/users/E-DEN/projects/1) でプライベートに管理しています。
+
+### gh CLI でのアイテム操作
+
+```bash
+# アイテム追加
+gh project item-create 1 --owner E-DEN --title "タスク名"
+
+# アイテム一覧
+gh project item-list 1 --owner E-DEN
+```
