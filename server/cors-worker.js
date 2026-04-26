@@ -3,7 +3,7 @@
  *
  * 【デプロイ手順】
  *   npx wrangler deploy server/cors-worker.js --name gf-proxy --compatibility-date 2024-01-01
- *   （wrangler が iwara-resolver.mjs を自動バンドルする）
+ *   （wrangler が resolver.mjs を自動バンドルする）
  *
  * 無料プラン: 100,000 リクエスト/日
  *
