@@ -1034,6 +1034,7 @@ async function loadVideoFromURL(index, url) {
         img[index].onerror = () => {
           // CORS失敗 → プロキシ経由で再試行
           const proxyUrl = `${_MY_PROXY}/?url=${encodeURIComponent(url)}`;
+          img[index].crossOrigin = 'anonymous';
           img[index].onerror = _imgFail;
           img[index].src = proxyUrl;
         };
@@ -1041,6 +1042,7 @@ async function loadVideoFromURL(index, url) {
         const PROXY_FIRST_HOSTS = ['i.pximg.net', 'i-f.pximg.net'];
         const _needsProxy = PROXY_FIRST_HOSTS.some(h => url.includes(h));
         if (_needsProxy) {
+          img[index].crossOrigin = 'anonymous';
           img[index].onerror = _imgFail;
           img[index].src = `${_MY_PROXY}/?url=${encodeURIComponent(url)}`;
         } else {
@@ -1083,8 +1085,10 @@ async function loadVideoFromURL(index, url) {
     _pendingLoad = true;
     _stopBitmapCapture(index);
     loaded[index] = false;
-    vid[index].removeAttribute('crossorigin');
-    vid[index].src = resolvedUrl;
+    // crossOrigin='anonymous' を設定してプロキシ経由で読み込む
+    // → toBlob() でキャンバスが tainted にならないようにする
+    vid[index].crossOrigin = 'anonymous';
+    vid[index].src = `${_MY_PROXY}/?url=${encodeURIComponent(resolvedUrl)}`;
     vid[index].load();
     vid[index].onloadedmetadata = () => {
       setStatus('');
@@ -1160,6 +1164,7 @@ function loadVideo(index, file, handle = null) {
   const url = URL.createObjectURL(file);
   _stopBitmapCapture(index);
   loaded[index] = false;
+  vid[index].removeAttribute('crossorigin');
   vid[index].src = url;
   vid[index].load();
   vid[index].onloadedmetadata = () => {
@@ -2358,6 +2363,7 @@ function bindSlider(id, valId, fmt, onChange) {
   // --- 単体リセットボタン ---
   const resetBtn = document.createElement('button');
   resetBtn.className = 'ctrl-reset-btn';
+  resetBtn.dataset.i18nTitle = 'slider-reset';
   resetBtn.title = t('slider-reset');
   resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
   resetBtn.addEventListener('click', () => {
@@ -3313,6 +3319,9 @@ function applyLang(lang) {
   document.getElementById('theaterBtn').title = t(isTheater ? 'theater-close' : 'theater-open');
   const isFs = !!document.fullscreenElement;
   document.getElementById('fullscreenBtn').title = t(isFs ? 'fs-close' : 'fs-open');
+  _updateArLockBtn();
+  _hintStatePrev = ''; // キャッシュを無効化してヒントを再描画
+  _updateCanvasHints();
   if (_presetsReady) renderPresets();
   lucide.createIcons();
 }
