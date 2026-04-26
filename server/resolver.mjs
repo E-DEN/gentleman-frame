@@ -6,7 +6,7 @@
  *
  * 将来的に他サービスのリゾルバ (resolveXxxAPI) もここに追加する。
  *
- * ⚠️  このファイルを変更した場合は必ず Worker を再デプロイすること:
+ * [!] このファイルを変更した場合は必ず Worker を再デプロイすること:
  *     npx wrangler deploy server/cors-worker.js --name gf-proxy --compatibility-date 2024-01-01
  */
 

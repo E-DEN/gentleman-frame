@@ -11,7 +11,7 @@
  *   GET /resolve?url=<encoded-iwara-page-url>  → { url, title, author }
  *   GET /?url=<encoded-url>                    → CORS プロキシ (汎用 / Referer付き)
  *
- * ⚠️  共通ロジックは resolver.mjs を編集すること。
+ * [!] 共通ロジックは resolver.mjs を編集すること。
  */
 
 import {

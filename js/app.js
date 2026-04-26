@@ -296,6 +296,7 @@ let _canvasInitialized = false; // setCanvasAspectRatio が一度でも呼ばれ
 let _bufferSynced      = false; // 初回CSS表示サイズへのバッファ同期済みか
 let _pendingMask = null; // applySettings から設定。次回 setCanvasAspectRatio で適用される
 let _activePresetIdx = null; // 現在適用中のプリセットのインデックス
+const _missingFiles = new Set(); // 「presetId_slot」形式: このセッションでファイル未発見だったスロット
 
 // 初回同期: app.js は </body> 直前で実行されるため getBoundingClientRect が確実に使える。
 // ResizeObserver より先に同期することで初期フレームのぼかしを防ぐ。
@@ -3597,8 +3598,11 @@ function renderPresets() {
     const n0 = p.data.vid0Name, n1 = p.data.vid1Name;
     let fileHint = '';
     if (n0 || n1) {
-      const lines = [n0, n1].filter(Boolean)
-        .map(n => `<span class="preset-file-line"><span class="pname-inner">${_esc(n)}</span></span>`)
+      const lines = [[n0, 0], [n1, 1]].filter(([n]) => n)
+        .map(([n, si]) => {
+          const missing = p.data.presetId && _missingFiles.has(`${p.data.presetId}_${si}`);
+          return `<span class="preset-file-line${missing ? ' preset-file-missing' : ''}"><span class="pname-inner">${_esc(n)}</span></span>`;
+        })
         .join('');
       fileHint = `<span class="preset-item-files">${lines}</span>`;
     } else if (!p.data.presetId) {
@@ -3741,13 +3745,18 @@ function renderPresets() {
         const handle = p.data.presetId
           ? await _IDB.get(`preset_${p.data.presetId}_${i}`).catch(() => null)
           : null;
+        let loaded_ok = false;
+        const _mkey = `${p.data.presetId}_${i}`;
         if (handle) {
-          if (i === 1) vid1HasSource = true;
-          await loadVideoFromHandle(i, handle);
-        } else {
+          loaded_ok = await loadVideoFromHandle(i, handle);
+          // ハンドルは削除しない（ファイルが戻ったとき再試行できるよう残す）
+        }
+        if (!loaded_ok) {
           const savedUrl = p.data[`vid${i}Url`];
           if (savedUrl) {
             if (i === 1) vid1HasSource = true;
+            loaded_ok = true;
+            if (_missingFiles.delete(_mkey)) needsRender = true;
             const urlInput = document.getElementById(`urlInput${i}`);
             if (urlInput) urlInput.value = savedUrl;
             await loadVideoFromURL(i, savedUrl);
@@ -3756,12 +3765,20 @@ function renderPresets() {
               const list2 = loadPresets();
               if (list2[idx]) { list2[idx].data[`vid${i}Name`] = resolved; savePresets(list2); needsRender = true; }
             }
+          } else if (p.data[`vid${i}Name`]) {
+            // URLもハンドルも使えないが名前が記録されている → ローカルファイルが消えた/IDB削除済み
+            if (!_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
+            _presetStatusMsg(t('preset-file-missing'), false);
           }
+        } else if (handle) {
+          if (_missingFiles.delete(_mkey)) needsRender = true;
+          if (i === 1) vid1HasSource = true;
         }
       }
       // vid1 がない場合のみここで枠フェードイン開始（vid1 がある場合は onloadedmetadata と同時に開始）
       if (!vid1HasSource && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
-      // _fgFadeStart は onloadedmetadata で vid1 実際のロード完了時にのみセットされる
+      // vid1 ソースがない場合はロード待ち状態を解除（枠・ヒントを即表示）
+      if (!vid1HasSource) _fgFadeStart = -1;
       if (needsRender) renderPresets();
     });
   });
