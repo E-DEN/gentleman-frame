@@ -3057,11 +3057,11 @@ document.addEventListener('touchend', () => { S.drag.active = false; S.drag.mode
 // ============================================================
 //  プログレスバー
 // ============================================================
-function fmtTime(sec) {
+function fmtTime(sec, forceHours = false) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
-  return h > 0
+  return (h > 0 || forceHours)
     ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
     : `${m}:${String(s).padStart(2, '0')}`;
 }
@@ -3073,7 +3073,8 @@ function updateProgress() {
   const pct = Math.min(1, Math.max(0, _compositeT / refDur));
   elProgressFill.style.width = `${pct * 100}%`;
   elProgressThumb.style.left = `${pct * 100}%`;
-  elTimeLabel.textContent = `${fmtTime(Math.min(_compositeT, refDur))} / ${fmtTime(refDur)}`;
+  const useHours = refDur >= 3600;
+  elTimeLabel.textContent = `${fmtTime(Math.min(_compositeT, refDur), useHours)} / ${fmtTime(refDur, useHours)}`;
 }
 
 // シークバードラッグ
