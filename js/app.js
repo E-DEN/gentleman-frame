@@ -2392,9 +2392,12 @@ bindSlider('offset0', 'offset0Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, 
 bindSlider('offset1', 'offset1Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, null);
 bindSlider('maskW',   'maskWVal',   v => `${Math.round(v)}`,    v => {
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
+  // スライダー操作時は下限10（テキスト入力は0まで許容）
+  const elW2 = document.getElementById('maskW');
+  if (parseFloat(elW2.value) < 10) { elW2.value = 10; updateSliderFill(elW2); v = 10; document.getElementById('maskWVal').value = 10; }
   S.mask.w = v;
   if (S.arLock && S.mask.h > 0) {
-    const newH = Math.max(10, Math.round(v / ar));
+    const newH = Math.max(0, Math.round(v / ar));
     S.mask.h = newH;
     const elH = document.getElementById('maskH');
     elH.value = newH;
@@ -2404,9 +2407,12 @@ bindSlider('maskW',   'maskWVal',   v => `${Math.round(v)}`,    v => {
 });
 bindSlider('maskH',   'maskHVal',   v => `${Math.round(v)}`,    v => {
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
+  // スライダー操作時は下限10（テキスト入力は0まで許容）
+  const elH2 = document.getElementById('maskH');
+  if (parseFloat(elH2.value) < 10) { elH2.value = 10; updateSliderFill(elH2); v = 10; document.getElementById('maskHVal').value = 10; }
   S.mask.h = v;
   if (S.arLock && S.mask.w > 0) {
-    const newW = Math.max(10, Math.round(v * ar));
+    const newW = Math.max(0, Math.round(v * ar));
     S.mask.w = newW;
     const elW = document.getElementById('maskW');
     elW.value = newW;
