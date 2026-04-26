@@ -1242,8 +1242,9 @@ async function loadVideoFromHandle(index, handle) {
 }
 
 function setupDropZone(index) {
-  const zone  = document.getElementById(`drop${index}`);
-  const input = document.getElementById(`file${index}`);
+  const zone    = document.getElementById(`drop${index}`);
+  const section = zone.closest('.vid-section'); // カード全体
+  const input   = document.getElementById(`file${index}`);
 
   async function pickFile() {
     if (window.showOpenFilePicker) {
@@ -1282,25 +1283,41 @@ function setupDropZone(index) {
     if (f.type.startsWith('image/')) loadImage(index, f);
     else loadVideo(index, f);
   });
+
+  // ---- D&D: vid-section カード全体 ----
+  // section レベルで統括。zone のイベントはバブリングさせて section に集約する。
+  // zone.drop のみ stopPropagation を維持（section.drop との二重処理防止）。
+
+  // 動画・画像ファイルのドラッグかどうかを判定（JSONは除外）
+  const _isMediaDrag = e => {
+    if (!e.dataTransfer?.items) return false;
+    return [...e.dataTransfer.items].some(item =>
+      item.kind === 'file' && (item.type.startsWith('video/') || item.type.startsWith('image/'))
+    );
+  };
+
   let _dragCount = 0;
   zone.addEventListener('dragenter', e => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (!_isMediaDrag(e)) return;
     _dragCount++;
     zone.classList.add('drag-over');
+    // stopPropagation しない → section.dragenter にバブリングさせる
   });
   zone.addEventListener('dragover', e => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (!_isMediaDrag(e)) return;
+    // stopPropagation しない → section.dragover にバブリングさせる
   });
   zone.addEventListener('dragleave', e => {
-    e.stopPropagation();
-    _dragCount--;
-    if (_dragCount <= 0) { _dragCount = 0; zone.classList.remove('drag-over'); }
+    if (_dragCount > 0) {
+      _dragCount--;
+      if (_dragCount <= 0) { _dragCount = 0; zone.classList.remove('drag-over'); }
+    }
+    // stopPropagation しない → section.dragleave にバブリングさせる
   });
   zone.addEventListener('drop', async e => {
+    if (!_isMediaDrag(e)) return; // JSONは無視（section.drop にもバブリングしない → OK）
     e.preventDefault();
-    e.stopPropagation();
+    e.stopPropagation(); // section.drop との二重処理を防ぐ
     _dragCount = 0;
     zone.classList.remove('drag-over');
     const item = e.dataTransfer.items?.[0];
@@ -1312,6 +1329,39 @@ function setupDropZone(index) {
     if (f && f.type.startsWith('image/')) loadImage(index, f, handle);
     else if (f && f.type.startsWith('video/')) loadVideo(index, f, handle);
   });
+
+  if (section) {
+    section.addEventListener('dragenter', e => {
+      if (!_isMediaDrag(e)) return;
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    section.addEventListener('dragover', e => {
+      if (!_isMediaDrag(e)) return;
+      e.preventDefault(); // 動画・画像のみドロップを許可
+    });
+    section.addEventListener('dragleave', e => {
+      if (!section.contains(e.relatedTarget)) {
+        _dragCount = 0;
+        zone.classList.remove('drag-over');
+      }
+    });
+    section.addEventListener('drop', async e => {
+      if (!_isMediaDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // zone.drop が stopPropagation 済みのためここには zone 上のドロップは来ない
+      zone.classList.remove('drag-over');
+      const item = e.dataTransfer.items?.[0];
+      const f = e.dataTransfer.files[0];
+      let handle = null;
+      if (item?.getAsFileSystemHandle) {
+        handle = await item.getAsFileSystemHandle().catch(() => null);
+      }
+      if (f && f.type.startsWith('image/')) loadImage(index, f, handle);
+      else if (f && f.type.startsWith('video/')) loadVideo(index, f, handle);
+    });
+  }
 }
 
 [0, 1].forEach(setupDropZone);
@@ -2020,8 +2070,17 @@ function _mOnMouseDown(e) {
   };
   new MutationObserver(bind).observe(document.body, { childList: true, subtree: true });
 })());
+// canvasWrap / maskDropOverlay では動画・画像のみ受け付ける
+const _isMediaDragCanvas = e => {
+  if (!e.dataTransfer?.items) return false;
+  return [...e.dataTransfer.items].some(item =>
+    item.kind === 'file' && (item.type.startsWith('video/') || item.type.startsWith('image/'))
+  );
+};
+
 canvasWrap.addEventListener('dragover', e => {
   if (_isDraggingPreset) { e.preventDefault(); return; }
+  if (!_isMediaDragCanvas(e)) return;
   e.preventDefault();
   canvasWrap.classList.add('canvas-drop-over');
   maskDropOverlay.classList.add('drag-active');
@@ -2034,6 +2093,7 @@ canvasWrap.addEventListener('dragleave', e => {
   }
 });
 canvasWrap.addEventListener('drop', e => {
+  if (!_isMediaDragCanvas(e)) return;
   e.preventDefault();
   if (e.target === maskDropOverlay) return; // マスク上のdropはoverlayが処理
   processDropFiles(e, 0); // canvasWrap直接ドロップ → 背景(0)
@@ -2041,6 +2101,7 @@ canvasWrap.addEventListener('drop', e => {
 
 // maskDropOverlay: マスク領域が本物のD&Dターゲット
 maskDropOverlay.addEventListener('dragover', e => {
+  if (!_isMediaDragCanvas(e)) return;
   e.preventDefault();
   e.stopPropagation(); // canvasWrapに伝播させない
   maskDropOverlay.classList.add('drag-over');
@@ -2050,6 +2111,7 @@ maskDropOverlay.addEventListener('dragleave', () => {
   maskDropOverlay.classList.remove('drag-over');
 });
 maskDropOverlay.addEventListener('drop', e => {
+  if (!_isMediaDragCanvas(e)) return;
   e.preventDefault();
   e.stopPropagation();
   processDropFiles(e, 1); // マスク上ドロップ → 前景(1)
@@ -4124,10 +4186,15 @@ document.getElementById('presetCodeInput').addEventListener('input', () => { doc
 
   const _isJsonDrag = e => {
     if (!e.dataTransfer) return false;
-    // ファイルドロップ判定（OS由来のファイル）
-    if (e.dataTransfer.types.includes('Files')) return true;
     // テキスト（gf2コードやJSONテキスト）
     if (e.dataTransfer.types.includes('text/plain')) return true;
+    // ファイルドロップ：JSONファイルのみ（動画・画像は無視）
+    if (e.dataTransfer.items) {
+      return [...e.dataTransfer.items].some(item =>
+        item.kind === 'file' &&
+        (item.type === 'application/json' || item.type === 'text/plain' || item.type === '')
+      );
+    }
     return false;
   };
 
