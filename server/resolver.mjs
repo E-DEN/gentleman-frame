@@ -13,6 +13,7 @@
 // ---- 許可ホスト (cors-worker.js の CORS プロキシで使用) ----
 
 export const ALLOWED_HOSTS = [
+  'iwara.tv',       // *.iwara.tv 全サブドメイン（CDNホスト名が動的に変わるため）
   'api.iwara.tv',
   'apiq.iwara.tv',
   'files.iwara.tv',

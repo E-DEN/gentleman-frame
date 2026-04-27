@@ -69,20 +69,31 @@ export default {
     const forwardHeaders = new Headers();
     const xv = request.headers.get('X-Version');
     if (xv) forwardHeaders.set('X-Version', xv);
+    const range = request.headers.get('Range');
+    if (range) forwardHeaders.set('Range', range);
     const referer = REFERER_MAP[targetUrl.hostname];
     if (referer) forwardHeaders.set('Referer', referer);
     forwardHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
 
-    const res  = await fetch(targetUrl.toString(), { headers: forwardHeaders });
-    const body = await res.arrayBuffer();
+    let res;
+    try {
+      res = await fetch(targetUrl.toString(), { headers: forwardHeaders });
+    } catch (e) {
+      return new Response(`Upstream fetch failed: ${e.message}`, { status: 502, headers: CORS_HEADERS });
+    }
 
-    return new Response(body, {
-      status: res.status,
-      headers: {
-        'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-store',
-      },
-    });
+    const respHeaders = {
+      'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store',
+    };
+    const cl = res.headers.get('Content-Length');
+    if (cl) respHeaders['Content-Length'] = cl;
+    const ar = res.headers.get('Accept-Ranges');
+    if (ar) respHeaders['Accept-Ranges'] = ar;
+    const cr = res.headers.get('Content-Range');
+    if (cr) respHeaders['Content-Range'] = cr;
+
+    return new Response(res.body, { status: res.status, headers: respHeaders });
   },
 };
