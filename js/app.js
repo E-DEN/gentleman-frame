@@ -106,7 +106,18 @@ const _vidBitmapPending = [false, false];
 
 function _startBitmapCapture(i) {
   if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
-  function onFrame() {
+  function onFrame(now, metadata) {
+    // FPS 計測: expectedDisplayTime の間隔から推定
+    const edt = metadata?.expectedDisplayTime ?? 0;
+    if (_vidFpsPrev[i] > 0 && edt > _vidFpsPrev[i]) {
+      const interval = edt - _vidFpsPrev[i];
+      if (interval > 4 && interval < 200) { // 5fps〜250fps の有効範囲のみ
+        const fps = Math.round(1000 / interval);
+        _vidFps[i] = _vidFps[i] === 0 ? fps : Math.round(_vidFps[i] * 0.7 + fps * 0.3);
+      }
+    }
+    _vidFpsPrev[i] = edt;
+
     if (!_vidBitmapPending[i]) {
       _vidBitmapPending[i] = true;
       createImageBitmap(vid[i]).then(bmp => {
@@ -122,6 +133,7 @@ function _startBitmapCapture(i) {
 
 function _stopBitmapCapture(i) {
   if (_vidBitmap[i]) { _vidBitmap[i].close(); _vidBitmap[i] = null; }
+
 }
 
 function getMediaSrc(i) {
@@ -348,6 +360,11 @@ const elBorderOpacity = document.getElementById('borderOpacity');
 const elBorderAnim    = document.getElementById('borderAnim');
 const elBorderAnimSpeed = document.getElementById('borderAnimSpeed');
 const elBorderAnimBright = document.getElementById('borderAnimBright');
+const elPhoneUiRow    = document.getElementById('phoneUiRow');
+const elPhoneUiBtnRoT = document.getElementById('phoneUiRoT');
+const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
+const elPhoneUiBtnDot = document.getElementById('phoneUiDot');
+const elPhoneUiBtnRot90 = document.getElementById('phoneUiRot90');
 const elBlurAmt       = document.getElementById('blurAmt');
 const elFilterVignette  = document.getElementById('filterVignette');
 const elFilterCA        = document.getElementById('filterCA');
@@ -949,8 +966,13 @@ function buildMaskPath(c, m) {
 // スマホカメラ録画風フレーム描画
 let _shutterMorphT = 0;    // モーフ状態 (0=丸, 1=角丸四角)
 let _shutterMorphLast = 0; // 前回の nowMs
+let _phoneShowRoT  = false; // 三等分グリッド表示
+let _phoneShowRec  = true;  // RECインジケーター+タイムコード表示
+let _phoneShowDot  = true;  // パンチホールカメラ表示
+let _phoneLandscape = false; // 横向きモード
 let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
 let _glassSamplerCtx  = null;
+
 
 function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   if (typeof ctx.roundRect !== 'function') return;
@@ -962,22 +984,29 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   const _bg     = parseInt(_bc.slice(3, 5), 16);
   const _bb     = parseInt(_bc.slice(5, 7), 16);
 
-  // スマートフォン ディスプレイ比率: 9:19.5
+  // スマートフォン ディスプレイ比率: 9:19.5（縦）/ 横なら反転
   const IP17_W = 9, IP17_H = 19.5;
+  const _land = _phoneLandscape;
+  const ratW = _land ? IP17_H : IP17_W;
+  const ratH = _land ? IP17_W : IP17_H;
   let scrW = m.w, scrH = m.h;
-  if (m.w / m.h > IP17_W / IP17_H) {
-    scrW = Math.round(m.h * (IP17_W / IP17_H));
+  if (m.w / m.h > ratW / ratH) {
+    scrW = Math.round(m.h * (ratW / ratH));
   } else {
-    scrH = Math.round(m.w * (IP17_H / IP17_W));
+    scrH = Math.round(m.w * (ratH / ratW));
   }
   const scrX = m.x + Math.round((m.w - scrW) / 2);
   const scrY = m.y + Math.round((m.h - scrH) / 2);
 
-  const mSide = Math.round(scrW * 0.040);
-  const mTop  = Math.round(scrH * 0.048);
-  const mBot  = Math.round(scrH * 0.038);
-  const bx = scrX - mSide, by = scrY - mTop;
-  const bw = scrW + mSide * 2, bh = scrH + mTop + mBot;
+  // マージン: 縦向き=上下が広い、横向き=左右が広い
+  const mShort = _land ? Math.round(scrH * 0.040) : Math.round(scrW * 0.040); // 短辺側マージン
+  const mLong1 = _land ? Math.round(scrW * 0.048) : Math.round(scrH * 0.048); // 長辺・先頭側
+  const mLong2 = _land ? Math.round(scrW * 0.038) : Math.round(scrH * 0.038); // 長辺・末尾側
+  // 縦: bx=left, by=top(mTop), 横: bx=left(mLong1), by=top(mShort)
+  const bx = _land ? scrX - mLong1 : scrX - mShort;
+  const by = _land ? scrY - mShort  : scrY - mLong1;
+  const bw = _land ? scrW + mLong1 + mLong2 : scrW + mShort * 2;
+  const bh = _land ? scrH + mShort * 2       : scrH + mLong1 + mLong2;
   const bodyR = Math.round(Math.min(bw, bh) * 0.12);
 
   const sw   = Math.max(1.5, 2.5 * s);
@@ -1014,59 +1043,107 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   }
 
   // ---- パンチホールカメラ ----
-  const dotR = Math.max(2, Math.round(2.5 * s));
-  ctx.save();
-  if (_animOn) ctx.globalAlpha = opacity * _dotA;
-  ctx.beginPath();
-  ctx.arc(scrX + scrW / 2, scrY + mTop * 0.44, dotR, 0, Math.PI * 2);
-  ctx.fillStyle = colDot;
-  ctx.fill();
-  ctx.restore();
+  if (_phoneShowDot) {
+    const dotR = Math.max(2, Math.round(2.5 * s));
+    ctx.save();
+    if (_animOn) ctx.globalAlpha = opacity * _dotA;
+    ctx.beginPath();
+    // 縦: 上中央、横: 左中央（参考画像に合わせ左辺）
+    const dotX = _land ? scrX - mLong1 * 0.44 : scrX + scrW / 2;
+    const dotY = _land ? scrY + scrH / 2        : scrY + mLong1 * 0.44;
+    ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = colDot;
+    ctx.fill();
+    ctx.restore();
+  }
 
   // ---- サイドボタン ----
   ctx.save();
   if (_animOn) ctx.globalAlpha = opacity * _btnA;
   ctx.fillStyle = colBtn;
-  [[0.22, 0.055], [0.35, 0.085], [0.46, 0.085]].forEach(([yf, hf]) => {
+  if (!_land) {
+    // 縦向き: 左に3つ、右に1つ
+    [[0.22, 0.055], [0.35, 0.085], [0.46, 0.085]].forEach(([yf, hf]) => {
+      ctx.beginPath();
+      ctx.roundRect(bx - btnW, by + bh * yf, btnW, bh * hf, btnR);
+      ctx.fill();
+    });
     ctx.beginPath();
-    ctx.roundRect(bx - btnW, by + bh * yf, btnW, bh * hf, btnR);
+    ctx.roundRect(bx + bw, by + bh * 0.37, btnW, bh * 0.13, btnR);
     ctx.fill();
-  });
-  ctx.beginPath();
-  ctx.roundRect(bx + bw, by + bh * 0.37, btnW, bh * 0.13, btnR);
-  ctx.fill();
+  } else {
+    // 横向き (+90CW): 縦LEFT(3ボタン)→TOP, 縦RIGHT(1ボタン)→BOTTOM
+    [[0.22, 0.055], [0.35, 0.085], [0.46, 0.085]].forEach(([xf, wf]) => {
+      ctx.beginPath();
+      ctx.roundRect(bx + bw * xf, by - btnW, bw * wf, btnW, btnR);
+      ctx.fill();
+    });
+    ctx.beginPath();
+    ctx.roundRect(bx + bw * 0.37, by + bh, bw * 0.13, btnW, btnR);
+    ctx.fill();
+  }
   ctx.restore();
 
   // ---- ホームインジケーター ----
-  const hiW = scrW * 0.26, hiH = Math.max(2.5, Math.round(3 * s));
   ctx.save();
   if (_animOn) ctx.globalAlpha = opacity * _homeA;
-  ctx.beginPath();
-  ctx.roundRect(scrX + (scrW - hiW) / 2, scrY + scrH + (mBot - hiH) / 2, hiW, hiH, hiH / 2);
-  ctx.fillStyle = colHome;
-  ctx.fill();
+  if (!_land) {
+    const hiW = scrW * 0.26, hiH = Math.max(2.5, Math.round(3 * s));
+    ctx.beginPath();
+    ctx.roundRect(scrX + (scrW - hiW) / 2, scrY + scrH + (mLong2 - hiH) / 2, hiW, hiH, hiH / 2);
+    ctx.fillStyle = colHome;
+    ctx.fill();
+  } else {
+    // 横向き: ホームバーは右辺中央（縦棒）
+    const hiH = scrH * 0.26, hiW = Math.max(2.5, Math.round(3 * s));
+    ctx.beginPath();
+    ctx.roundRect(scrX + scrW + (mLong2 - hiW) / 2, scrY + (scrH - hiH) / 2, hiW, hiH, hiW / 2);
+    ctx.fillStyle = colHome;
+    ctx.fill();
+  }
   ctx.restore();
 
-  // ---- シャッターボタン ----
-  const sbCx = scrX + scrW / 2;
-  const sbCy = scrY + scrH * 0.855;
-  const sbR  = Math.max(8, Math.round(scrW * 0.080));
-  const sqSide  = Math.round(sbR * 1.15);
-  const sqR_end = Math.max(2, Math.round(sqSide * 0.24));
+  // ---- 三等分グリッド（Rule of Thirds）----
+  if (_phoneShowRoT) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(scrX, scrY, scrW, scrH, Math.round(Math.min(scrW, scrH) * 0.11));
+    ctx.clip();
+    ctx.globalAlpha = opacity * 0.30;
+    ctx.strokeStyle = _animOn ? _grad : `rgba(${_br},${_bg},${_bb},0.75)`;
+    ctx.lineWidth   = Math.max(0.5, 0.7 * s);
+    const r3W = scrW / 3, r3H = scrH / 3;
+    ctx.beginPath();
+    ctx.moveTo(scrX + r3W,     scrY);       ctx.lineTo(scrX + r3W,     scrY + scrH);
+    ctx.moveTo(scrX + r3W * 2, scrY);       ctx.lineTo(scrX + r3W * 2, scrY + scrH);
+    ctx.moveTo(scrX,           scrY + r3H); ctx.lineTo(scrX + scrW,    scrY + r3H);
+    ctx.moveTo(scrX,     scrY + r3H * 2);   ctx.lineTo(scrX + scrW,    scrY + r3H * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
-  // モーフタイマー更新
+  // ---- モーフタイマー更新（カメラUI・シャッター・RECで共用）----
   const nowMs = performance.now();
   const dtMs  = Math.min(50, _shutterMorphLast > 0 ? nowMs - _shutterMorphLast : 16);
   _shutterMorphLast = nowMs;
   _shutterMorphT += ((S.playing ? 1 : 0) - _shutterMorphT) * Math.min(1, (dtMs / 1000) * 7.0);
   const mt = _shutterMorphT;
 
+
+  // ---- シャッターボタン ----
+  // 縦: 横中央・下寄り、横: 右寄り・縦中央（参考画像に小わせ）
+  const sbCx = _land ? scrX + scrW * 0.855 : scrX + scrW / 2;
+  const sbCy = _land ? scrY + scrH / 2      : scrY + scrH * 0.855;
+  const sbR  = Math.max(8, Math.round((_land ? scrH : scrW) * 0.080));
+  const sqSide  = Math.round(sbR * 1.15);
+  const sqR_end = Math.max(2, Math.round(sqSide * 0.24));
+
   const glassR = sbR + Math.max(4, Math.round(4 * s));
 
   // ---- 背景透過: ガウスブラー磨りガラス ----
   // getImageData(desynchronized canvas)はGPU Stall→動画ラグの原因。
   // drawImageで GPU間コピーのみ使用する。
-  {
+  if (_phoneShowRec) {
     const gx = Math.floor(sbCx - glassR);
     const gy = Math.floor(sbCy - glassR);
     const gd = Math.ceil(glassR * 2);
@@ -1103,20 +1180,21 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
 
 
 
-  // ---- 録画インジケーター（赤丸→赤四角モーフ）----
+  // ---- 録画インジケーター（赤丸→赤四角モーフ）とタイムコード ----
   const pulse = 0.60 + 0.40 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
-  const iSide = sbR * 2 * (1 - mt) + sqSide * mt;
-  const iCorR = sbR * (1 - mt) + sqR_end * mt;
-  ctx.save();
-  ctx.globalAlpha = opacity * pulse;
-  ctx.fillStyle   = 'rgba(235,110,110,0.80)';
-  ctx.beginPath();
-  ctx.roundRect(sbCx - iSide / 2, sbCy - iSide / 2, iSide, iSide, iCorR);
-  ctx.fill();
-  ctx.restore();
+  if (_phoneShowRec) {
+    const iSide = sbR * 2 * (1 - mt) + sqSide * mt;
+    const iCorR = sbR * (1 - mt) + sqR_end * mt;
+    ctx.save();
+    ctx.globalAlpha = opacity * pulse;
+    ctx.fillStyle   = 'rgba(235,110,110,0.80)';
+    ctx.beginPath();
+    ctx.roundRect(sbCx - iSide / 2, sbCy - iSide / 2, iSide, iSide, iCorR);
+    ctx.fill();
+    ctx.restore();
 
-  // ---- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン）----
-  if (mt > 0.001) {
+    // ---- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン）----
+    if (mt > 0.001) {
     const dur = (loaded[0] && mediaType[0] === 'video' && vid[0].duration > 0)
       ? vid[0].duration
       : (loaded[1] && mediaType[1] === 'video' && vid[1].duration > 0 ? vid[1].duration : 0);
@@ -1128,7 +1206,7 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
         return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
       };
       const timeStr = fmt(_compositeT);
-      const fs      = Math.max(11, Math.round(scrW * 0.052));
+      const fs      = Math.max(11, Math.round((_land ? scrH : scrW) * 0.052));
       const padH    = Math.round(fs * 0.20);
       const padW    = Math.round(fs * 0.50);
       const boxR    = Math.max(3, Math.round(fs * 0.28));
@@ -1168,8 +1246,9 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
       ctx.textBaseline = 'alphabetic';
       ctx.fillText(timeStr, cX, tY + padH + textAsc);
       ctx.restore();
-    }
-  }
+    } // end dur > 0
+    } // end mt > 0.001
+  } // end _phoneShowRec
 
   ctx.restore();
 }
@@ -3084,6 +3163,7 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     S.mask.shape = btn.dataset.shape;
+    elPhoneUiRow.style.display = btn.dataset.shape === 'phone' ? '' : 'none';
     if (btn.dataset.shape === 'heart') {
       // ハート → 大きい方に揃えてアス比ロックを自動ON
       const side = Math.max(S.mask.w, S.mask.h);
@@ -3133,6 +3213,31 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       if (S.arLock) { S.arLock = false; _updateArLockBtn(); }
     }
   });
+});
+
+// ---- スマホ UI オーバーレイ 表示トグル ----
+[
+  { btn: elPhoneUiBtnRoT,   get: () => _phoneShowRoT,  set: v => { _phoneShowRoT  = v; } },
+  { btn: elPhoneUiBtnRec,   get: () => _phoneShowRec,  set: v => { _phoneShowRec  = v; } },
+  { btn: elPhoneUiBtnDot,   get: () => _phoneShowDot,  set: v => { _phoneShowDot  = v; } },
+].forEach(({ btn, get, set }) => {
+  btn.addEventListener('click', () => {
+    set(!get());
+    btn.classList.toggle('active', get());
+  });
+});
+
+elPhoneUiBtnRot90.addEventListener('click', () => {
+  _phoneLandscape = !_phoneLandscape;
+  elPhoneUiBtnRot90.classList.toggle('active', _phoneLandscape);
+  // マスクの幅・高さを swap して再センタリング
+  const cw = renderCvs.width, ch = renderCvs.height;
+  const tmp = S.mask.w;
+  S.mask.w = S.mask.h;
+  S.mask.h = tmp;
+  S.mask.x = Math.round((cw - S.mask.w) / 2);
+  S.mask.y = Math.round((ch - S.mask.h) / 2);
+  _syncMaskSliders();
 });
 
 function _updateArLockBtn() {
@@ -3837,6 +3942,10 @@ function collectSettings() {
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
     vid1Url:       _loadedSrcUrl[1] || _loadedPageUrl[1],
+    phoneLandscape: _phoneLandscape,
+    phoneShowRoT:   _phoneShowRoT,
+    phoneShowRec:   _phoneShowRec,
+    phoneShowDot:   _phoneShowDot,
   };
 }
 
@@ -3893,8 +4002,24 @@ function applySettings(d) {
     document.querySelectorAll('.shape-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.shape === d.maskShape);
     });
+    elPhoneUiRow.style.display = d.maskShape === 'phone' ? '' : 'none';
   }
-  // 動画ロードで AR が変化しても正しいマスクを復元できるよう pending に保存
+  if (d.phoneLandscape != null) {
+    _phoneLandscape = !!d.phoneLandscape;
+    elPhoneUiBtnRot90.classList.toggle('active', _phoneLandscape);
+  }
+  if (d.phoneShowRoT != null) {
+    _phoneShowRoT = !!d.phoneShowRoT;
+    elPhoneUiBtnRoT.classList.toggle('active', _phoneShowRoT);
+  }
+  if (d.phoneShowRec != null) {
+    _phoneShowRec = !!d.phoneShowRec;
+    elPhoneUiBtnRec.classList.toggle('active', _phoneShowRec);
+  }
+  if (d.phoneShowDot != null) {
+    _phoneShowDot = !!d.phoneShowDot;
+    elPhoneUiBtnDot.classList.toggle('active', _phoneShowDot);
+  }
   // srcW/srcH にプリセット保存時のバッファサイズを記録し、異なる解像度でも正確に変換できるようにする
   if (d.maskW != null) {
     _pendingMask = {
