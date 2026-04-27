@@ -343,9 +343,10 @@ const server = http.createServer(async (req, res) => {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         ...(referer ? { 'Referer': referer } : {}),
+        ...(req.headers['range'] ? { 'Range': req.headers['range'] } : {}),
       },
     };
-    https.get(opts, (upstream) => {
+    const upstreamReq = https.get(opts, (upstream) => {
       if ([301, 302, 303, 307, 308].includes(upstream.statusCode) && upstream.headers.location) {
         upstream.resume();
         res.writeHead(upstream.statusCode, { 'Location': upstream.headers.location, 'Access-Control-Allow-Origin': '*' });
@@ -355,11 +356,15 @@ const server = http.createServer(async (req, res) => {
         'Access-Control-Allow-Origin': '*',
         'Content-Type': upstream.headers['content-type'] || 'application/octet-stream',
         'Cache-Control': 'no-store',
+        'Accept-Ranges': 'bytes',
       };
       if (upstream.headers['content-length']) headers['Content-Length'] = upstream.headers['content-length'];
+      if (upstream.headers['content-range'])  headers['Content-Range']  = upstream.headers['content-range'];
       res.writeHead(upstream.statusCode, headers);
       upstream.pipe(res);
-    }).on('error', (e) => { res.writeHead(502); res.end(e.message); });
+      res.on('close', () => { upstream.destroy(); });
+    });
+    upstreamReq.on('error', (e) => { if (!res.headersSent) { res.writeHead(502); res.end(e.message); } });
     return;
   }
 
@@ -370,6 +375,12 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`gentle-frame proxy running at http://localhost:${PORT}`);
   console.log('  GET /resolve?url=<encoded-url>[&token=<bearer>]');
+});
+
+// クライアント切断等による EPIPE でプロセスがクラッシュしないよう保護
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  console.error('[uncaughtException]', err);
 });
 
 // EOF

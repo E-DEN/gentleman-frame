@@ -183,8 +183,8 @@ grainCvs.width = 256; grainCvs.height = 256;
 const grainCtx = grainCvs.getContext('2d');
 
 // Canvas バッファ解像度を CSS 表示サイズに同期してアップスケール時のぼかしを防ぐ
-let _canvasAR = 854 / 480; // 現在のアスペクト比
-let _prevBufW = 854, _prevBufH = 480; // バッファ変更前のサイズ（マスク比率スケール用）
+let _canvasAR = 1920 / 1080; // 現在のアスペクト比
+let _prevBufW = 1920, _prevBufH = 1080; // バッファ変更前のサイズ（マスク比率スケール用）
 
 // CSS変数キャッシュ (getComputedStyleを毎フレーム呼ばないため)
 let _cachedAccent = '';
@@ -273,8 +273,16 @@ function setCanvasAspectRatio(w, h) {
     const pm = _pendingMask;
     _pendingMask = null;
     if (!_applyMaskFromPm(pm, w, h)) {
-      S.mask.w = Math.min(400, w);
-      S.mask.h = Math.min(400, h);
+      if (S.mask.shape === 'phone') {
+        const targetW = 360, targetH = 780;
+        let newW = Math.min(targetW, w);
+        let newH = Math.round(newW * targetH / targetW);
+        if (newH > h) { newH = h; newW = Math.round(newH * targetW / targetH); }
+        S.mask.w = newW; S.mask.h = newH;
+      } else {
+        S.mask.w = Math.min(400, w);
+        S.mask.h = Math.min(400, h);
+      }
       S.mask.x = Math.round((w - S.mask.w) / 2);
       S.mask.y = Math.round((h - S.mask.h) / 2);
     }
@@ -298,20 +306,19 @@ let _pendingMask = null; // applySettings から設定。次回 setCanvasAspectR
 let _activePresetIdx = null; // 現在適用中のプリセットのインデックス
 const _missingFiles = new Set(); // 「presetId_slot」形式: このセッションでファイル未発見だったスロット
 
-// 初回同期: app.js は </body> 直前で実行されるため getBoundingClientRect が確実に使える。
-// ResizeObserver より先に同期することで初期フレームのぼかしを防ぐ。
+// 初回同期: バッファ解像度はFHD(1920x1080)固定。CSS表示サイズは _dispW/_dispH で追跡。
 {
   const r = canvas.getBoundingClientRect();
   const iw = Math.round(r.width), ih = Math.round(r.height);
-  if (iw > 0 && ih > 0) {
-    _syncAllBuffers(iw, ih);
-    _prevBufW = iw; _prevBufH = ih;
-    S.mask.w = Math.min(400, iw); S.mask.h = Math.min(400, ih);
-    S.mask.x = Math.round((iw - S.mask.w) / 2);
-    S.mask.y = Math.round((ih - S.mask.h) / 2);
-    _bufferSynced = true;
-    _syncMaskSliders();
-  }
+  const BUF_W = 1920, BUF_H = 1080;
+  _syncAllBuffers(BUF_W, BUF_H);
+  _prevBufW = BUF_W; _prevBufH = BUF_H;
+  if (iw > 0) { _dispW = iw; _dispH = Math.round(iw / _canvasAR); }
+  S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+  S.mask.x = Math.round((BUF_W - S.mask.w) / 2);
+  S.mask.y = Math.round((BUF_H - S.mask.h) / 2);
+  _bufferSynced = true;
+  _syncMaskSliders();
 }
 
 // ResizeObserver: _dispW/_dispH の追跡のみ。バッファ・マスクは変更しない。
@@ -324,11 +331,12 @@ new ResizeObserver(entries => {
   if (_bufferSynced) return; // 初回同期済みなら何もしない
   // フォールバック: getBoundingClientRect が 0 だった極稀なケース
   const h = _dispH;
-  _syncAllBuffers(w, h);
-  _prevBufW = w; _prevBufH = h;
-  S.mask.w = Math.min(400, w); S.mask.h = Math.min(400, h);
-  S.mask.x = Math.round((w - S.mask.w) / 2);
-  S.mask.y = Math.round((h - S.mask.h) / 2);
+  const BUF_W = 1920, BUF_H = 1080;
+  _syncAllBuffers(BUF_W, BUF_H);
+  _prevBufW = BUF_W; _prevBufH = BUF_H;
+  S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+  S.mask.x = Math.round((BUF_W - S.mask.w) / 2);
+  S.mask.y = Math.round((BUF_H - S.mask.h) / 2);
   _bufferSynced = true;
   _syncMaskSliders();
 }).observe(canvas);
@@ -847,6 +855,13 @@ function _renderFrame() {
     ctx.restore();
   }
 
+  // --- スマホ形状オーバーレイ ---
+  if (!maskHidden && S.mask.shape === 'phone') {
+    const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
+    const phase = (performance.now() * 0.001 * speed) % 1;
+    _drawPhoneFrame(ctx, m, bufScale, 1.0, phase);
+  }
+
   // --- コンポジット時刻 ---
   const _rafNow = performance.now();
   if (S.playing && !_compositeSeekPending) {
@@ -904,6 +919,10 @@ function buildMaskPath(c, m) {
   c.beginPath();
   if (m.shape === 'rect') {
     c.rect(m.x, m.y, m.w, m.h);
+  } else if (m.shape === 'phone') {
+    const br = Math.round(Math.min(m.w, m.h) * 0.11);
+    if (typeof c.roundRect === 'function') { c.roundRect(m.x, m.y, m.w, m.h, br); }
+    else { c.rect(m.x, m.y, m.w, m.h); }
   } else if (m.shape === 'circle') {
     c.ellipse(m.x + m.w / 2, m.y + m.h / 2, m.w / 2, m.h / 2, 0, 0, Math.PI * 2);
   } else if (m.shape === 'heart') {
@@ -925,6 +944,234 @@ function buildMaskPath(c, m) {
     }
     c.closePath();
   }
+}
+
+// スマホカメラ録画風フレーム描画
+let _shutterMorphT = 0;    // モーフ状態 (0=丸, 1=角丸四角)
+let _shutterMorphLast = 0; // 前回の nowMs
+let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
+let _glassSamplerCtx  = null;
+
+function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
+  if (typeof ctx.roundRect !== 'function') return;
+  const s = bufScale;
+
+  // 選択色をRGBに展開
+  const _bc     = elBorderColor.value;
+  const _br     = parseInt(_bc.slice(1, 3), 16);
+  const _bg     = parseInt(_bc.slice(3, 5), 16);
+  const _bb     = parseInt(_bc.slice(5, 7), 16);
+
+  // スマートフォン ディスプレイ比率: 9:19.5
+  const IP17_W = 9, IP17_H = 19.5;
+  let scrW = m.w, scrH = m.h;
+  if (m.w / m.h > IP17_W / IP17_H) {
+    scrW = Math.round(m.h * (IP17_W / IP17_H));
+  } else {
+    scrH = Math.round(m.w * (IP17_H / IP17_W));
+  }
+  const scrX = m.x + Math.round((m.w - scrW) / 2);
+  const scrY = m.y + Math.round((m.h - scrH) / 2);
+
+  const mSide = Math.round(scrW * 0.040);
+  const mTop  = Math.round(scrH * 0.048);
+  const mBot  = Math.round(scrH * 0.038);
+  const bx = scrX - mSide, by = scrY - mTop;
+  const bw = scrW + mSide * 2, bh = scrH + mTop + mBot;
+  const bodyR = Math.round(Math.min(bw, bh) * 0.12);
+
+  const sw   = Math.max(1.5, 2.5 * s);
+  const btnW = Math.max(3, Math.round(4 * s));
+  const btnR = Math.round(2 * s);
+
+  // アニメON/OFF を確定してパーツ色を決定
+  const _anim   = elBorderAnim.value;
+  const _bright = parseInt(elBorderAnimBright.value, 10);
+  const _animOn = _anim !== 'none';
+  const _grad   = _animOn ? _buildBorderGrad(ctx, { x: bx, y: by, w: bw, h: bh }, phase, _anim, _bright) : null;
+  // パーツ opacity: アニメON時はglobalAlphaで乗算、OFF時はrgbaに直接埋め込む
+  const _dotA  = 0.85;
+  const _btnA  = 0.70;
+  const _homeA = 0.45;
+  const colDot  = _animOn ? _grad : `rgba(${_br},${_bg},${_bb},${_dotA})`;
+  const colBtn  = _animOn ? _grad : `rgba(${_br},${_bg},${_bb},${_btnA})`;
+  const colHome = _animOn ? _grad : `rgba(${_br},${_bg},${_bb},${_homeA})`;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+
+  // ---- 本体アウトライン（選択色 / アニメ対応）----
+  {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur  = 4 * s;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, bodyR);
+    ctx.strokeStyle = _animOn ? _grad : _bc;
+    ctx.lineWidth = sw;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---- パンチホールカメラ ----
+  const dotR = Math.max(2, Math.round(2.5 * s));
+  ctx.save();
+  if (_animOn) ctx.globalAlpha = opacity * _dotA;
+  ctx.beginPath();
+  ctx.arc(scrX + scrW / 2, scrY + mTop * 0.44, dotR, 0, Math.PI * 2);
+  ctx.fillStyle = colDot;
+  ctx.fill();
+  ctx.restore();
+
+  // ---- サイドボタン ----
+  ctx.save();
+  if (_animOn) ctx.globalAlpha = opacity * _btnA;
+  ctx.fillStyle = colBtn;
+  [[0.22, 0.055], [0.35, 0.085], [0.46, 0.085]].forEach(([yf, hf]) => {
+    ctx.beginPath();
+    ctx.roundRect(bx - btnW, by + bh * yf, btnW, bh * hf, btnR);
+    ctx.fill();
+  });
+  ctx.beginPath();
+  ctx.roundRect(bx + bw, by + bh * 0.37, btnW, bh * 0.13, btnR);
+  ctx.fill();
+  ctx.restore();
+
+  // ---- ホームインジケーター ----
+  const hiW = scrW * 0.26, hiH = Math.max(2.5, Math.round(3 * s));
+  ctx.save();
+  if (_animOn) ctx.globalAlpha = opacity * _homeA;
+  ctx.beginPath();
+  ctx.roundRect(scrX + (scrW - hiW) / 2, scrY + scrH + (mBot - hiH) / 2, hiW, hiH, hiH / 2);
+  ctx.fillStyle = colHome;
+  ctx.fill();
+  ctx.restore();
+
+  // ---- シャッターボタン ----
+  const sbCx = scrX + scrW / 2;
+  const sbCy = scrY + scrH * 0.855;
+  const sbR  = Math.max(8, Math.round(scrW * 0.080));
+  const sqSide  = Math.round(sbR * 1.15);
+  const sqR_end = Math.max(2, Math.round(sqSide * 0.24));
+
+  // モーフタイマー更新
+  const nowMs = performance.now();
+  const dtMs  = Math.min(50, _shutterMorphLast > 0 ? nowMs - _shutterMorphLast : 16);
+  _shutterMorphLast = nowMs;
+  _shutterMorphT += ((S.playing ? 1 : 0) - _shutterMorphT) * Math.min(1, (dtMs / 1000) * 7.0);
+  const mt = _shutterMorphT;
+
+  const glassR = sbR + Math.max(4, Math.round(4 * s));
+
+  // ---- 背景透過: ガウスブラー磨りガラス ----
+  // getImageData(desynchronized canvas)はGPU Stall→動画ラグの原因。
+  // drawImageで GPU間コピーのみ使用する。
+  {
+    const gx = Math.floor(sbCx - glassR);
+    const gy = Math.floor(sbCy - glassR);
+    const gd = Math.ceil(glassR * 2);
+    const cW = ctx.canvas.width, cH = ctx.canvas.height;
+    const safeGx = Math.max(0, gx);
+    const safeGy = Math.max(0, gy);
+    const safeW  = Math.min(gd - (safeGx - gx), cW - safeGx);
+    const safeH  = Math.min(gd - (safeGy - gy), cH - safeGy);
+    if (safeW > 4 && safeH > 4) {
+      try {
+        if (!_glassSamplerCvs || _glassSamplerCvs.width !== safeW || _glassSamplerCvs.height !== safeH) {
+          _glassSamplerCvs = document.createElement('canvas');
+          _glassSamplerCvs.width  = safeW;
+          _glassSamplerCvs.height = safeH;
+          _glassSamplerCtx = _glassSamplerCvs.getContext('2d');
+        }
+        // GPU間コピー（CPU readbackなし）
+        _glassSamplerCtx.drawImage(ctx.canvas, safeGx, safeGy, safeW, safeH, 0, 0, safeW, safeH);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sbCx, sbCy, glassR, 0, Math.PI * 2);
+        ctx.clip();
+        const blurPx = Math.max(4, Math.round(glassR * 0.45));
+        ctx.filter = `blur(${blurPx}px)`;
+        ctx.drawImage(_glassSamplerCvs, safeGx, safeGy);
+        ctx.filter = 'none';
+        // 薄白膜（曇り感）
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.fill();
+        ctx.restore();
+      } catch(e) {}
+    }
+  }
+
+
+
+  // ---- 録画インジケーター（赤丸→赤四角モーフ）----
+  const pulse = 0.60 + 0.40 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
+  const iSide = sbR * 2 * (1 - mt) + sqSide * mt;
+  const iCorR = sbR * (1 - mt) + sqR_end * mt;
+  ctx.save();
+  ctx.globalAlpha = opacity * pulse;
+  ctx.fillStyle   = 'rgba(235,110,110,0.80)';
+  ctx.beginPath();
+  ctx.roundRect(sbCx - iSide / 2, sbCy - iSide / 2, iSide, iSide, iCorR);
+  ctx.fill();
+  ctx.restore();
+
+  // ---- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン）----
+  if (mt > 0.001) {
+    const dur = (loaded[0] && mediaType[0] === 'video' && vid[0].duration > 0)
+      ? vid[0].duration
+      : (loaded[1] && mediaType[1] === 'video' && vid[1].duration > 0 ? vid[1].duration : 0);
+    if (dur > 0) {
+      const fmt = (t) => {
+        const ss = Math.floor(t % 60);
+        const mm = Math.floor(t / 60) % 60;
+        const hh = Math.floor(t / 3600);
+        return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+      };
+      const timeStr = fmt(_compositeT);
+      const fs      = Math.max(11, Math.round(scrW * 0.052));
+      const padH    = Math.round(fs * 0.20);
+      const padW    = Math.round(fs * 0.50);
+      const boxR    = Math.max(3, Math.round(fs * 0.28));
+
+      ctx.save();
+      ctx.font = `${fs}px Consolas, "Courier New", monospace`;
+      const metrics = ctx.measureText(timeStr);
+      const tw   = metrics.width;
+      // 実際の字形の高さ（emスクエアでなく視覚的な高さ）でボックスを決定
+      const textAsc  = metrics.actualBoundingBoxAscent  ?? fs * 0.75;
+      const textDesc = metrics.actualBoundingBoxDescent ?? fs * 0.20;
+      const textH = textAsc + textDesc;
+      const boxW = tw + padW * 2;
+      const boxH = textH + padH * 2;
+      const tX   = scrX + Math.round((scrW - boxW) / 2);
+      const tY   = scrY + Math.round(scrH * 0.045);
+      const cX   = tX + boxW / 2;
+      const cY   = tY + boxH / 2;
+
+      // mt でスケール＋フェードイン（0.80→1.0）
+      const tsScale = 0.80 + 0.20 * mt;
+      ctx.translate(cX, cY);
+      ctx.scale(tsScale, tsScale);
+      ctx.translate(-cX, -cY);
+
+      // 赤背景（レコード丸と同色・同 pulse）
+      ctx.globalAlpha = opacity * pulse * mt;
+      ctx.beginPath();
+      ctx.roundRect(tX, tY, boxW, boxH, boxR);
+      ctx.fillStyle = 'rgba(235,110,110,0.80)';
+      ctx.fill();
+
+      // テキスト：baseline を alphabet 基準にして視覚的中央へ配置
+      ctx.globalAlpha = opacity * pulse * mt;
+      ctx.fillStyle   = 'rgba(255,255,255,0.97)';
+      ctx.textAlign   = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(timeStr, cX, tY + padH + textAsc);
+      ctx.restore();
+    }
+  }
+
+  ctx.restore();
 }
 
 _startRenderLoop();
@@ -2825,9 +3072,15 @@ document.querySelectorAll('.offset-btn').forEach(btn => {
 // ============================================================
 //  シェイプボタン
 // ============================================================
+// phone切り替え前のマスクサイズを保存（離脱時に復元するため）
+let _prePhoneMask = null;
+// phone離脱時のphone状態を保存（再適用時に復元するため）
+let _lastPhoneMask = null;
+
 document.querySelectorAll('.shape-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.disabled) return;
+    const prevShape = S.mask.shape;
     document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     S.mask.shape = btn.dataset.shape;
@@ -2842,8 +3095,41 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
         updateSliderFill(el);
       });
       if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
+    } else if (btn.dataset.shape === 'phone') {
+      // phoneに切り替える前のサイズを保存（初回のみ）
+      if (prevShape !== 'phone') {
+        _prePhoneMask = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
+      }
+      // 前回のphone状態があれば復元、なければ 360x780 をデフォルト適用
+      const cw = canvas.width, ch = canvas.height;
+      let newW, newH, newX, newY;
+      if (_lastPhoneMask) {
+        newW = _lastPhoneMask.w; newH = _lastPhoneMask.h;
+        newX = _lastPhoneMask.x; newY = _lastPhoneMask.y;
+      } else {
+        const targetW = 360, targetH = 780;
+        newW = Math.min(targetW, cw);
+        newH = Math.round(newW * targetH / targetW);
+        if (newH > ch) { newH = ch; newW = Math.round(newH * targetW / targetH); }
+        newX = Math.round((cw - newW) / 2);
+        newY = Math.round((ch - newH) / 2);
+      }
+      S.mask.w = newW; S.mask.h = newH;
+      S.mask.x = newX; S.mask.y = newY;
+      _syncMaskSliders();
+      if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
     } else {
-      // ハート以外に切り替えたらロックを自動OFF
+      // phoneから離れたら: phone状態を保存してから非phone状態を復元
+      if (prevShape === 'phone') {
+        _lastPhoneMask = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
+        if (_prePhoneMask) {
+          S.mask.w = _prePhoneMask.w; S.mask.h = _prePhoneMask.h;
+          S.mask.x = _prePhoneMask.x; S.mask.y = _prePhoneMask.y;
+          _prePhoneMask = null;
+          _syncMaskSliders();
+        }
+      }
+      // phone/heart以外に切り替えたらロックを自動OFF
       if (S.arLock) { S.arLock = false; _updateArLockBtn(); }
     }
   });
@@ -3012,6 +3298,7 @@ function hitTestMask(px, py) {
     buildMaskPath(tc, { x: 0, y: 0, w, h, shape: 'heart' });
     return tc.isPointInPath(px - x, py - y);
   }
+  if (shape === 'phone') return px >= x && px <= x + w && py >= y && py <= y + h;
   return false;
 }
 
@@ -4348,7 +4635,7 @@ const _B64U = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g
 const _B64D = s => { const b64 = s.replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(b64.padEnd(Math.ceil(b64.length/4)*4,'=')), c => c.charCodeAt(0)); };
 
 // ---- Bit-pack: 157 bits → 20 bytes → 27 base64url chars ----
-const _MSHAPES = ['circle','rect','triangle','diamond','star','hexagon','none','ellipse'];
+const _MSHAPES = ['circle','rect','triangle','diamond','star','hexagon','none','ellipse','phone'];
 function _packPreset(d) {
   const bits = [];
   const w = (raw, n) => { const v = Math.round(+raw||0); for (let i=n-1;i>=0;i--) bits.push((v>>i)&1); };
