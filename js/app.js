@@ -103,21 +103,9 @@ const mediaType = ['video', 'video']; // 'video' | 'image'
 // → GPU overlay demotion 時の drawImage(video) ブロッキングを回避。
 const _vidBitmap = [null, null];
 const _vidBitmapPending = [false, false];
-
 function _startBitmapCapture(i) {
   if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
-  function onFrame(now, metadata) {
-    // FPS 計測: expectedDisplayTime の間隔から推定
-    const edt = metadata?.expectedDisplayTime ?? 0;
-    if (_vidFpsPrev[i] > 0 && edt > _vidFpsPrev[i]) {
-      const interval = edt - _vidFpsPrev[i];
-      if (interval > 4 && interval < 200) { // 5fps〜250fps の有効範囲のみ
-        const fps = Math.round(1000 / interval);
-        _vidFps[i] = _vidFps[i] === 0 ? fps : Math.round(_vidFps[i] * 0.7 + fps * 0.3);
-      }
-    }
-    _vidFpsPrev[i] = edt;
-
+  function onFrame() {
     if (!_vidBitmapPending[i]) {
       _vidBitmapPending[i] = true;
       createImageBitmap(vid[i]).then(bmp => {
@@ -967,7 +955,7 @@ function buildMaskPath(c, m) {
 let _shutterMorphT = 0;    // モーフ状態 (0=丸, 1=角丸四角)
 let _shutterMorphLast = 0; // 前回の nowMs
 let _phoneShowRoT  = false; // 三等分グリッド表示
-let _phoneShowRec  = true;  // RECインジケーター+タイムコード表示
+let _phoneShowRec  = true;  // RECインジケーター＋タイムコード表示
 let _phoneShowDot  = true;  // パンチホールカメラ表示
 let _phoneLandscape = false; // 横向きモード
 let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
@@ -1048,8 +1036,8 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
     ctx.save();
     if (_animOn) ctx.globalAlpha = opacity * _dotA;
     ctx.beginPath();
-    // 縦: 上中央、横: 左中央（参考画像に合わせ左辺）
-    const dotX = _land ? scrX - mLong1 * 0.44 : scrX + scrW / 2;
+    // 縦: ディスプレイ上辺中央、横: ディスプレイ左辺中央（どちらもディスプレイ内）
+    const dotX = _land ? scrX + mLong1 * 0.44 : scrX + scrW / 2;
     const dotY = _land ? scrY + scrH / 2        : scrY + mLong1 * 0.44;
     ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
     ctx.fillStyle = colDot;
@@ -1180,7 +1168,7 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
 
 
 
-  // ---- 録画インジケーター（赤丸→赤四角モーフ）とタイムコード ----
+  // ---- 録画インジケーター（赤丸→赤四角モーフ）＋タイムコード ----
   const pulse = 0.60 + 0.40 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
   if (_phoneShowRec) {
     const iSide = sbR * 2 * (1 - mt) + sqSide * mt;
@@ -3151,20 +3139,39 @@ document.querySelectorAll('.offset-btn').forEach(btn => {
 // ============================================================
 //  シェイプボタン
 // ============================================================
-// phone切り替え前のマスクサイズを保存（離脱時に復元するため）
-let _prePhoneMask = null;
-// phone離脱時のphone状態を保存（再適用時に復元するため）
-let _lastPhoneMask = null;
+// phone ↔ 非phone で独立してマスク状態を保持
+let _phoneMaskState    = null; // phone 時の最後の状態
+let _nonPhoneMaskState = null; // 非phone 時の最後の状態
 
 document.querySelectorAll('.shape-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.disabled) return;
     const prevShape = S.mask.shape;
+    const newShape  = btn.dataset.shape;
     document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    S.mask.shape = btn.dataset.shape;
-    elPhoneUiRow.style.display = btn.dataset.shape === 'phone' ? '' : 'none';
-    if (btn.dataset.shape === 'heart') {
+    S.mask.shape = newShape;
+    elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
+
+    // --- phone ↔ 非phone の状態スワップ（形状固有処理より先に行う）---
+    if (prevShape !== 'phone' && newShape === 'phone') {
+      // 非phone → phone: 現在の非phone状態を保存
+      _nonPhoneMaskState = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
+    } else if (prevShape === 'phone' && newShape !== 'phone') {
+      // phone → 非phone: phone状態を保存し、非phone状態を復元
+      _phoneMaskState = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
+      if (_nonPhoneMaskState) {
+        S.mask.w = _nonPhoneMaskState.w; S.mask.h = _nonPhoneMaskState.h;
+        S.mask.x = _nonPhoneMaskState.x; S.mask.y = _nonPhoneMaskState.y;
+      } else {
+        S.mask.w = 400; S.mask.h = 400;
+        S.mask.x = Math.round((canvas.width  - 400) / 2);
+        S.mask.y = Math.round((canvas.height - 400) / 2);
+      }
+    }
+
+    // --- 形状固有処理 ---
+    if (newShape === 'heart') {
       // ハート → 大きい方に揃えてアス比ロックを自動ON
       const side = Math.max(S.mask.w, S.mask.h);
       S.mask.w = side; S.mask.h = side;
@@ -3175,17 +3182,13 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
         updateSliderFill(el);
       });
       if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
-    } else if (btn.dataset.shape === 'phone') {
-      // phoneに切り替える前のサイズを保存（初回のみ）
-      if (prevShape !== 'phone') {
-        _prePhoneMask = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
-      }
-      // 前回のphone状態があれば復元、なければ 360x780 をデフォルト適用
+    } else if (newShape === 'phone') {
+      // phone状態を復元（なければデフォルト 360x780）
       const cw = canvas.width, ch = canvas.height;
       let newW, newH, newX, newY;
-      if (_lastPhoneMask) {
-        newW = _lastPhoneMask.w; newH = _lastPhoneMask.h;
-        newX = _lastPhoneMask.x; newY = _lastPhoneMask.y;
+      if (_phoneMaskState) {
+        newW = _phoneMaskState.w; newH = _phoneMaskState.h;
+        newX = _phoneMaskState.x; newY = _phoneMaskState.y;
       } else {
         const targetW = 360, targetH = 780;
         newW = Math.min(targetW, cw);
@@ -3196,22 +3199,12 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       }
       S.mask.w = newW; S.mask.h = newH;
       S.mask.x = newX; S.mask.y = newY;
-      _syncMaskSliders();
       if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
     } else {
-      // phoneから離れたら: phone状態を保存してから非phone状態を復元
-      if (prevShape === 'phone') {
-        _lastPhoneMask = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
-        if (_prePhoneMask) {
-          S.mask.w = _prePhoneMask.w; S.mask.h = _prePhoneMask.h;
-          S.mask.x = _prePhoneMask.x; S.mask.y = _prePhoneMask.y;
-          _prePhoneMask = null;
-          _syncMaskSliders();
-        }
-      }
       // phone/heart以外に切り替えたらロックを自動OFF
       if (S.arLock) { S.arLock = false; _updateArLockBtn(); }
     }
+    _syncMaskSliders();
   });
 });
 
@@ -3264,7 +3257,21 @@ document.getElementById('maskVisBtn').addEventListener('click', () => {
 
 document.getElementById('maskResetBtn').addEventListener('click', () => {
   const cw = canvas.width, ch = canvas.height;
-  const dw = 400, dh = 400;
+  let dw, dh;
+  if (S.mask.shape === 'phone') {
+    if (_phoneLandscape) {
+      // 横向き 19.5:9 — キャンバス高さの 85% を基準
+      dh = Math.round(ch * 0.85);
+      dw = Math.round(dh * 19.5 / 9);
+      if (dw > cw) { dw = Math.round(cw * 0.90); dh = Math.round(dw * 9 / 19.5); }
+    } else {
+      // 縦向き 9:19.5 — キャンバス高さの 85% を基準
+      dh = Math.round(ch * 0.85);
+      dw = Math.round(dh * 9 / 19.5);
+    }
+  } else {
+    dw = 400; dh = 400;
+  }
   S.mask.x = Math.round((cw - dw) / 2);
   S.mask.y = Math.round((ch - dh) / 2);
   S.mask.w = dw;
@@ -4014,6 +4021,11 @@ function applySettings(d) {
   }
   if (d.phoneShowRec != null) {
     _phoneShowRec = !!d.phoneShowRec;
+    elPhoneUiBtnRec.classList.toggle('active', _phoneShowRec);
+  }
+  // 旧プリセット互換: phoneShowTC は phoneShowRec として扱う
+  if (d.phoneShowTC != null && d.phoneShowRec == null) {
+    _phoneShowRec = !!d.phoneShowTC;
     elPhoneUiBtnRec.classList.toggle('active', _phoneShowRec);
   }
   if (d.phoneShowDot != null) {

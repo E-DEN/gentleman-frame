@@ -2,6 +2,8 @@
 
 いわゆる紳士枠を表示するツール
 
+![デモ](docs.gif)
+
 **<https://gentleman-frame.pages.dev/>**
 
 ---
