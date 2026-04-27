@@ -51,10 +51,6 @@
 
 習うより慣れよー。
 
----
-
-## ショートカット
-
 ### キーボード
 
 | キー | 動作 |
@@ -82,6 +78,19 @@ Cloudflare のインフラは送信元 IP アドレスおよびアクセス日�
 
 ---
 
+## デモ素材クレジット
+
+デモ GIF に以下の 3D モデル作品を使用しています。
+
+| 作品 | 作者 |
+| --- | --- |
+| [秤アツコ（ブルアカ）](https://3d.nicovideo.jp/works/td88695) | ちくわエグゼ ([@chikuwa_exe](https://x.com/chikuwa_exe)) |
+| [秤アツコ(ブルーアーカイブ)水着](https://3d.nicovideo.jp/works/td95433) | ちくわエグゼ ([@chikuwa_exe](https://x.com/chikuwa_exe)) |
+
+ライセンス：著作表示・非商用・改変可・再配布時URL表示
+
+---
+
 ## License
 
 [MIT](LICENSE)
@@ -91,3 +100,4 @@ Cloudflare のインフラは送信元 IP アドレスおよびアクセス日�
 ## バグ報告・機能要望
 
 [GitHub Issues](https://github.com/E-DEN/gentleman-frame/issues/new/choose) からお願いします。
+
