@@ -1377,9 +1377,7 @@ async function loadVideoFromURL(index, url) {
     if (/iwara\.(tv|ai)\/video\//i.test(url)) {
       setStatus(t('api-checking'));
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      // iwara.ai → iwara.tv に正規化（プロキシ側は両ドメイン対応）
-      const iwaraUrl = url.replace(/^(https?:\/\/(?:www\.)?)(iwara\.ai)(.*)/i, '$1iwara.tv$3');
-      const result = await resolveIwaraURL(iwaraUrl);
+      const result = await resolveIwaraURL(url);
       if (!result) throw new Error(t('url-resolve-fail'));
       setStatus('CDN URLを取得中...');
       resolvedUrl = result.url;
