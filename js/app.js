@@ -2645,6 +2645,10 @@ document.addEventListener('keydown', e => {
       _applyCompositeT(_compositeT);
       break;
     }
+    case 'KeyP':
+      e.preventDefault();
+      document.getElementById('screenshotBtn').click();
+      break;
   }
 });
 
