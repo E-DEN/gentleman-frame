@@ -39,6 +39,7 @@
     "height": "높이",
     "mask-x": "X 위치",
     "mask-y": "Y 위치",
+    "mask-zoom": "줌",
     "blur": "블러",
     "border-w": "테두리",
     "border-op": "불투명도",

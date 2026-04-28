@@ -361,6 +361,7 @@ const elPhoneUiBtnRoT = document.getElementById('phoneUiRoT');
 const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
 const elPhoneUiBtnDot = document.getElementById('phoneUiDot');
 const elPhoneUiBtnRot90 = document.getElementById('phoneUiRot90');
+const elMaskZoom      = document.getElementById('maskZoom');
 const elBlurAmt       = document.getElementById('blurAmt');
 const elFilterVignette  = document.getElementById('filterVignette');
 const elFilterCA        = document.getElementById('filterCA');
@@ -527,7 +528,14 @@ function _renderFrame() {
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
-    offCtx.drawImage(getMediaSrc(1), 0, 0, W, H);
+    const maskZoom = parseFloat(elMaskZoom.value);
+    if (maskZoom > 1.001) {
+      const cx = m.x + m.w / 2;
+      const cy = m.y + m.h / 2;
+      offCtx.drawImage(getMediaSrc(1), cx * (1 - maskZoom), cy * (1 - maskZoom), W * maskZoom, H * maskZoom);
+    } else {
+      offCtx.drawImage(getMediaSrc(1), 0, 0, W, H);
+    }
     if (!maskHidden) {
       offCtx.globalCompositeOperation = 'destination-in';
       buildMaskPath(offCtx, m);
@@ -2851,6 +2859,7 @@ bindSlider('maskOffY', 'maskOffYVal', v => `${Math.round(v)}`, v => {
   S.mask.y = Math.max(0, Math.min(cy + Math.round(v), ch - S.mask.h));
 });
 bindSlider('borderW', 'borderWVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('maskZoom', 'maskZoomVal', v => v.toFixed(1), null);
 bindSlider('blurAmt',  'blurAmtVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
