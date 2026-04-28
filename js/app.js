@@ -5,6 +5,20 @@ const PRESET_KEY = 'gentleFrame_presets';
 let _presetsReady = false;
 let _maskFollowMode = false;
 let _followTargetX = 0, _followTargetY = 0;
+const _ANIM_DEFAULTS = {
+  cm:     ['#22d3ee','#f472b6'],
+  sakura: ['#f472b6','#4ade80'],
+  neon:   ['#4ade80','#22d3ee'],
+  fire:   ['#ef4444','#f97316'],
+  pink:   ['#dcbcd2','#cd2377'],
+};
+let _animColors = {
+  cm:     ['#22d3ee','#f472b6'],
+  sakura: ['#f472b6','#4ade80'],
+  neon:   ['#4ade80','#22d3ee'],
+  fire:   ['#ef4444','#f97316'],
+  pink:   ['#dcbcd2','#cd2377'],
+};
 
 // ドロップゾーンの loaded アニメーションを管理するヘルパー。
 // カード開閉時のアニメーション再起動を防ぐため、終了後に inline で凍結する。
@@ -465,26 +479,11 @@ function _buildBorderGrad(ctx, m, phase, anim, bright) {
   );
   if (anim === 'rainbow') {
     for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60},100%,${L}%)`);
-  } else if (anim === 'cm') {
-    g.addColorStop(0,   `hsl(180,100%,${L}%)`);
-    g.addColorStop(0.5, `hsl(300,100%,${L}%)`);
-    g.addColorStop(1,   `hsl(180,100%,${L}%)`);
-  } else if (anim === 'sakura') {
-    g.addColorStop(0,   `hsl(335,100%,${L}%)`);
-    g.addColorStop(0.5, `hsl(130,90%,${L}%)`);
-    g.addColorStop(1,   `hsl(335,100%,${L}%)`);
-  } else if (anim === 'neon') {
-    g.addColorStop(0,   `hsl(145,100%,${L}%)`);
-    g.addColorStop(0.5, `hsl(200,100%,${L}%)`);
-    g.addColorStop(1,   `hsl(145,100%,${L}%)`);
-  } else if (anim === 'fire') {
-    g.addColorStop(0,   `hsl(0,100%,${L}%)`);
-    g.addColorStop(0.5, `hsl(22,100%,${L}%)`);
-    g.addColorStop(1,   `hsl(0,100%,${L}%)`);
-  } else if (anim === 'aurora') {
-    g.addColorStop(0,   `hsl(260,100%,${L}%)`);
-    g.addColorStop(0.5, `hsl(160,100%,${L}%)`);
-    g.addColorStop(1,   `hsl(260,100%,${L}%)`);
+  } else if (_animColors[anim]) {
+    const [c0, c1] = _animColors[anim];
+    g.addColorStop(0,   c0);
+    g.addColorStop(0.5, c1);
+    g.addColorStop(1,   c0);
   }
   return g;
 }
@@ -2606,6 +2605,35 @@ document.addEventListener('keydown', e => {
   if (document.activeElement?.contentEditable === 'true' || document.activeElement?.contentEditable === 'plaintext-only') return;
 
   switch (e.code) {
+    case 'Escape': {
+      // 言語ポップが開いているとき: 追加フォーム → ダイアログ の二段階
+      const langDialog = document.getElementById('langImportDialog');
+      if (langDialog && !langDialog.hidden) {
+        const addSec = document.getElementById('langAddSection');
+        if (addSec && !addSec.hidden) {
+          addSec.hidden = true;
+          const toggle = document.getElementById('langAddToggle');
+          if (toggle) toggle.querySelector('span:last-child').textContent = t('lang-add');
+        } else {
+          langDialog.hidden = true;
+          document.getElementById('langImportText').value = '';
+        }
+        return;
+      }
+      // カラーピッカーが開いているときの二段階 Escape
+      const pop = document.getElementById('borderColorPopover');
+      if (pop && pop.style.display !== 'none') {
+        const customRow = document.getElementById('bcpCustomAnimRow');
+        if (customRow?.classList.contains('is-open')) {
+          customRow.classList.remove('is-open');
+          _resetBcpTarget();
+        } else {
+          _closeBorderColorPop();
+        }
+        return;
+      }
+      break;
+    }
     case 'Space':
       e.preventDefault();
       if (S.playing) syncPause(); else syncPlay();
@@ -2815,8 +2843,10 @@ bindSlider('blurAmt',  'blurAmtVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderAnimBright', 'borderAnimBrightVal', v => `${Math.round(v)}`, null);
-let _syncBorderSwatch   = () => {};
+let _syncBorderSwatch    = () => {};
 let _closeBorderColorPop = () => {};
+let _syncAnimColors      = (_anim) => {};
+let _resetBcpTarget      = ()      => {};
 function _applyBorderAnim(anim) {
   elBorderAnim.value = anim;
   document.querySelectorAll('.banim-btn[data-anim]').forEach(b => b.classList.toggle('active', b.dataset.anim === anim));
@@ -2824,14 +2854,67 @@ function _applyBorderAnim(anim) {
   document.getElementById('borderColRow').classList.toggle('anim-active', on);
   document.getElementById('borderAnimSpeedRow').style.display  = on ? '' : 'none';
   document.getElementById('borderAnimBrightRow').style.display = on ? '' : 'none';
+  // カスタムカラー行の表示制御
+  const customRow = document.getElementById('bcpCustomAnimRow');
+  if (customRow) {
+    const showSwatches = on && anim !== 'rainbow';
+    if (showSwatches) {
+      const activeBtn = document.querySelector(`.banim-btn[data-anim="${anim}"]`);
+      const wrap = activeBtn?.closest('.bcp-grad-wrap');
+      if (activeBtn && wrap) {
+        const btnRect  = activeBtn.getBoundingClientRect();
+        const wrapRect = wrap.getBoundingClientRect();
+        const centerX  = btnRect.left - wrapRect.left + btnRect.width / 2;
+        customRow.style.setProperty('--pop-x', centerX + 'px');
+      }
+    }
+    if (showSwatches) {
+      const _applySwatchColors = () => {
+        if (_animColors[anim]) {
+          const [c0, c1] = _animColors[anim];
+          const c0b = document.getElementById('bcpC0Swatch');
+          const c1b = document.getElementById('bcpC1Swatch');
+          if (c0b) c0b.style.background = c0;
+          if (c1b) c1b.style.background = c1;
+        }
+      };
+      _applySwatchColors();
+      // インラインスタイルで閉じた状態を強制 → リフロー → 解除でトランジションを必ず再発火
+      customRow.style.transition = 'none';
+      customRow.classList.remove('is-open');
+      customRow.style.opacity = '0';
+      customRow.style.transform = 'translateX(-50%) translateY(-6px) scale(0.95)';
+      void customRow.offsetHeight; // reflow
+      customRow.style.transition = '';
+      customRow.style.opacity = '';
+      customRow.style.transform = '';
+      customRow.classList.add('is-open');
+    } else {
+      customRow.classList.remove('is-open');
+    }
+  }
+  _resetBcpTarget();
   _syncBorderSwatch();
 }
 document.querySelectorAll('.banim-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const next = elBorderAnim.value === btn.dataset.anim ? 'none' : btn.dataset.anim;
+    const cur = elBorderAnim.value;
+    if (cur === btn.dataset.anim && cur !== 'rainbow') {
+      const customRow = document.getElementById('bcpCustomAnimRow');
+      if (customRow?.classList.contains('is-open')) {
+        // カスタム行が開いている → カスタム行とポップオーバー全体を閉じる
+        customRow.classList.remove('is-open');
+        _closeBorderColorPop();
+        _resetBcpTarget();
+      } else {
+        // カスタム行が閉じている → 再度開く
+        _applyBorderAnim(cur);
+      }
+      return;
+    }
+    const next = cur === btn.dataset.anim ? 'none' : btn.dataset.anim;
     _applyBorderAnim(next);
-    _closeBorderColorPop();
   });
 });
 // ── ボーダーカラーピッカー（HSV）───────────────────────────────
@@ -2841,14 +2924,9 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     '#ffdd33','#33dd77','#33aaff','#33eeff',
     '#aa55ff','#ff55bb','#ff8833','#00ffcc'
   ];
-  const GRAD_MAP = {
-    rainbow: 'conic-gradient(from 0deg, #ff7eb3, #ffb347, #f9f871, #6ee7b7, #93c5fd, #d8b4fe, #ff7eb3)',
-    cm:      'linear-gradient(135deg,#22d3ee,#f472b6)',
-    sakura:  'linear-gradient(135deg,#f472b6,#4ade80)',
-    neon:    'linear-gradient(135deg,#4ade80,#22d3ee)',
-    fire:    'linear-gradient(135deg,#ef4444,#f97316)',
-    aurora:  'linear-gradient(135deg,#7c3aed,#34d399)',
-  };
+  const GRAD_MAP = { rainbow: 'conic-gradient(from 0deg, #ff7eb3, #ffb347, #f9f871, #6ee7b7, #93c5fd, #d8b4fe, #ff7eb3)' };
+  Object.entries(_animColors).forEach(([k, [c0, c1]]) => { GRAD_MAP[k] = `linear-gradient(135deg,${c0},${c1})`; });
+  let _bcpTarget = 'main'; // 'main' | 'c0' | 'c1'
 
   const swatch    = document.getElementById('borderColorSwatch');
   const picker    = document.getElementById('borderColor');
@@ -2921,9 +2999,17 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     const hex = _rgbToHex(r, g, b);
     hexInput.value = hex;
     preview.style.background = hex;
-    picker.value = hex;
+    if (_bcpTarget === 'c0') {
+      const anim = elBorderAnim.value;
+      if (_animColors[anim]) { _animColors[anim] = [hex, _animColors[anim][1]]; _syncAnimColors(anim); }
+    } else if (_bcpTarget === 'c1') {
+      const anim = elBorderAnim.value;
+      if (_animColors[anim]) { _animColors[anim] = [_animColors[anim][0], hex]; _syncAnimColors(anim); }
+    } else {
+      picker.value = hex;
+      document.querySelectorAll('.bcp-chip').forEach(c => c.classList.toggle('active', c.dataset.color === hex));
+    }
     _syncBorderSwatch();
-    document.querySelectorAll('.bcp-chip').forEach(c => c.classList.toggle('active', c.dataset.color === hex));
   }
   function _loadHex(hex) {
     if (!/^#[0-9a-f]{6}$/i.test(hex)) return;
@@ -2940,9 +3026,9 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     const btn = document.createElement('button');
     btn.className = 'bcp-chip'; btn.style.background = hex; btn.dataset.color = hex;
     btn.addEventListener('click', () => {
-      _applyBorderAnim('none');
-      picker.value = hex; _loadHex(hex); _applyColorState();
-      _closeBorderColorPop();
+      if (_bcpTarget === 'main') _applyBorderAnim('none');
+      _loadHex(hex); _applyColorState();
+      if (_bcpTarget === 'main') _closeBorderColorPop();
     });
     solidRow.appendChild(btn);
   });
@@ -2952,7 +3038,8 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     const r = svCanvas.getBoundingClientRect();
     _s = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     _v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height));
-    _applyBorderAnim('none'); _drawSv(); _applyColorState();
+    if (_bcpTarget === 'main') _applyBorderAnim('none');
+    _drawSv(); _applyColorState();
   }
   function _pickHue(e) {
     const r = hueCanvas.getBoundingClientRect();
@@ -2972,14 +3059,14 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     let v = hexInput.value.trim();
     if (!v.startsWith('#')) v = '#' + v;
     if (/^#[0-9a-f]{6}$/i.test(v)) {
-      _applyBorderAnim('none');
-      picker.value = v; _loadHex(v); _applyColorState();
+      if (_bcpTarget === 'main') _applyBorderAnim('none');
+      _loadHex(v); _applyColorState();
     }
   });
 
   // ネイティブカラーピッカー フォールバック
   picker.addEventListener('input', () => {
-    _applyBorderAnim('none');
+    if (_bcpTarget === 'main') _applyBorderAnim('none');
     _loadHex(picker.value); _applyColorState();
   });
 
@@ -2992,6 +3079,9 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
 
   // 開閉
   function _openPop() {
+    _bcpTarget = 'main';
+    document.getElementById('bcpC0Swatch')?.classList.remove('active');
+    document.getElementById('bcpC1Swatch')?.classList.remove('active');
     _loadHex(picker.value);
     popover.style.display = '';
     swatch.classList.add('active');
@@ -2999,6 +3089,9 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
   _closeBorderColorPop = function () {
     popover.style.display = 'none';
     swatch.classList.remove('active');
+    const customRow = document.getElementById('bcpCustomAnimRow');
+    if (customRow) customRow.classList.remove('is-open');
+    _resetBcpTarget();
   };
   swatch.addEventListener('click', e => {
     e.stopPropagation();
@@ -3009,6 +3102,84 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     if (!popover.contains(e.target) && e.target !== swatch) _closeBorderColorPop();
   });
   popover.addEventListener('click', e => e.stopPropagation());
+  // HexInput での Escape
+  hexInput.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    const customRow = document.getElementById('bcpCustomAnimRow');
+    if (customRow?.classList.contains('is-open')) {
+      customRow.classList.remove('is-open');
+      _resetBcpTarget();
+      hexInput.blur();
+    } else {
+      _closeBorderColorPop();
+    }
+  });
+
+  // アニメーション色スウォッチ（全プリセット共通）
+  {
+    const c0btn = document.getElementById('bcpC0Swatch');
+    const c1btn = document.getElementById('bcpC1Swatch');
+    const resetBtn = document.getElementById('bcpAnimReset');
+
+    _syncAnimColors = function(anim) {
+      if (!anim || !_animColors[anim]) return;
+      const [c0, c1] = _animColors[anim];
+      GRAD_MAP[anim] = `linear-gradient(135deg,${c0},${c1})`;
+      const animBtn = document.querySelector(`.banim-btn[data-anim="${anim}"]`);
+      if (animBtn) animBtn.style.background = GRAD_MAP[anim];
+      if (elBorderAnim.value === anim) {
+        if (c0btn) c0btn.style.background = c0;
+        if (c1btn) c1btn.style.background = c1;
+      }
+      _syncBorderSwatch();
+    };
+
+    _resetBcpTarget = function() {
+      _bcpTarget = 'main';
+      if (c0btn) c0btn.classList.remove('active');
+      if (c1btn) c1btn.classList.remove('active');
+    };
+
+    function _closeSwatchAndPop() {
+      const customRow = document.getElementById('bcpCustomAnimRow');
+      if (customRow) customRow.classList.remove('is-open');
+      _resetBcpTarget();
+    }
+    c0btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (_bcpTarget === 'c0') { _closeSwatchAndPop(); return; }
+      _bcpTarget = 'c0';
+      c0btn.classList.add('active');
+      c1btn.classList.remove('active');
+      const anim = elBorderAnim.value;
+      _loadHex((_animColors[anim] || _ANIM_DEFAULTS.custom)[0]);
+    });
+    c1btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (_bcpTarget === 'c1') { _closeSwatchAndPop(); return; }
+      _bcpTarget = 'c1';
+      c1btn.classList.add('active');
+      c0btn.classList.remove('active');
+      const anim = elBorderAnim.value;
+      _loadHex((_animColors[anim] || _ANIM_DEFAULTS.custom)[1]);
+    });
+    if (resetBtn) {
+      resetBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const anim = elBorderAnim.value;
+        if (_ANIM_DEFAULTS[anim]) {
+          _animColors[anim] = [..._ANIM_DEFAULTS[anim]];
+          _syncAnimColors(anim);
+          if (_bcpTarget === 'c0') _loadHex(_animColors[anim][0]);
+          else if (_bcpTarget === 'c1') _loadHex(_animColors[anim][1]);
+        }
+      });
+    }
+
+    // 初期同期
+    Object.keys(_animColors).forEach(_syncAnimColors);
+  }
 
   // 初期描画
   _loadHex(picker.value);
@@ -3843,6 +4014,22 @@ applyLang(_lang);
   });
   dialog.addEventListener('click', (e) => e.stopPropagation());
 
+  // Escape \u4e8c\u6bb5\u968e\u30af\u30ed\u30fc\u30ba\uff08textarea \u30d5\u30a9\u30fc\u30ab\u30b9\u4e2d\u3082\u52d5\u4f5c\uff09
+  function _langDialogEscape(e) {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    const addSec = document.getElementById('langAddSection');
+    if (addSec && !addSec.hidden) {
+      addSec.hidden = true;
+      const toggle = document.getElementById('langAddToggle');
+      if (toggle) toggle.querySelector('span:last-child').textContent = t('lang-add');
+    } else {
+      closePopover();
+    }
+  }
+  dialog.addEventListener('keydown', _langDialogEscape);
+  textEl.addEventListener('keydown', _langDialogEscape);
+
   function applyJSONText(text) {
     try {
       const { code, label } = loadLangJSON(text);
@@ -3925,6 +4112,7 @@ function collectSettings() {
     borderAnim:    document.getElementById('borderAnim').value,
     borderAnimSpeed:  document.getElementById('borderAnimSpeed').value,
     borderAnimBright: document.getElementById('borderAnimBright').value,
+    borderAnimColors: JSON.stringify(_animColors),
     blurAmt:       document.getElementById('blurAmt').value,
     filterBrightness: document.getElementById('filterBrightness').value,
     filterContrast:   document.getElementById('filterContrast').value,
@@ -4000,6 +4188,17 @@ function applySettings(d) {
     const animBright = document.getElementById('borderAnimBright');
     if (d.borderAnimSpeed  != null) { animSpeed.value  = d.borderAnimSpeed;  animSpeed.dispatchEvent(new Event('input')); }
     if (d.borderAnimBright != null) { animBright.value = d.borderAnimBright; animBright.dispatchEvent(new Event('input')); }
+    if (d.borderAnimColors != null) {
+      try {
+        const parsed = JSON.parse(d.borderAnimColors);
+        Object.keys(_animColors).forEach(k => { if (parsed[k]) _animColors[k] = parsed[k]; });
+      } catch (_) {}
+    } else {
+      // 旧バージョン互換: borderCustomC0/C1
+      if (d.borderCustomC0 != null) _animColors.custom[0] = d.borderCustomC0;
+      if (d.borderCustomC1 != null) _animColors.custom[1] = d.borderCustomC1;
+    }
+    Object.keys(_animColors).forEach(_syncAnimColors);
     _applyBorderAnim(d.borderAnim);
   }
   if (d.maskShape) {
@@ -4830,6 +5029,8 @@ function _presetEncodeOne(p) {
     ba: d.borderAnim ?? 'none',
     bs: d.borderAnimSpeed ?? '1',
     bb: d.borderAnimBright ?? '70',
+    bc0: d.borderCustomC0 ?? '#ff55bb',
+    bc1: d.borderCustomC1 ?? '#aa55ff',
     ft: d.filterTemp ?? '0',
     fm: d.filterMatte ?? '0',
     fg: d.filterGrain ?? '0',
@@ -4855,6 +5056,8 @@ function _presetDecodeOne(code) {
       if (ex.ba != null) data.borderAnim      = ex.ba;
       if (ex.bs != null) data.borderAnimSpeed = ex.bs;
       if (ex.bb != null) data.borderAnimBright = ex.bb;
+      if (ex.bc0 != null) data.borderCustomC0 = ex.bc0;
+      if (ex.bc1 != null) data.borderCustomC1 = ex.bc1;
       if (ex.ft != null) data.filterTemp      = ex.ft;
       if (ex.fm != null) data.filterMatte     = ex.fm;
       if (ex.fg != null) data.filterGrain     = ex.fg;
