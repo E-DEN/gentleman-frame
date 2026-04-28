@@ -111,6 +111,23 @@ node server/proxy.js
 # アイテム追加
 gh project item-create 1 --owner E-DEN --title "タスク名"
 
-# アイテム一覧
-gh project item-list 1 --owner E-DEN
+# アイテム一覧（PVTI_ ID と status を確認）
+gh project item-list 1 --owner E-DEN --format json
+```
+
+### ステータス変更（GraphQL 必須）
+
+`gh project` コマンドにはステータス変更がないため、GraphQL API を直接使用する。
+
+```powershell
+# 既知の ID（変わらない限り使い回し可）
+# projectId : PVT_kwHOADinic4BVy2-
+# fieldId   : PVTSSF_lAHOADinic4BVy2-zhRMBbM
+# Todo      : f75ad846
+# In Progress: 47fc9ee4
+# Done      : 98236657
+# itemId は item-list で確認（PVTI_... の値）
+
+$q = 'mutation { updateProjectV2ItemFieldValue(input:{projectId:\"PVT_kwHOADinic4BVy2-\", itemId:\"<PVTI_...>\", fieldId:\"PVTSSF_lAHOADinic4BVy2-zhRMBbM\", value:{singleSelectOptionId:\"98236657\"}}) { projectV2Item { id } } }'
+gh api graphql -f query=$q
 ```
