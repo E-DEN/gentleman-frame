@@ -549,7 +549,9 @@ function _renderFrame() {
       offCtx.imageSmoothingEnabled = true;
     }
 
-    if (!maskHidden) {
+    // ぼかしありの場合は offCvs にマスクを適用しない
+    // （端まで画素データを保ったまま blur し、ctx.clip() で切り抜く）
+    if (!maskHidden && blurAmt <= 0) {
       offCtx.globalCompositeOperation = 'destination-in';
       buildMaskPath(offCtx, m);
       offCtx.fill();
@@ -1087,7 +1089,7 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
     ctx.beginPath();
     ctx.roundRect(scrX, scrY, scrW, scrH, Math.round(Math.min(scrW, scrH) * 0.11));
     ctx.clip();
-    ctx.globalAlpha = opacity * 0.30;
+    ctx.globalAlpha = opacity * 0.55;
     ctx.strokeStyle = _animOn ? _grad : `rgba(${_br},${_bg},${_bb},0.75)`;
     ctx.lineWidth   = Math.max(0.5, 0.7 * s);
     const r3W = scrW / 3, r3H = scrH / 3;
@@ -3714,6 +3716,15 @@ canvas.addEventListener('contextmenu', e => {
 canvas.addEventListener('wheel', e => {
   if (!_maskFollowMode && !S.maskHovered) return;
   e.preventDefault();
+  if (e.ctrlKey) {
+    // Ctrl+ホイール: マスクズーム
+    const step = e.deltaY < 0 ? 0.1 : -0.1;
+    const cur = parseFloat(elMaskZoom.value);
+    const next = Math.round(Math.min(5, Math.max(1, cur + step)) * 10) / 10;
+    elMaskZoom.value = next;
+    elMaskZoom.dispatchEvent(new Event('input'));
+    return;
+  }
   const step = e.deltaY < 0 ? 10 : -10;
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
   const cx = S.mask.x + S.mask.w / 2;
@@ -4128,6 +4139,7 @@ function collectSettings() {
     borderAnimBright: document.getElementById('borderAnimBright').value,
     borderAnimColors: JSON.stringify(_animColors),
     blurAmt:       document.getElementById('blurAmt').value,
+    maskZoom:      document.getElementById('maskZoom').value,
     filterBrightness: document.getElementById('filterBrightness').value,
     filterContrast:   document.getElementById('filterContrast').value,
     filterHighlight:  document.getElementById('filterHighlight').value,
@@ -4171,12 +4183,14 @@ function applySettings(d) {
     ['filterPixel','filterPixelVal'],
     ['filterFlare','filterFlareVal'],
     ['filterBars','filterBarsVal'],
+    ['maskZoom','maskZoomVal'],
   ];
   const vals = {
     vol0: d.vol0, offset0: d.offset0,
     vol1: d.vol1, offset1: d.offset1,
     maskW: d.maskW, maskH: d.maskH,
     borderW: d.borderW, borderOpacity: d.borderOpacity, blurAmt: d.blurAmt,
+    maskZoom: d.maskZoom ?? '1',
     filterBrightness: d.filterBrightness, filterContrast: d.filterContrast,
     filterHighlight: d.filterHighlight ?? 0, filterShadow: d.filterShadow ?? 0,
     filterSaturation: d.filterSaturation, filterHue: d.filterHue ?? 0, filterVignette: d.filterVignette,
@@ -5051,6 +5065,7 @@ function _presetEncodeOne(p) {
     fp: d.filterPixel ?? '0',
     ff: d.filterFlare ?? '0',
     fb: d.filterBars ?? '0',
+    mz: d.maskZoom ?? '1',
   };
   // iwara以外のURL（画像等）はexに保存
   if (d.vid0Url && !_iwaraId(d.vid0Url)) ex.u0 = d.vid0Url;
@@ -5078,6 +5093,7 @@ function _presetDecodeOne(code) {
       if (ex.fp != null) data.filterPixel     = ex.fp;
       if (ex.ff != null) data.filterFlare     = ex.ff;
       if (ex.fb != null) data.filterBars      = ex.fb;
+      if (ex.mz != null) data.maskZoom         = ex.mz;
       // iwara以外のURL（画像等）を復元
       if (ex.u0 != null) { data.vid0Url = ex.u0; data.vid0Name = data.vid0Name || ex.u0.split('/').pop().split('?')[0]; }
       if (ex.u1 != null) { data.vid1Url = ex.u1; data.vid1Name = data.vid1Name || ex.u1.split('/').pop().split('?')[0]; }
