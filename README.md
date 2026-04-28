@@ -2,7 +2,7 @@
 
 いわゆる紳士枠を表示するツール
 
-![デモ](docs.gif)
+![デモ](demo.gif)
 
 **<https://gentleman-frame.pages.dev/>**
 
@@ -95,8 +95,6 @@ Cloudflare のインフラは送信元 IP アドレスおよびアクセス日�
 | --- | --- |
 | [秤アツコ（ブルアカ）](https://3d.nicovideo.jp/works/td88695) | ちくわエグゼ ([@chikuwa_exe](https://x.com/chikuwa_exe)) |
 | [秤アツコ(ブルーアーカイブ)水着](https://3d.nicovideo.jp/works/td95433) | ちくわエグゼ ([@chikuwa_exe](https://x.com/chikuwa_exe)) |
-
-ライセンス：著作表示・非商用・改変可・再配布時URL表示
 
 ---
 
