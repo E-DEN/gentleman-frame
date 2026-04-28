@@ -529,21 +529,14 @@ function _renderFrame() {
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
     const maskZoom = parseFloat(elMaskZoom.value);
-    if (maskZoom > 1.001) {
+    if (Math.abs(maskZoom - 1) > 0.001) {
       const cx = m.x + m.w / 2;
       const cy = m.y + m.h / 2;
       offCtx.drawImage(getMediaSrc(1), cx * (1 - maskZoom), cy * (1 - maskZoom), W * maskZoom, H * maskZoom);
     } else {
       offCtx.drawImage(getMediaSrc(1), 0, 0, W, H);
     }
-    if (!maskHidden) {
-      offCtx.globalCompositeOperation = 'destination-in';
-      buildMaskPath(offCtx, m);
-      offCtx.fill();
-      offCtx.globalCompositeOperation = 'source-over';
-    }
-
-    // --- Pixelation (マスク側) ---
+    // --- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ---
     if (pixelAmt >= 1) {
       const pSize = Math.round(pixelAmt * 4);
       const pw = Math.ceil(W / pSize);
@@ -554,13 +547,13 @@ function _renderFrame() {
       offCtx.imageSmoothingEnabled = false;
       offCtx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
       offCtx.imageSmoothingEnabled = true;
-      // ピクセル化で拡大した際にマスク外へはみ出るため再クリップ
-      if (!maskHidden) {
-        offCtx.globalCompositeOperation = 'destination-in';
-        buildMaskPath(offCtx, m);
-        offCtx.fill();
-        offCtx.globalCompositeOperation = 'source-over';
-      }
+    }
+
+    if (!maskHidden) {
+      offCtx.globalCompositeOperation = 'destination-in';
+      buildMaskPath(offCtx, m);
+      offCtx.fill();
+      offCtx.globalCompositeOperation = 'source-over';
     }
 
     if (blurAmt > 0) {
@@ -569,11 +562,7 @@ function _renderFrame() {
       if (!maskHidden) { buildMaskPath(ctx, m); ctx.clip(); }
       ctx.filter = `blur(${bp}px)`;
       ctx.globalAlpha = fgAlpha;
-      if (pixelAmt >= 2) {
-        ctx.drawImage(offCvs, 0, 0);
-      } else {
-        ctx.drawImage(getMediaSrc(1), -bp, -bp, W + bp * 2, H + bp * 2);
-      }
+      ctx.drawImage(offCvs, 0, 0);
       ctx.filter = 'none';
       ctx.globalAlpha = 1;
       ctx.restore();
