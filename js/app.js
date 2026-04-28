@@ -2850,7 +2850,7 @@ bindSlider('maskOffY', 'maskOffYVal', v => `${Math.round(v)}`, v => {
   S.mask.y = Math.max(0, Math.min(cy + Math.round(v), ch - S.mask.h));
 });
 bindSlider('borderW', 'borderWVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('maskZoom', 'maskZoomVal', v => v.toFixed(1), null);
+bindSlider('maskZoom', 'maskZoomVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('blurAmt',  'blurAmtVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
