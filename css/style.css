@@ -776,7 +776,7 @@
     .banim-btn[data-anim="rainbow"] { background: conic-gradient(from 0deg, #ff7eb3, #ffb347, #f9f871, #6ee7b7, #93c5fd, #d8b4fe, #ff7eb3); }
     .banim-btn[data-anim="cm"]      { background: linear-gradient(135deg, #22d3ee, #f472b6); }
     .banim-btn[data-anim="sakura"]  { background: linear-gradient(135deg, #f472b6, #4ade80); }
-    .banim-btn[data-anim="neon"]    { background: linear-gradient(135deg, #4ade80, #22d3ee); }
+    .banim-btn[data-anim="cyber"]   { background: linear-gradient(135deg, #8325df, #3be30b); }
     .banim-btn[data-anim="fire"]    { background: linear-gradient(135deg, #ef4444, #f97316); }
     .banim-btn[data-anim="pink"]    { background: linear-gradient(135deg, #dcbcd2, #cd2377); }
     #borderColRow input[type="color"] {

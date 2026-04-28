@@ -8,17 +8,11 @@ let _followTargetX = 0, _followTargetY = 0;
 const _ANIM_DEFAULTS = {
   cm:     ['#22d3ee','#f472b6'],
   sakura: ['#f472b6','#4ade80'],
-  neon:   ['#4ade80','#22d3ee'],
+  cyber:  ['#8325df','#3be30b'],
   fire:   ['#ef4444','#f97316'],
   pink:   ['#dcbcd2','#cd2377'],
 };
-let _animColors = {
-  cm:     ['#22d3ee','#f472b6'],
-  sakura: ['#f472b6','#4ade80'],
-  neon:   ['#4ade80','#22d3ee'],
-  fire:   ['#ef4444','#f97316'],
-  pink:   ['#dcbcd2','#cd2377'],
-};
+let _animColors = structuredClone(_ANIM_DEFAULTS);
 
 // ドロップゾーンの loaded アニメーションを管理するヘルパー。
 // カード開閉時のアニメーション再起動を防ぐため、終了後に inline で凍結する。
@@ -1059,14 +1053,14 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
     ctx.roundRect(bx + bw, by + bh * 0.37, btnW, bh * 0.13, btnR);
     ctx.fill();
   } else {
-    // 横向き (+90CW): 縦LEFT(3ボタン)→TOP, 縦RIGHT(1ボタン)→BOTTOM
+    // 横向き (+90CW / ホーム右): 縦LEFT(音量3ボタン)→BOTTOM, 縦RIGHT(電源1ボタン)→TOP
     [[0.22, 0.055], [0.35, 0.085], [0.46, 0.085]].forEach(([xf, wf]) => {
       ctx.beginPath();
-      ctx.roundRect(bx + bw * xf, by - btnW, bw * wf, btnW, btnR);
+      ctx.roundRect(bx + bw * xf, by + bh, bw * wf, btnW, btnR);
       ctx.fill();
     });
     ctx.beginPath();
-    ctx.roundRect(bx + bw * 0.37, by + bh, bw * 0.13, btnW, btnR);
+    ctx.roundRect(bx + bw * 0.37, by - btnW, bw * 0.13, btnW, btnR);
     ctx.fill();
   }
   ctx.restore();
@@ -2707,7 +2701,25 @@ function bindSlider(id, valId, fmt, onChange) {
   resetBtn.title = t('slider-reset');
   resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
   resetBtn.addEventListener('click', () => {
-    el.value = el.defaultValue;
+    // maskW / maskH は phone 形状のとき初期値が異なる
+    const id = el.id;
+    if ((id === 'maskW' || id === 'maskH') && S.mask.shape === 'phone') {
+      const cw = canvas.width, ch = canvas.height;
+      const targetW = 360, targetH = 780;
+      let dw, dh;
+      if (_phoneLandscape) {
+        dw = Math.min(targetH, cw);
+        dh = Math.round(dw * targetW / targetH);
+        if (dh > ch) { dh = Math.min(targetW, ch); dw = Math.round(dh * targetH / targetW); }
+      } else {
+        dw = Math.min(targetW, cw);
+        dh = Math.round(dw * targetH / targetW);
+        if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
+      }
+      el.value = id === 'maskW' ? dw : dh;
+    } else {
+      el.value = el.defaultValue;
+    }
     el.dispatchEvent(new Event('input'));
   });
   vl.insertAdjacentElement('afterend', resetBtn);
@@ -3428,15 +3440,17 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
   const cw = canvas.width, ch = canvas.height;
   let dw, dh;
   if (S.mask.shape === 'phone') {
+    const targetW = 360, targetH = 780;
     if (_phoneLandscape) {
-      // 横向き 19.5:9 — キャンバス高さの 85% を基準
-      dh = Math.round(ch * 0.85);
-      dw = Math.round(dh * 19.5 / 9);
-      if (dw > cw) { dw = Math.round(cw * 0.90); dh = Math.round(dw * 9 / 19.5); }
+      // 横向き: 幅・高さを swap
+      dw = Math.min(targetH, cw);
+      dh = Math.round(dw * targetW / targetH);
+      if (dh > ch) { dh = Math.min(targetW, ch); dw = Math.round(dh * targetH / targetW); }
     } else {
-      // 縦向き 9:19.5 — キャンバス高さの 85% を基準
-      dh = Math.round(ch * 0.85);
-      dw = Math.round(dh * 9 / 19.5);
+      // 縦向き: 360x780 をキャンバスに収める
+      dw = Math.min(targetW, cw);
+      dh = Math.round(dw * targetH / targetW);
+      if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
     }
   } else {
     dw = 400; dh = 400;
@@ -3446,8 +3460,12 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
   S.mask.w = dw;
   S.mask.h = dh;
   // shape はそのまま
-  S.arLock = false;
+  S.arLock = (S.mask.shape === 'phone' || S.mask.shape === 'heart'); // phone/heart は AR ロックを維持
   _updateArLockBtn();
+  // phone の保存状態も更新
+  if (S.mask.shape === 'phone') {
+    _phoneMaskState = { w: dw, h: dh, x: S.mask.x, y: S.mask.y };
+  }
   // スライダーを defaultValue（HTML の value 属性）にリセット
   const resetSlider = id => {
     const el = document.getElementById(id);
@@ -3459,9 +3477,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
     el.value = val;
     el.dispatchEvent(new Event('input'));
   };
-  setSliderValue('maskW', dw);
-  setSliderValue('maskH', dh);
-  _syncOffsetSliders();
+  _syncMaskSliders();
   ['blurAmt', 'borderW', 'borderOpacity', 'borderSpeed', 'borderGlow'].forEach(resetSlider);
   document.getElementById('borderColor').value =
     document.getElementById('borderColor').defaultValue || '#ffffff';
