@@ -560,7 +560,7 @@ let _renderIntervalId = null; // 互換用（現在は未使用）
 
 function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
-  if (_followMode === 'mask' || _followMode === 'both') {
+  if (_followMode === 'mask') {
     const lerpK = 0.22; // 1フレームあたりの追従率 (0〜1)
     const cx = _followTargetX - S.mask.w / 2;
     const cy = _followTargetY - S.mask.h / 2;
@@ -3594,6 +3594,10 @@ function _syncZoomToMaskScale(oldW, newW) {
 }
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
   S.fgFixed = !S.fgFixed;
+  if (S.fgFixed && !S.zoomLock) {
+    S.zoomLock = true;
+    _updateZoomLockBtn();
+  }
   _updateFgFixedBtn();
 });
 
@@ -3917,12 +3921,15 @@ canvas.addEventListener('contextmenu', e => {
   const p = canvasCoords(e);
   _followTargetX = p.x;
   _followTargetY = p.y;
-  // none → mask → (fgFixed なら anchor → both) → none とサイクル
-  const hasFgFixed = S.fgFixed;
-  const order = hasFgFixed ? ['none', 'mask', 'anchor', 'both'] : ['none', 'mask'];
-  const idx = order.indexOf(_followMode);
-  const next = order[(idx + 1) % order.length];
-  _setFollowMode(next);
+  if (S.fgFixed && hitTestAnchor(p.x, p.y)) {
+    // アンカーの上で右クリック → アンカー追従トグル
+    const next = _followMode === 'anchor' ? 'none' : 'anchor';
+    _setFollowMode(next);
+  } else if (hitTestMask(p.x, p.y) || hitTestHandle(p.x, p.y)) {
+    // マスクの上で右クリック → マスク追従トグル
+    const next = _followMode === 'mask' ? 'none' : 'mask';
+    _setFollowMode(next);
+  }
 });
 
 canvas.addEventListener('wheel', e => {
@@ -3964,12 +3971,12 @@ document.addEventListener('mousemove', e => {
   if (_followMode !== 'none') {
     _followTargetX = p.x;
     _followTargetY = p.y;
-    if (_followMode === 'mask' || _followMode === 'both') {
+    if (_followMode === 'mask') {
       S.mask.x = Math.round(p.x - S.mask.w / 2);
       S.mask.y = Math.round(p.y - S.mask.h / 2);
       _syncOffsetSliders();
     }
-    if ((_followMode === 'anchor' || _followMode === 'both') && S.fgFixed) {
+    if (_followMode === 'anchor' && S.fgFixed) {
       const nx = Math.max(-1920, Math.min(1920, Math.round(p.x - canvas.width  / 2)));
       const ny = Math.max(-1080, Math.min(1080, Math.round(p.y - canvas.height / 2)));
       elFgPinX.value = nx; elFgPinY.value = ny;
