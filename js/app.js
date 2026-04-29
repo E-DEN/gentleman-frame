@@ -1615,6 +1615,9 @@ function loadImage(index, file, handle = null) {
   _stopBitmapCapture(index);
   if (vid[index].src) { URL.revokeObjectURL(vid[index].src); vid[index].removeAttribute('src'); vid[index].load(); }
   if (img[index].src?.startsWith('blob:')) URL.revokeObjectURL(img[index].src);
+  // ロード完了前に旧ビデオ状態が残らないよう即座にリセット
+  loaded[index] = false;
+  mediaType[index] = 'image';
   _currentHandle[index]  = handle;
   _loadedFileName[index] = file.name;
   _loadedPageUrl[index]  = '';
@@ -1628,7 +1631,7 @@ function loadImage(index, file, handle = null) {
   const url = URL.createObjectURL(file);
   img[index].onload = () => {
     loaded[index] = true;
-    mediaType[index] = 'image';
+    // mediaType[index] = 'image' はロード開始時に設定済み
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
     if (index === 0) { setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight); if (_maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now(); }
@@ -3716,6 +3719,13 @@ function swapVideos() {
     updateSliderFill(r1);
     updateSliderFill(r2);
   });
+
+  // requestVideoFrameCallback のクロージャは元インデックス(i)を保持したままなので
+  // スワップ後は古いループが誤ったスロットに書き込む。ビットマップキャプチャを再起動する。
+  [0, 1].forEach(i => {
+    _stopBitmapCapture(i); // 古いビットマップを破棄（ループ自体は自然停止に任せる）
+    if (mediaType[i] === 'video' && loaded[i]) _startBitmapCapture(i);
+  });
 }
 
 document.getElementById('swapBtn').addEventListener('click', swapVideos);
@@ -4076,11 +4086,9 @@ function updateProgress() {
 // ============================================================
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    vid[0].pause();
-    vid[1].pause();
+    [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].pause(); });
   } else if (S.playing) {
-    if (loaded[0]) vid[0].play();
-    if (loaded[1]) vid[1].play();
+    [0, 1].forEach(i => { if (loaded[i] && mediaType[i] === 'video') vid[i].play().catch(() => {}); });
   }
 });
 
