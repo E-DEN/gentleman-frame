@@ -4831,7 +4831,9 @@ function renderPresets() {
   const rootInsertIdx = firstFolderIdx !== -1 ? firstFolderIdx : list.length;
 
   const presetItemHTML = (p, i, isChild) => {
-    const n0 = p.data.vid0Name, n1 = p.data.vid1Name;
+    const _urlBase = url => { try { return decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() || url); } catch { return url; } };
+    const n0 = p.data.vid0Name || (p.data.vid0Url && !_iwaraId(p.data.vid0Url) ? _urlBase(p.data.vid0Url) : '');
+    const n1 = p.data.vid1Name || (p.data.vid1Url && !_iwaraId(p.data.vid1Url) ? _urlBase(p.data.vid1Url) : '');
     let fileHint = '';
     if (n0 || n1) {
       const lines = [[n0, 0], [n1, 1]].filter(([n]) => n)
@@ -5573,9 +5575,9 @@ async function _presetEncodeOne(p) {
   const data = {...d};
   if (id0) { delete data.vid0Url; delete data.vid0Id; }
   if (id1) { delete data.vid1Url; delete data.vid1Id; }
-  // ローカルファイル名（URLなし）はdataに残す
-  if (!d.vid0Url && vid0Name) data.vid0Name = vid0Name;
-  if (!d.vid1Url && vid1Name) data.vid1Name = vid1Name;
+  // ローカルファイル・直リンク画像の名前を保持（iwaraはIDから復元できるため不要）
+  if (!id0 && vid0Name) data.vid0Name = vid0Name;
+  if (!id1 && vid1Name) data.vid1Name = vid1Name;
   const name = (p.name || '').replace(/~/g, '');
   const cs = new CompressionStream('deflate-raw');
   const cw = cs.writable.getWriter();
@@ -5611,9 +5613,9 @@ async function _presetEncode(arr) {
     const {presetId,vid0Name,vid1Name,...d}=p.data;
     const id0=_iwaraId(d.vid0Url); if(id0){d.vid0Id=id0;delete d.vid0Url;}
     const id1=_iwaraId(d.vid1Url); if(id1){d.vid1Id=id1;delete d.vid1Url;}
-    // ローカルファイル名（URLなし）は保持
-    if (!d.vid0Url && !d.vid0Id && vid0Name) d.vid0Name = vid0Name;
-    if (!d.vid1Url && !d.vid1Id && vid1Name) d.vid1Name = vid1Name;
+    // ローカルファイル・直リンク画像の名前を保持（iwaraはIDから復元できるため不要）
+    if (!id0 && vid0Name) d.vid0Name = vid0Name;
+    if (!id1 && vid1Name) d.vid1Name = vid1Name;
     return {name:p.name,data:d};
   });
   const cs=new CompressionStream('deflate-raw');
