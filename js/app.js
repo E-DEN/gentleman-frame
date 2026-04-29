@@ -3820,6 +3820,17 @@ function _applyAnchorDrag(p) {
   updateSliderFill(elFgPinX); updateSliderFill(elFgPinY);
 }
 
+// phone形状の固定ARからwを偶数にスナップしてhを導出、それ以外は通常のMath.round
+function _snapMaskSize(w, h) {
+  if (S.mask.shape === 'phone') {
+    const ar = _phoneLandscape ? 780 / 360 : 360 / 780;
+    const sw = Math.round(w / 2) * 2; // 偶数スナップ
+    const sh = Math.round(sw / ar / 2) * 2;
+    return { w: sw, h: sh };
+  }
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
 function applyResize(hid, dx, dy, shiftKey) {
   const sm = S.drag.sm;
   let { x, y, w, h } = sm;
@@ -3870,14 +3881,15 @@ function applyResize(hid, dx, dy, shiftKey) {
     if (h < MIN) { h = MIN; if (hid.includes('t')) y = sm.y + sm.h - MIN; }
   }
   _syncZoomToMaskScale(sm.w, Math.round(w));
-  S.mask.x = Math.round(x); S.mask.y = Math.round(y); S.mask.w = Math.round(w); S.mask.h = Math.round(h);
+  const snapped = _snapMaskSize(w, h);
+  S.mask.x = Math.round(x); S.mask.y = Math.round(y); S.mask.w = snapped.w; S.mask.h = snapped.h;
   // スライダーを同期
   const elMaskW = document.getElementById('maskW');
   const elMaskH = document.getElementById('maskH');
-  elMaskW.value = Math.round(w);
-  document.getElementById('maskWVal').value = Math.round(w);
-  elMaskH.value = Math.round(h);
-  document.getElementById('maskHVal').value = Math.round(h);
+  elMaskW.value = S.mask.w;
+  document.getElementById('maskWVal').value = S.mask.w;
+  elMaskH.value = S.mask.h;
+  document.getElementById('maskHVal').value = S.mask.h;
   updateSliderFill(elMaskW);
   updateSliderFill(elMaskH);
 }
@@ -3974,17 +3986,17 @@ canvas.addEventListener('wheel', e => {
   };
   const doResize = () => {
     const step = e.deltaY < 0 ? 10 : -10;
-    const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
     const cx = S.mask.x + S.mask.w / 2;
     const cy = S.mask.y + S.mask.h / 2;
     const oldW = S.mask.w;
-    const newW = Math.max(20, S.mask.w + step);
-    const newH = Math.max(20, Math.round(newW / ar));
-    _syncZoomToMaskScale(oldW, newW);
-    S.mask.w = newW;
-    S.mask.h = newH;
-    S.mask.x = Math.round(cx - newW / 2);
-    S.mask.y = Math.round(cy - newH / 2);
+    const rawW = Math.max(20, S.mask.w + step);
+    const rawH = S.mask.h > 0 ? Math.max(20, Math.round(rawW * S.mask.h / S.mask.w)) : rawW;
+    const snapped = _snapMaskSize(rawW, rawH);
+    _syncZoomToMaskScale(oldW, snapped.w);
+    S.mask.w = snapped.w;
+    S.mask.h = snapped.h;
+    S.mask.x = Math.round(cx - snapped.w / 2);
+    S.mask.y = Math.round(cy - snapped.h / 2);
     _followTargetX = cx;
     _followTargetY = cy;
     _syncMaskSliders();
