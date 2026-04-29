@@ -5,6 +5,8 @@ const PRESET_KEY = 'gentleFrame_presets';
 let _presetsReady = false;
 let _followMode = 'none'; // 'none' | 'mask' | 'anchor' | 'both'
 let _followTargetX = 0, _followTargetY = 0;
+let _zoomLockBeforeFgFixed = null; // fgFixed ON前のzoomLock値を保持
+let _arLockBeforeAutoLock = null;   // heart/phone自動ON前のarLock値を保持
 const _ANIM_DEFAULTS = {
   cm:     ['#22d3ee','#f472b6'],
   sakura: ['#f472b6','#4ade80'],
@@ -3491,7 +3493,7 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
         document.getElementById(id + 'Val').value = Math.round(side);
         updateSliderFill(el);
       });
-      if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
+      if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'phone') {
       // phone状態を復元（なければデフォルト 360x780）
       const cw = canvas.width, ch = canvas.height;
@@ -3509,10 +3511,17 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       }
       S.mask.w = newW; S.mask.h = newH;
       S.mask.x = newX; S.mask.y = newY;
-      if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
+      if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
     } else {
-      // phone/heart以外に切り替えたらロックを自動OFF
-      if (S.arLock) { S.arLock = false; _updateArLockBtn(); }
+      // phone/heart以外に切り替えたら元のロック状態を復元
+      if (_arLockBeforeAutoLock !== null) {
+        S.arLock = _arLockBeforeAutoLock;
+        _arLockBeforeAutoLock = null;
+        _updateArLockBtn();
+      } else if (S.arLock) {
+        S.arLock = false;
+        _updateArLockBtn();
+      }
     }
     _syncMaskSliders();
   });
@@ -3595,6 +3604,19 @@ function _syncZoomToMaskScale(oldW, newW) {
 }
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
   S.fgFixed = !S.fgFixed;
+  if (S.fgFixed) {
+    _zoomLockBeforeFgFixed = S.zoomLock;
+    if (!S.zoomLock) {
+      S.zoomLock = true;
+      _updateZoomLockBtn();
+    }
+  } else {
+    if (_zoomLockBeforeFgFixed !== null) {
+      S.zoomLock = _zoomLockBeforeFgFixed;
+      _zoomLockBeforeFgFixed = null;
+      _updateZoomLockBtn();
+    }
+  }
   _updateFgFixedBtn();
 });
 
