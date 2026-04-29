@@ -5554,7 +5554,13 @@ renderPresets();
 //  単体共有 : "gf~<name>~<id0>~<id1>~<deflate-raw(JSON) base64url>"
 //  全件バックアップ: deflate-raw JSON
 // ============================================================
-const _B64U = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+const _B64U = b => {
+  const arr = new Uint8Array(b);
+  let bin = '';
+  const CHUNK = 8192;
+  for (let i = 0; i < arr.length; i += CHUNK) bin += String.fromCharCode(...arr.subarray(i, i + CHUNK));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+};
 const _B64D = s => { const b64 = s.replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(b64.padEnd(Math.ceil(b64.length/4)*4,'=')), c => c.charCodeAt(0)); };
 
 // 単体コード: "gf~<name>~<id0>~<id1>~<deflate-raw(JSON) base64url>"
@@ -5605,6 +5611,9 @@ async function _presetEncode(arr) {
     const {presetId,vid0Name,vid1Name,...d}=p.data;
     const id0=_iwaraId(d.vid0Url); if(id0){d.vid0Id=id0;delete d.vid0Url;}
     const id1=_iwaraId(d.vid1Url); if(id1){d.vid1Id=id1;delete d.vid1Url;}
+    // ローカルファイル名（URLなし）は保持
+    if (!d.vid0Url && !d.vid0Id && vid0Name) d.vid0Name = vid0Name;
+    if (!d.vid1Url && !d.vid1Id && vid1Name) d.vid1Name = vid1Name;
     return {name:p.name,data:d};
   });
   const cs=new CompressionStream('deflate-raw');
