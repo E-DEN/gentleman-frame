@@ -1209,8 +1209,6 @@
       white-space: nowrap;
     }
     .preset-file-line.preset-file-missing > .pname-inner { color: var(--err, #f87); }
-    .preset-file-line.preset-file-picking > .pname-inner { color: var(--accent) !important; }
-    .preset-file-line.preset-file-picking .pname-inner.overflows { animation: preset-text-slide var(--slide-dur, 4.5s) 0.5s ease-in-out infinite alternate; }
     .preset-file-line.preset-file-unlinked > .pname-inner { color: color-mix(in srgb, var(--text-muted) 45%, transparent); }
     .preset-file-line:has(.pname-inner.overflows) {
       -webkit-mask-image: linear-gradient(to right, black 97%, transparent 100%);
