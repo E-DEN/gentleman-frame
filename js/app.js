@@ -4832,8 +4832,9 @@ function renderPresets() {
 
   const presetItemHTML = (p, i, isChild) => {
     const _urlBase = url => { try { return decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() || url); } catch { return url; } };
-    const n0 = p.data.vid0Name || (p.data.vid0Url && !_iwaraId(p.data.vid0Url) ? _urlBase(p.data.vid0Url) : '');
-    const n1 = p.data.vid1Name || (p.data.vid1Url && !_iwaraId(p.data.vid1Url) ? _urlBase(p.data.vid1Url) : '');
+    const _isIwara = url => /iwara\.(?:tv|ai)\/video\//.test(url || '');
+    const n0 = p.data.vid0Name || (p.data.vid0Url && !_isIwara(p.data.vid0Url) ? _urlBase(p.data.vid0Url) : '');
+    const n1 = p.data.vid1Name || (p.data.vid1Url && !_isIwara(p.data.vid1Url) ? _urlBase(p.data.vid1Url) : '');
     let fileHint = '';
     if (n0 || n1) {
       const lines = [[n0, 0], [n1, 1]].filter(([n]) => n)
