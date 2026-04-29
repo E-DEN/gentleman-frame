@@ -45,13 +45,15 @@ const S = {
   maskHovered: false,
   maskTouched: false,
   mask: {
-    x: 227, // (854 - 400) / 2
-    y: 40,  // (480 - 400) / 2
+    x: 0,
+    y: 0,
     w: 400,
     h: 400,
-    shape: 'rect'
+    shape: 'phone'  // 紳士枠モードをデフォルトに
   },
   arLock: false,
+  zoomLock: false,  // マスクリサイズ時にズームを自動追従させる
+  fgFixed: false,   // false = 紳士枠モード（前景が背景と同位置）、true = アンカーモード
   drag: { active: false, mode: null, ox: 0, oy: 0, sm: null, sp: null }
 };
 
@@ -365,11 +367,23 @@ document.addEventListener('keyup', e => {
   _syncAllBuffers(BUF_W, BUF_H);
   _prevBufW = BUF_W; _prevBufH = BUF_H;
   if (iw > 0) { _dispW = iw; _dispH = Math.round(iw / _canvasAR); }
-  S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+  if (S.mask.shape === 'phone') {
+    const _tW = 360, _tH = 780;
+    let _mw = Math.min(_tW, BUF_W);
+    let _mh = Math.round(_mw * _tH / _tW);
+    if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
+    S.mask.w = _mw; S.mask.h = _mh;
+    S.arLock = true;
+  } else {
+    S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+  }
   S.mask.x = Math.round((BUF_W - S.mask.w) / 2);
   S.mask.y = Math.round((BUF_H - S.mask.h) / 2);
   _bufferSynced = true;
   _syncMaskSliders();
+  document.getElementById('phoneUiRow').style.display = S.mask.shape === 'phone' ? '' : 'none';
+  _updateArLockBtn();
+  _updateFgFixedBtn();
 }
 
 // ResizeObserver: _dispW/_dispH の追跡のみ。バッファ・マスクは変更しない。
@@ -385,7 +399,16 @@ new ResizeObserver(entries => {
   const BUF_W = 1920, BUF_H = 1080;
   _syncAllBuffers(BUF_W, BUF_H);
   _prevBufW = BUF_W; _prevBufH = BUF_H;
-  S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+  if (S.mask.shape === 'phone') {
+    const _tW = 360, _tH = 780;
+    let _mw = Math.min(_tW, BUF_W);
+    let _mh = Math.round(_mw * _tH / _tW);
+    if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
+    S.mask.w = _mw; S.mask.h = _mh;
+    S.arLock = true;
+  } else {
+    S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+  }
   S.mask.x = Math.round((BUF_W - S.mask.w) / 2);
   S.mask.y = Math.round((BUF_H - S.mask.h) / 2);
   _bufferSynced = true;
@@ -405,6 +428,8 @@ const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
 const elPhoneUiBtnDot = document.getElementById('phoneUiDot');
 const elPhoneUiBtnRot90 = document.getElementById('phoneUiRot90');
 const elMaskZoom      = document.getElementById('maskZoom');
+const elFgPinX        = document.getElementById('fgPinX');
+const elFgPinY        = document.getElementById('fgPinY');
 const elBlurAmt       = document.getElementById('blurAmt');
 const elFilterVignette  = document.getElementById('filterVignette');
 const elFilterCA        = document.getElementById('filterCA');
@@ -549,6 +574,8 @@ function _renderFrame() {
   const m = S.mask;
   // バッファ → 表示CSS px の拡大率。動画解像度が高いほど > 1 になる。
   // lineWidth などの「見た目固定」値はこの係数で補正する。
+  // バッファ → 表示CSS px の拡大率。動画解像度が高いほど > 1 になる。
+  // lineWidth などの「見た目固定」値はこの係数で補正する。
   const bufScale = _dispH > 0 ? H / _dispH : 1;
 
   ctx.clearRect(0, 0, W, H);
@@ -572,10 +599,24 @@ function _renderFrame() {
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
     const maskZoom = parseFloat(elMaskZoom.value);
-    if (Math.abs(maskZoom - 1) > 0.001) {
-      const cx = m.x + m.w / 2;
-      const cy = m.y + m.h / 2;
-      offCtx.drawImage(getMediaSrc(1), cx * (1 - maskZoom), cy * (1 - maskZoom), W * maskZoom, H * maskZoom);
+    if (Math.abs(maskZoom - 1) > 0.001 || S.fgFixed) {
+      // Mode 1（OFF）: マスク中央を zoom の基点にする（マスク追従）
+      // Mode 2（ON） : ビデオのアンカー点（fgPinX/Yでパン）がマスク中央に重なるよう描画
+      let dx, dy;
+      if (S.fgFixed) {
+        const mcx = m.x + m.w / 2;
+        const mcy = m.y + m.h / 2;
+        const ax  = W / 2 + parseFloat(elFgPinX.value);
+        const ay  = H / 2 + parseFloat(elFgPinY.value);
+        dx = mcx - ax * maskZoom;
+        dy = mcy - ay * maskZoom;
+      } else {
+        const cx = m.x + m.w / 2;
+        const cy = m.y + m.h / 2;
+        dx = cx * (1 - maskZoom);
+        dy = cy * (1 - maskZoom);
+      }
+      offCtx.drawImage(getMediaSrc(1), dx, dy, W * maskZoom, H * maskZoom);
     } else {
       offCtx.drawImage(getMediaSrc(1), 0, 0, W, H);
     }
@@ -892,6 +933,38 @@ function _renderFrame() {
       ctx.fillRect  (h.x - hSz, h.y - hSz, hSz * 2, hSz * 2);
       ctx.strokeRect(h.x - hSz, h.y - hSz, hSz * 2, hSz * 2);
     }
+    ctx.restore();
+  }
+
+  // --- 前景アンカー（phone + fgFixed ON 時、アンカー位置にカメラファインダー型クロスヘア）---
+  if (S.fgFixed && S.mask.shape === 'phone' && loaded[1] && !visHidden[1]) {
+    // アンカーマーカーはキャンバス上の独立した点（マスクとは無関係）
+    const ax  = W / 2 + parseFloat(elFgPinX.value);
+    const ay  = H / 2 + parseFloat(elFgPinY.value);
+    const r   = Math.max(18, Math.round(28 * bufScale));  // コーナーブラケットの中心からの幅
+    const bw  = Math.max(8,  Math.round(12 * bufScale));  // ブラケットアーム長
+    const ca  = Math.max(5,  Math.round(7  * bufScale));  // 中央十字アーム長
+    const lw  = Math.max(1,  1.2 * bufScale);             // ブラケット線幅（細め）
+    const clw = Math.max(1,  1.0 * bufScale);             // 中央十字線幅
+    ctx.save();
+    ctx.globalCompositeOperation = 'difference';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    // コーナーブラケット（細め）
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(ax - r, ay - r + bw); ctx.lineTo(ax - r, ay - r); ctx.lineTo(ax - r + bw, ay - r); // TL
+    ctx.moveTo(ax + r - bw, ay - r); ctx.lineTo(ax + r, ay - r); ctx.lineTo(ax + r, ay - r + bw); // TR
+    ctx.moveTo(ax - r, ay + r - bw); ctx.lineTo(ax - r, ay + r); ctx.lineTo(ax - r + bw, ay + r); // BL
+    ctx.moveTo(ax + r - bw, ay + r); ctx.lineTo(ax + r, ay + r); ctx.lineTo(ax + r, ay + r - bw); // BR
+    ctx.stroke();
+    // 中央小十字
+    ctx.lineWidth = clw;
+    ctx.beginPath();
+    ctx.moveTo(ax - ca, ay); ctx.lineTo(ax + ca, ay);
+    ctx.moveTo(ax, ay - ca); ctx.lineTo(ax, ay + ca);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -2861,6 +2934,7 @@ bindSlider('maskW',   'maskWVal',   v => `${Math.round(v)}`,    v => {
   // スライダー操作時は下限10（テキスト入力は0まで許容）
   const elW2 = document.getElementById('maskW');
   if (parseFloat(elW2.value) < 10) { elW2.value = 10; updateSliderFill(elW2); v = 10; document.getElementById('maskWVal').value = 10; }
+  _syncZoomToMaskScale(S.mask.w, v);
   S.mask.w = v;
   if (S.arLock && S.mask.h > 0) {
     const newH = Math.max(0, Math.round(v / ar));
@@ -2897,7 +2971,9 @@ bindSlider('maskOffY', 'maskOffYVal', v => `${Math.round(v)}`, v => {
   S.mask.y = Math.max(0, Math.min(cy + Math.round(v), ch - S.mask.h));
 });
 bindSlider('borderW', 'borderWVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('maskZoom', 'maskZoomVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('maskZoom', 'maskZoomVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(2), null);
+bindSlider('fgPinX',   'fgPinXVal',   v => `${Math.round(v)}`, null);
+bindSlider('fgPinY',   'fgPinYVal',   v => `${Math.round(v)}`, null);
 bindSlider('blurAmt',  'blurAmtVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
@@ -3380,6 +3456,7 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     btn.classList.add('active');
     S.mask.shape = newShape;
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
+    _updateFgFixedBtn();
 
     // --- phone ↔ 非phone の状態スワップ（形状固有処理より先に行う）---
     if (prevShape !== 'phone' && newShape === 'phone') {
@@ -3472,6 +3549,50 @@ document.getElementById('arLockBtn').addEventListener('click', () => {
   S.arLock = !S.arLock;
   _updateArLockBtn();
 });
+
+function _updateZoomLockBtn() {
+  const btn = document.getElementById('zoomLockBtn');
+  btn.classList.toggle('active', S.zoomLock);
+  btn.innerHTML = `<i data-lucide="${S.zoomLock ? 'lock' : 'lock-open'}"></i>`;
+  btn.title = t(S.zoomLock ? 'zoom-lock' : 'zoom-unlock');
+  lucide.createIcons();
+}
+document.getElementById('zoomLockBtn').addEventListener('click', () => {
+  S.zoomLock = !S.zoomLock;
+  _updateZoomLockBtn();
+});
+
+function _updateFgFixedBtn() {
+  const isPhone = S.mask.shape === 'phone';
+  // phone 以外のときは fgFixed を解除
+  if (!isPhone) S.fgFixed = false;
+  // X/Y スライダーはアンカーモード（fgFixed ON）時のみ表示
+  document.getElementById('fgPinXRow').style.display = S.fgFixed ? '' : 'none';
+  document.getElementById('fgPinYRow').style.display = S.fgFixed ? '' : 'none';
+  // ズームスライダーはアンカーモードでも操作可能（zoomLock で連動制御）
+  document.getElementById('maskZoom').disabled = false;
+  document.getElementById('maskZoomVal').disabled = false;
+  // 錨アイコンはアンカーモード (fgFixed) の ON/OFF を反映
+  const btn = document.getElementById('fgFixedBtn');
+  btn.classList.toggle('active', S.fgFixed);
+  btn.title = t(S.fgFixed ? 'fg-anchor-hide' : 'fg-anchor-show');
+}
+
+// ズームロック ON 時、マスク幅の変化率に比例して maskZoom を追従させる
+function _syncZoomToMaskScale(oldW, newW) {
+  if (!S.zoomLock || oldW <= 0 || Math.abs(oldW - newW) < 0.5) return;
+  const ratio = newW / oldW;
+  const curZoom = parseFloat(elMaskZoom.value);
+  const newZoom = Math.min(3, Math.max(0.1, parseFloat((curZoom * ratio).toFixed(2))));
+  elMaskZoom.value = newZoom;
+  document.getElementById('maskZoomVal').value = newZoom % 1 === 0 ? `${Math.round(newZoom)}` : newZoom.toFixed(2);
+  updateSliderFill(elMaskZoom);
+}
+document.getElementById('fgFixedBtn').addEventListener('click', () => {
+  S.fgFixed = !S.fgFixed;
+  _updateFgFixedBtn();
+});
+
 
 // ---- マスクリセット ----
 document.getElementById('maskVisBtn').addEventListener('click', () => {
@@ -3646,6 +3767,25 @@ function hitTestMask(px, py) {
   return false;
 }
 
+function hitTestAnchor(px, py) {
+  if (!S.fgFixed || S.mask.shape !== 'phone') return false;
+  const scale = _dispH > 0 ? canvas.height / _dispH : 1;
+  // アンカーマーカーの位置はキャンバス中央 + fgPinX/Y
+  const ax  = canvas.width  / 2 + parseFloat(elFgPinX.value);
+  const ay  = canvas.height / 2 + parseFloat(elFgPinY.value);
+  const r = Math.max(18, Math.round(28 * scale));
+  return Math.abs(px - ax) <= r && Math.abs(py - ay) <= r;
+}
+
+function _applyAnchorDrag(p) {
+  const nx = Math.max(-1920, Math.min(1920, Math.round(S.drag.pinX0 + (p.x - S.drag.sp.x))));
+  const ny = Math.max(-1080, Math.min(1080, Math.round(S.drag.pinY0 + (p.y - S.drag.sp.y))));
+  elFgPinX.value = nx; elFgPinY.value = ny;
+  document.getElementById('fgPinXVal').value = nx;
+  document.getElementById('fgPinYVal').value = ny;
+  updateSliderFill(elFgPinX); updateSliderFill(elFgPinY);
+}
+
 function applyResize(hid, dx, dy, shiftKey) {
   const sm = S.drag.sm;
   let { x, y, w, h } = sm;
@@ -3695,6 +3835,7 @@ function applyResize(hid, dx, dy, shiftKey) {
     if (w < MIN) { w = MIN; if (hid.includes('l')) x = sm.x + sm.w - MIN; }
     if (h < MIN) { h = MIN; if (hid.includes('t')) y = sm.y + sm.h - MIN; }
   }
+  _syncZoomToMaskScale(sm.w, Math.round(w));
   S.mask.x = Math.round(x); S.mask.y = Math.round(y); S.mask.w = Math.round(w); S.mask.h = Math.round(h);
   // スライダーを同期
   const elMaskW = document.getElementById('maskW');
@@ -3708,6 +3849,17 @@ function applyResize(hid, dx, dy, shiftKey) {
 }
 
 function startDrag(e, p) {
+  // アンカードラッグ（fgFixed ON 時、マスクより優先）
+  if (hitTestAnchor(p.x, p.y)) {
+    S.drag.active = true;
+    S.drag.mode   = 'fg-anchor';
+    S.drag.sp     = { x: p.x, y: p.y };
+    S.drag.pinX0  = parseFloat(elFgPinX.value);
+    S.drag.pinY0  = parseFloat(elFgPinY.value);
+    canvas.style.cursor = 'grabbing';
+    e.preventDefault();
+    return;
+  }
   const hh = hitTestHandle(p.x, p.y);
   if (hh) {
     S.drag.active = true;
@@ -3765,9 +3917,9 @@ canvas.addEventListener('wheel', e => {
   e.preventDefault();
   if (e.ctrlKey) {
     // Ctrl+ホイール: マスクズーム
-    const step = e.deltaY < 0 ? 0.1 : -0.1;
+    const step = e.deltaY < 0 ? 0.01 : -0.01;
     const cur = parseFloat(elMaskZoom.value);
-    const next = Math.round(Math.min(5, Math.max(1, cur + step)) * 10) / 10;
+    const next = Math.round(Math.min(3, Math.max(0.1, cur + step)) * 100) / 100;
     elMaskZoom.value = next;
     elMaskZoom.dispatchEvent(new Event('input'));
     return;
@@ -3776,8 +3928,10 @@ canvas.addEventListener('wheel', e => {
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
   const cx = S.mask.x + S.mask.w / 2;
   const cy = S.mask.y + S.mask.h / 2;
+  const oldW = S.mask.w;
   const newW = Math.max(20, S.mask.w + step);
   const newH = Math.max(20, Math.round(newW / ar));
+  _syncZoomToMaskScale(oldW, newW);
   S.mask.w = newW;
   S.mask.h = newH;
   S.mask.x = Math.round(cx - newW / 2);
@@ -3804,14 +3958,17 @@ document.addEventListener('mousemove', e => {
     return;
   }
   if (!S.drag.active) {
-    const hh     = hitTestHandle(p.x, p.y);
-    const inMask = hitTestMask(p.x, p.y);
+    const hh       = hitTestHandle(p.x, p.y);
+    const inMask   = hitTestMask(p.x, p.y);
+    const inAnchor = hitTestAnchor(p.x, p.y);
     S.maskHovered = !!(hh || inMask);
-    canvas.style.cursor = hh ? hh.cur : (inMask ? 'grab' : 'default');
+    canvas.style.cursor = inAnchor ? 'grab' : (hh ? hh.cur : (inMask ? 'grab' : 'default'));
     return;
   }
   _canvasClickMoved = true;
-  if (S.drag.mode === 'move') {
+  if (S.drag.mode === 'fg-anchor') {
+    _applyAnchorDrag(p);
+  } else if (S.drag.mode === 'move') {
     S.mask.x = Math.round(p.x - S.drag.ox);
     S.mask.y = Math.round(p.y - S.drag.oy);
     _syncOffsetSliders();
@@ -3840,7 +3997,9 @@ canvas.addEventListener('touchstart', e => {
 document.addEventListener('touchmove', e => {
   if (!S.drag.active) return;
   const p = canvasCoords(e);
-  if (S.drag.mode === 'move') {
+  if (S.drag.mode === 'fg-anchor') {
+    _applyAnchorDrag(p);
+  } else if (S.drag.mode === 'move') {
     S.mask.x = Math.round(p.x - S.drag.ox);
     S.mask.y = Math.round(p.y - S.drag.oy);
     _syncOffsetSliders();
@@ -4187,6 +4346,10 @@ function collectSettings() {
     borderAnimColors: JSON.stringify(_animColors),
     blurAmt:       document.getElementById('blurAmt').value,
     maskZoom:      document.getElementById('maskZoom').value,
+    fgFixed:       S.fgFixed,
+    zoomLock:      S.zoomLock,
+    fgPinX:        document.getElementById('fgPinX').value,
+    fgPinY:        document.getElementById('fgPinY').value,
     filterBrightness: document.getElementById('filterBrightness').value,
     filterContrast:   document.getElementById('filterContrast').value,
     filterHighlight:  document.getElementById('filterHighlight').value,
@@ -4230,6 +4393,8 @@ function applySettings(d) {
     ['filterFlare','filterFlareVal'],
     ['filterBars','filterBarsVal'],
     ['maskZoom','maskZoomVal'],
+    ['fgPinX','fgPinXVal'],
+    ['fgPinY','fgPinYVal'],
   ];
   const vals = {
     vol0: d.vol0, offset0: d.offset0,
@@ -4237,6 +4402,8 @@ function applySettings(d) {
     maskW: d.maskW, maskH: d.maskH,
     borderW: d.borderW, borderOpacity: d.borderOpacity, blurAmt: d.blurAmt,
     maskZoom: d.maskZoom ?? '1',
+    fgPinX: d.fgPinX ?? '0',
+    fgPinY: d.fgPinY ?? '0',
     filterBrightness: d.filterBrightness, filterContrast: d.filterContrast,
     filterHighlight: d.filterHighlight ?? 0, filterShadow: d.filterShadow ?? 0,
     filterSaturation: d.filterSaturation, filterHue: d.filterHue ?? 0, filterVignette: d.filterVignette,
@@ -4277,6 +4444,7 @@ function applySettings(d) {
       b.classList.toggle('active', b.dataset.shape === d.maskShape);
     });
     elPhoneUiRow.style.display = d.maskShape === 'phone' ? '' : 'none';
+    _updateFgFixedBtn();
   }
   if (d.phoneLandscape != null) {
     _phoneLandscape = !!d.phoneLandscape;
@@ -4322,6 +4490,14 @@ function applySettings(d) {
   if (d.arLock != null) {
     S.arLock = !!d.arLock;
     _updateArLockBtn();
+  }
+  if (d.zoomLock != null) {
+    S.zoomLock = !!d.zoomLock;
+    _updateZoomLockBtn();
+  }
+  if (d.fgFixed != null) {
+    S.fgFixed = !!d.fgFixed;
+    _updateFgFixedBtn();
   }
   // theme はプリセットに含めない（ユーザー個人の設定として独立管理）
   // 動画ロード後のマスク枠フェードイン準備

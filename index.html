@@ -222,19 +222,20 @@
       <div class="ctrl-row">
         <label data-i18n="shape">形状</label>
         <div class="shape-group">
-          <button class="shape-btn active" data-shape="rect" data-i18n-title="shape-rect" title="四角"><i data-lucide="square"></i></button>
+          <button class="shape-btn" data-shape="rect" data-i18n-title="shape-rect" title="四角"><i data-lucide="square"></i></button>
           <button class="shape-btn" data-shape="circle" data-i18n-title="shape-circle" title="円"><i data-lucide="circle"></i></button>
           <button class="shape-btn" data-shape="heart" data-i18n-title="shape-heart" title="ハート"><i data-lucide="heart"></i></button>
-          <button class="shape-btn" data-shape="phone" data-i18n-title="shape-phone" title="スマホ"><i data-lucide="smartphone"></i></button>
+          <button class="shape-btn active" data-shape="phone" data-i18n-title="shape-phone" title="スマホ"><i data-lucide="smartphone"></i></button>
         </div>
       </div>
-      <div class="ctrl-row" id="phoneUiRow" style="display:none">
+      <div class="ctrl-row" id="phoneUiRow">
         <label data-i18n="phone-ui">表示</label>
         <div class="phone-ui-group">
           <button class="phone-ui-btn" id="phoneUiRot90" data-i18n-title="phone-ui-rot90" title="横向き"><i data-lucide="rotate-cw"></i></button>
           <button class="phone-ui-btn" id="phoneUiRoT" data-i18n-title="phone-ui-rot" title="三等分グリッド"><i data-lucide="grid-3x3"></i></button>
           <button class="phone-ui-btn active" id="phoneUiRec" data-i18n-title="phone-ui-rec" title="REC/タイムコード"><i data-lucide="video"></i></button>
           <button class="phone-ui-btn active" id="phoneUiDot" data-i18n-title="phone-ui-dot" title="パンチホール"><i data-lucide="camera"></i></button>
+          <button class="phone-ui-btn" id="fgFixedBtn" data-i18n-title="fg-anchor-show" title="アンカー表示"><i data-lucide="anchor"></i></button>
         </div>
       </div>
       <div class="ctrl-row">
@@ -269,11 +270,20 @@
         <input type="text" class="ctrl-val" id="filterPixelVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="mask-zoom">ズーム</label>
-        <input type="range" id="maskZoom" min="1" max="5" value="1" step="0.1">
+        <label><span data-i18n="mask-zoom">ズーム</span><span id="zoomLockBtn" class="ar-lock-icon" title="ズームをマスクサイズに追従させる"><i data-lucide="lock-open"></i></span></label>
+        <input type="range" id="maskZoom" min="0.1" max="3" value="1" step="0.01">
         <input type="text" class="ctrl-val" id="maskZoomVal" value="1.0" spellcheck="false" autocomplete="off">
       </div>
-      <div class="ctrl-mini-sep"></div>
+      <div class="ctrl-row" id="fgPinXRow" style="display:none">
+        <label data-i18n="fg-pin-x">X 位置</label>
+        <input type="range" id="fgPinX" min="-1920" max="1920" value="0" step="1">
+        <input type="text" class="ctrl-val" id="fgPinXVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row" id="fgPinYRow" style="display:none">
+        <label data-i18n="fg-pin-y">Y 位置</label>
+        <input type="range" id="fgPinY" min="-1080" max="1080" value="0" step="1">
+        <input type="text" class="ctrl-val" id="fgPinYVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
         <div class="ctrl-row" id="borderColRow">
           <label data-i18n="border-col">枠の色</label>
           <input type="color" id="borderColor" value="#ffffff" style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
