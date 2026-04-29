@@ -4975,9 +4975,9 @@ function renderPresets() {
         if (!children.length) return;
         // 先頭行にフォルダ名ヘッダーを付与してフォルダ構造を保持
         const folderHeader = 'gff~' + encodeURIComponent(p.name || 'フォルダ');
-        code = [folderHeader, ...children.map(c => _presetEncodeOne(c))].join('\n');
+        code = [folderHeader, ...(await Promise.all(children.map(c => _presetEncodeOne(c))))].join('\n');
       } else {
-        code = _presetEncodeOne(p);
+        code = await _presetEncodeOne(p);
       }
       try {
         await navigator.clipboard.writeText(code);
@@ -5168,35 +5168,36 @@ const _doInlineImport = async (rawOverride) => {
   if (!raw) return;
   let arr;
   try {
-    const gf2Idx = raw.indexOf('gf2~');
-    const gffIdx  = raw.indexOf('gff~');
+    const _isGfCode = l => l.startsWith('gf~');
+    const gfIdx = raw.indexOf('gf~');
+    const gffIdx = raw.indexOf('gff~');
     if (gffIdx !== -1) {
-      // フォルダコピー形式: gff~名前 + gf2~ プリセット群
-      // 改行・スペース等あらゆるセパレーターに対応 — gff~/gf2~ の直前で分割
-      const allLines = raw.split(/\s+(?=gf[f2]~)/).map(l => l.trim()).filter(l => l);
+      // フォルダコピー形式: gff~名前 + gf~ プリセット群
+      // 改行・スペース等あらゆるセパレーターに対応 — gff~/gf~ の直前で分割
+      const allLines = raw.split(/\s+(?=gff~|gf~)/).map(l => l.trim()).filter(l => l);
       const gffLine = allLines.find(l => l.startsWith('gff~'));
       if (gffLine) {
         let folderName;
         try { folderName = decodeURIComponent(gffLine.slice(4)); } catch { folderName = gffLine.slice(4); }
         folderName = folderName || 'フォルダ';
-        const presetLines = allLines.filter(l => l.startsWith('gf2~'));
+        const presetLines = allLines.filter(_isGfCode);
         const decoded = [];
         for (const l of presetLines) {
-          try { decoded.push(_presetDecodeOne(l)); } catch (e) { console.error('[folder import] skip line:', JSON.stringify(l), e); }
+          try { decoded.push(await _presetDecodeOne(l)); } catch (e) { console.error('[folder import] skip line:', JSON.stringify(l), e); }
         }
         arr = [{ type: 'folder', name: folderName, open: true }, ...decoded];
       } else {
-        // gff~ が見つからない場合は通常の gf2 インポートにフォールバック
-        const lines = allLines.filter(l => l.startsWith('gf2~'));
-        arr = lines.length > 1 ? lines.map(l => _presetDecodeOne(l)) : [_presetDecodeOne(raw.slice(gf2Idx))];
+        // gff~ が見つからない場合は通常のインポートにフォールバック
+        const lines = allLines.filter(_isGfCode);
+        arr = lines.length > 1 ? await Promise.all(lines.map(l => _presetDecodeOne(l))) : [await _presetDecodeOne(raw.slice(gfIdx))];
       }
-    } else if (gf2Idx !== -1) {
-      // 単体 or 複数の gf2~ コードをあらゆるセパレーターで分割してすべてデコード
-      const lines = raw.split(/\s+(?=gf2~)/).map(l => l.trim()).filter(l => l.startsWith('gf2~'));
+    } else if (gfIdx !== -1) {
+      // 単体 or 複数の gf~ コードをあらゆるセパレーターで分割してすべてデコード
+      const lines = raw.split(/\s+(?=gf~)/).map(l => l.trim()).filter(_isGfCode);
       if (lines.length > 1) {
-        arr = lines.map(l => _presetDecodeOne(l));
+        arr = await Promise.all(lines.map(l => _presetDecodeOne(l)));
       } else {
-        arr = [_presetDecodeOne(raw.slice(gf2Idx))];
+        arr = [await _presetDecodeOne(raw.slice(gfIdx))];
       }
     } else {
       try { arr = JSON.parse(raw); }
@@ -5364,145 +5365,51 @@ renderPresets();
 })();
 
 // ============================================================
-//  プリセット圧縮コーデック v2
-//  単体共有 : "gf2~<settings27>~<name>~<id0>~<id1>"  (設定+Iwara動画2本で~60文字)
+//  プリセット圧縮コーデック
+//  単体共有 : "gf~<name>~<id0>~<id1>~<deflate-raw(JSON) base64url>"
 //  全件バックアップ: deflate-raw JSON
-//  ℹ️  Iwara ID 14文字×2が最小単位のため6-12文字は不可能
 // ============================================================
 const _B64U = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 const _B64D = s => { const b64 = s.replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(b64.padEnd(Math.ceil(b64.length/4)*4,'=')), c => c.charCodeAt(0)); };
 
-// ---- Bit-pack: 157 bits → 20 bytes → 27 base64url chars ----
-const _MSHAPES = ['circle','rect','heart','phone'];
-function _packPreset(d) {
-  const bits = [];
-  const w = (raw, n) => { const v = Math.round(+raw||0); for (let i=n-1;i>=0;i--) bits.push((v>>i)&1); };
-  const cl = (v,lo,hi) => Math.max(lo, Math.min(hi, +v||0));
-  w(cl(d.vol0,0,100),                       7);
-  w(cl(d.vol1,0,100),                       7);
-  w((cl(d.offset0,-10,10)+10)*100,         11); // 0-2000 (step 0.01)
-  w((cl(d.offset1,-10,10)+10)*100,         11);
-  w(cl(d.maskX,0,1023),                    10);
-  w(cl(d.maskY,0,511),                      9);
-  w(cl(d.maskW,0,1023),                    10);
-  w(cl(d.maskH,0,511),                      9);
-  w(Math.max(0,_MSHAPES.indexOf(d.maskShape??'circle')), 3);
-  w(cl(d.borderW,0,10)*10,                  7); // 0-100 (step 0.1)
-  w(cl(d.borderOpacity,0,100),              7);
-  const c=(d.borderColor||'#ffffff').replace('#','');
-  w(parseInt(c.slice(0,2)||'ff',16), 8); w(parseInt(c.slice(2,4)||'ff',16), 8); w(parseInt(c.slice(4,6)||'ff',16), 8);
-  w(cl(d.blurAmt,0,10)*10,                  7); // 0-100 (step 0.1)
-  w(cl(d.filterBrightness,50,150)-50,       7); // 0-100
-  w(cl(d.filterContrast,50,150)-50,         7);
-  w(cl(d.filterSaturation,0,200),           8);
-  w(cl(d.filterVignette,0,10)*10,           7); // 0-100 (step 0.1)
-  w(cl(d.filterCA,0,10)*10,                 7); // 0-100 (step 0.1)
-  w(d.arLock?1:0,                             1); // arLock
-  while(bits.length%8) bits.push(0);
-  const b=new Uint8Array(bits.length/8);
-  for(let i=0;i<b.length;i++) b[i]=bits.slice(i*8,i*8+8).reduce((v,bit,j)=>v|(bit<<(7-j)),0);
-  return b;
-}
-function _unpackPreset(bytes) {
-  const bits=[];
-  for(const byte of bytes) for(let i=7;i>=0;i--) bits.push((byte>>i)&1);
-  let pos=0;
-  const r=n=>{let v=0;for(let i=0;i<n;i++)v=(v<<1)|(bits[pos++]||0);return v;};
-  const f=v=>v%1===0?String(v):String(+v.toFixed(2));
-  return {
-    vol0:String(r(7)), vol1:String(r(7)),
-    offset0:f(r(11)/100-10), offset1:f(r(11)/100-10),
-    maskX:r(10), maskY:r(9), maskW:r(10), maskH:r(9),
-    maskShape:_MSHAPES[r(3)]||'circle',
-    borderW:f(r(7)/10), borderOpacity:String(r(7)),
-    borderColor:'#'+[r(8),r(8),r(8)].map(v=>v.toString(16).padStart(2,'0')).join(''),
-    blurAmt:f(r(7)/10),
-    filterBrightness:String(r(7)+50), filterContrast:String(r(7)+50),
-    filterSaturation:String(r(8)), filterVignette:f(r(7)/10),
-    filterCA:f(r(7)/10),
-    arLock:!!r(1),
-  };
-}
-
-// 単体コード: "gf2~<27>~<name>~<id0>~<id1>"
+// 単体コード: "gf~<name>~<id0>~<id1>~<deflate-raw(JSON) base64url>"
 const _iwaraId = url => url?.match(/iwara\.(?:tv|ai)\/video\/([^/?#]+)/)?.[1] ?? '';
-function _presetEncodeOne(p) {
-  const {presetId,vid0Name,vid1Name,...d} = p.data;
-  const base = `gf2~${_B64U(_packPreset(d))}~${(p.name||'').replace(/~/g,'')}~${_iwaraId(d.vid0Url)||d.vid0Id||''}~${_iwaraId(d.vid1Url)||d.vid1Id||''}`;
-  const ex = {
-    ba: d.borderAnim ?? 'none',
-    bs: d.borderAnimSpeed ?? '1',
-    bb: d.borderAnimBright ?? '70',
-    bc0: d.borderCustomC0 ?? '#ff55bb',
-    bc1: d.borderCustomC1 ?? '#aa55ff',
-    ft: d.filterTemp ?? '0',
-    fm: d.filterMatte ?? '0',
-    fg: d.filterGrain ?? '0',
-    fp: d.filterPixel ?? '0',
-    ff: d.filterFlare ?? '0',
-    fb: d.filterBars ?? '0',
-    mz: d.maskZoom ?? '1',
-    fhi: d.filterHighlight  ?? '0',
-    fsh: d.filterShadow     ?? '0',
-    fhu: d.filterHue        ?? '0',
-    ftn: d.filterTint       ?? '0',
-    fsp: d.filterSharpness  ?? '0',
-    pl:  d.phoneLandscape   ? 1 : 0,
-    pr:  d.phoneShowRoT     ? 1 : 0,
-    prec:d.phoneShowRec     ? 1 : 0,
-    pd:  d.phoneShowDot     ? 1 : 0,
-  };
-  // borderAnimColors はデフォルトと異なる場合のみ保存（コード長削減）
-  if (d.borderAnimColors && d.borderAnimColors !== JSON.stringify(_ANIM_DEFAULTS)) ex.bac = d.borderAnimColors;
-  // iwara以外のURL（画像等）はexに保存
-  if (d.vid0Url && !_iwaraId(d.vid0Url)) ex.u0 = d.vid0Url;
-  if (d.vid1Url && !_iwaraId(d.vid1Url)) ex.u1 = d.vid1Url;
-  // ローカルファイル名（URLなし）はexに保存
-  if (!d.vid0Url && vid0Name) ex.n0 = vid0Name;
-  if (!d.vid1Url && vid1Name) ex.n1 = vid1Name;
-  return base + '~' + _B64U(new TextEncoder().encode(JSON.stringify(ex)));
+async function _presetEncodeOne(p) {
+  // フィールドを自由に追加・削除可能。バージョン管理不要。
+  const {presetId, vid0Name, vid1Name, ...d} = p.data;
+  const id0 = _iwaraId(d.vid0Url) || d.vid0Id || '';
+  const id1 = _iwaraId(d.vid1Url) || d.vid1Id || '';
+  const data = {...d};
+  if (id0) { delete data.vid0Url; delete data.vid0Id; }
+  if (id1) { delete data.vid1Url; delete data.vid1Id; }
+  // ローカルファイル名（URLなし）はdataに残す
+  if (!d.vid0Url && vid0Name) data.vid0Name = vid0Name;
+  if (!d.vid1Url && vid1Name) data.vid1Name = vid1Name;
+  const name = (p.name || '').replace(/~/g, '');
+  const cs = new CompressionStream('deflate-raw');
+  const cw = cs.writable.getWriter();
+  cw.write(new TextEncoder().encode(JSON.stringify(data))); cw.close();
+  const chunks = []; const cr = cs.readable.getReader();
+  for (;;) { const {done, value} = await cr.read(); if (done) break; chunks.push(value); }
+  const buf = new Uint8Array(chunks.reduce((n,c) => n+c.length, 0));
+  let off = 0; for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return `gf~${name}~${id0}~${id1}~${_B64U(buf)}`;
 }
-function _presetDecodeOne(code) {
-  const parts=code.split('~');
-  if(parts[0]!=='gf2'||parts.length<5) throw new Error('invalid gf2 code');
-  const [,s27,name,id0,id1,exPart]=parts;
-  const data=_unpackPreset(_B64D(s27));
-  if(id0) { data.vid0Url=`https://www.iwara.tv/video/${id0}`; data.vid0Name=id0; }
-  if(id1) { data.vid1Url=`https://www.iwara.tv/video/${id1}`; data.vid1Name=id1; }
-  if (exPart) {
-    try {
-      const ex = JSON.parse(new TextDecoder().decode(_B64D(exPart)));
-      if (ex.ba != null) data.borderAnim      = ex.ba;
-      if (ex.bs != null) data.borderAnimSpeed = ex.bs;
-      if (ex.bb != null) data.borderAnimBright = ex.bb;
-      if (ex.bc0 != null) data.borderCustomC0 = ex.bc0;
-      if (ex.bc1 != null) data.borderCustomC1 = ex.bc1;
-      if (ex.ft != null) data.filterTemp      = ex.ft;
-      if (ex.fm != null) data.filterMatte     = ex.fm;
-      if (ex.fg != null) data.filterGrain     = ex.fg;
-      if (ex.fp != null) data.filterPixel     = ex.fp;
-      if (ex.ff != null) data.filterFlare     = ex.ff;
-      if (ex.fb != null) data.filterBars      = ex.fb;
-      if (ex.mz   != null) data.maskZoom        = ex.mz;
-      if (ex.fhi  != null) data.filterHighlight  = ex.fhi;
-      if (ex.fsh  != null) data.filterShadow     = ex.fsh;
-      if (ex.fhu  != null) data.filterHue        = ex.fhu;
-      if (ex.ftn  != null) data.filterTint       = ex.ftn;
-      if (ex.fsp  != null) data.filterSharpness  = ex.fsp;
-      if (ex.pl   != null) data.phoneLandscape   = !!ex.pl;
-      if (ex.pr   != null) data.phoneShowRoT     = !!ex.pr;
-      if (ex.prec != null) data.phoneShowRec     = !!ex.prec;
-      if (ex.pd   != null) data.phoneShowDot     = !!ex.pd;
-      if (ex.bac  != null) data.borderAnimColors = ex.bac;
-      // iwara以外のURL（画像等）を復元
-      if (ex.u0 != null) { data.vid0Url = ex.u0; data.vid0Name = data.vid0Name || ex.u0.split('/').pop().split('?')[0]; }
-      if (ex.u1 != null) { data.vid1Url = ex.u1; data.vid1Name = data.vid1Name || ex.u1.split('/').pop().split('?')[0]; }
-      // ローカルファイル名を復元
-      if (ex.n0 != null) data.vid0Name = data.vid0Name || ex.n0;
-      if (ex.n1 != null) data.vid1Name = data.vid1Name || ex.n1;
-    } catch(e) {}
-  }
-  return {name:name||'インポート',data};
+async function _presetDecodeOne(code) {
+  const parts = code.split('~');
+  if (parts[0] !== 'gf' || parts.length < 5) throw new Error('invalid gf code');
+  const [, name, id0, id1, payload] = parts;
+  const bytes = _B64D(payload);
+  const ds = new DecompressionStream('deflate-raw');
+  const dw = ds.writable.getWriter(); dw.write(bytes); dw.close();
+  const chunks = []; const dr = ds.readable.getReader();
+  for (;;) { const {done, value} = await dr.read(); if (done) break; chunks.push(value); }
+  const buf = new Uint8Array(chunks.reduce((n,c) => n+c.length, 0));
+  let off = 0; for (const c of chunks) { buf.set(c, off); off += c.length; }
+  const data = JSON.parse(new TextDecoder().decode(buf));
+  if (id0) { data.vid0Url = `https://www.iwara.tv/video/${id0}`; data.vid0Name = data.vid0Name || id0; }
+  if (id1) { data.vid1Url = `https://www.iwara.tv/video/${id1}`; data.vid1Name = data.vid1Name || id1; }
+  return {name: name || 'インポート', data};
 }
 
 // 全件バックアップ: deflate JSON
