@@ -3026,6 +3026,7 @@ function _applyBorderAnim(anim) {
       customRow.classList.add('is-open');
     } else {
       customRow.classList.remove('is-open');
+      if (anim === 'rainbow') _closeBorderColorPop();
     }
   }
   _resetBcpTarget();
