@@ -111,10 +111,10 @@ node server/proxy.js
 # アイテム追加
 gh project item-create 1 --owner E-DEN --title "タスク名"
 
-# アイテム一覧（ステータス・全タイトルを確認）
+# アイテム一覧（ステータス・タイトル・要件を確認）
 # ※ PowerShell はエンコーディング設定が必須（設定なしだと文字化けして ConvertFrom-Json が失敗する）
 $OutputEncoding = [Console]::OutputEncoding = [Text.Encoding]::UTF8
-gh project item-list 1 --owner E-DEN --format json | ConvertFrom-Json | Select-Object -ExpandProperty items | Format-Table @{L='Status';E={$_.status}},@{L='Title';E={$_.title}} -Wrap
+gh project item-list 1 --owner E-DEN --format json | ConvertFrom-Json | Select-Object -ExpandProperty items | Format-Table @{L='Status';E={$_.status}},@{L='Title';E={$_.title}},@{L='Body';E={$_.content.body}} -Wrap
 
 # ブラウザで開く
 gh project item-list 1 --owner E-DEN --web
