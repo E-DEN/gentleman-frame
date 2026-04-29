@@ -43,6 +43,7 @@ function _setZoneLoaded(zone, isLoaded) {
 const S = {
   playing: false,
   maskHovered: false,
+  anchorHovered: false,
   maskTouched: false,
   mask: {
     x: 0,
@@ -922,7 +923,7 @@ function _renderFrame() {
   }
 
   // --- リサイズハンドル ---
-  if ((S.maskHovered || S.drag.active || S.maskTouched) && !maskHidden && !visHidden[1]) {
+  if ((S.maskHovered || S.drag.active || S.maskTouched) && !maskHidden && !visHidden[1] && _followMode === 'none' && S.drag.mode !== 'fg-anchor') {
     ctx.save();
     const accent = _cachedAccent;
     const hSz = Math.max(1, Math.round(HANDLE_SZ * bufScale));
@@ -3587,17 +3588,13 @@ function _syncZoomToMaskScale(oldW, newW) {
   if (!S.zoomLock || oldW <= 0 || Math.abs(oldW - newW) < 0.5) return;
   const ratio = newW / oldW;
   const curZoom = parseFloat(elMaskZoom.value);
-  const newZoom = Math.min(3, Math.max(0.1, parseFloat((curZoom * ratio).toFixed(2))));
+  const newZoom = Math.min(5, Math.max(0.1, parseFloat((curZoom * ratio).toFixed(2))));
   elMaskZoom.value = newZoom;
   document.getElementById('maskZoomVal').value = newZoom % 1 === 0 ? `${Math.round(newZoom)}` : newZoom.toFixed(2);
   updateSliderFill(elMaskZoom);
 }
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
   S.fgFixed = !S.fgFixed;
-  if (S.fgFixed && !S.zoomLock) {
-    S.zoomLock = true;
-    _updateZoomLockBtn();
-  }
   _updateFgFixedBtn();
 });
 
@@ -3913,7 +3910,10 @@ canvas.addEventListener('click', () => {
 function _setFollowMode(mode) {
   _followMode = mode;
   canvasWrap.classList.toggle('mask-follow', mode !== 'none');
-  _presetStatusMsg(t('follow-mode-' + mode), true);
+  if (mode === 'anchor' && !S.zoomLock) {
+    S.zoomLock = true;
+    _updateZoomLockBtn();
+  }
 }
 
 canvas.addEventListener('contextmenu', e => {
@@ -3933,35 +3933,51 @@ canvas.addEventListener('contextmenu', e => {
 });
 
 canvas.addEventListener('wheel', e => {
-  if (_followMode === 'none' && !S.maskHovered) return;
+  if (_followMode === 'none' && !S.maskHovered && !S.anchorHovered) return;
   e.preventDefault();
-  if (e.ctrlKey) {
-    // Ctrl+ホイール: マスクズーム
-    const step = e.deltaY < 0 ? 0.01 : -0.01;
+
+  const doZoom = () => {
     const cur = parseFloat(elMaskZoom.value);
-    const next = Math.round(Math.min(3, Math.max(0.1, cur + step)) * 100) / 100;
+    let next;
+    if (e.shiftKey) {
+      // 0.5刻みグリッドにスナップ
+      const dir = e.deltaY < 0 ? 1 : -1;
+      next = Math.round(Math.min(5, Math.max(0.5, Math.round(cur / 0.5 + dir) * 0.5)) * 10) / 10;
+    } else {
+      const step = e.deltaY < 0 ? 0.1 : -0.1;
+      next = Math.round(Math.min(5, Math.max(0.1, cur + step)) * 10) / 10;
+    }
     elMaskZoom.value = next;
     elMaskZoom.dispatchEvent(new Event('input'));
-    return;
+  };
+  const doResize = () => {
+    const step = e.deltaY < 0 ? 10 : -10;
+    const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
+    const cx = S.mask.x + S.mask.w / 2;
+    const cy = S.mask.y + S.mask.h / 2;
+    const oldW = S.mask.w;
+    const newW = Math.max(20, S.mask.w + step);
+    const newH = Math.max(20, Math.round(newW / ar));
+    _syncZoomToMaskScale(oldW, newW);
+    S.mask.w = newW;
+    S.mask.h = newH;
+    S.mask.x = Math.round(cx - newW / 2);
+    S.mask.y = Math.round(cy - newH / 2);
+    _followTargetX = cx;
+    _followTargetY = cy;
+    _syncMaskSliders();
+  };
+
+  if (_followMode === 'anchor' || S.anchorHovered) {
+    // 視点モード / アンカーホバー: ホイール=ズーム / Ctrl+ホイール=枠サイズ
+    if (e.ctrlKey) doResize(); else doZoom();
+  } else {
+    // マスク追従 / 通常ホバー: ホイール=枠サイズ / Ctrl+ホイール=ズーム
+    if (e.ctrlKey) doZoom(); else doResize();
   }
-  const step = e.deltaY < 0 ? 10 : -10;
-  const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
-  const cx = S.mask.x + S.mask.w / 2;
-  const cy = S.mask.y + S.mask.h / 2;
-  const oldW = S.mask.w;
-  const newW = Math.max(20, S.mask.w + step);
-  const newH = Math.max(20, Math.round(newW / ar));
-  _syncZoomToMaskScale(oldW, newW);
-  S.mask.w = newW;
-  S.mask.h = newH;
-  S.mask.x = Math.round(cx - newW / 2);
-  S.mask.y = Math.round(cy - newH / 2);
-  _followTargetX = cx;
-  _followTargetY = cy;
-  _syncMaskSliders();
 }, { passive: false });
 
-canvas.addEventListener('mouseleave', () => { S.maskHovered = false; });
+canvas.addEventListener('mouseleave', () => { S.maskHovered = false; S.anchorHovered = false; });
 
 let _modalOpen = false;
 
@@ -3992,6 +4008,7 @@ document.addEventListener('mousemove', e => {
     const inMask   = hitTestMask(p.x, p.y);
     const inAnchor = hitTestAnchor(p.x, p.y);
     S.maskHovered = !!(hh || inMask);
+    S.anchorHovered = !!inAnchor;
     canvas.style.cursor = inAnchor ? 'grab' : (hh ? hh.cur : (inMask ? 'grab' : 'default'));
     return;
   }
