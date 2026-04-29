@@ -4203,7 +4203,6 @@ function collectSettings() {
     filterPixel:      document.getElementById('filterPixel').value,
     filterFlare:      document.getElementById('filterFlare').value,
     filterBars:       document.getElementById('filterBars').value,
-    theme:         document.documentElement.dataset.theme,
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
@@ -4324,14 +4323,7 @@ function applySettings(d) {
     S.arLock = !!d.arLock;
     _updateArLockBtn();
   }
-  if (d.theme && d.theme !== document.documentElement.dataset.theme) {
-    document.documentElement.dataset.theme = d.theme;
-    const isDark = d.theme === 'dark';
-    document.getElementById('themeBtn').innerHTML =
-      `<i data-lucide="${isDark ? 'moon' : 'sun'}"></i>`;
-    document.getElementById('themeBtn').title = t(isDark ? 'mode-dark' : 'mode-light');
-    lucide.createIcons();
-  }
+  // theme はプリセットに含めない（ユーザー個人の設定として独立管理）
   // 動画ロード後のマスク枠フェードイン準備
   if (d.borderW != null && parseFloat(d.borderW) > 0) {
     _maskBorderFadeStart = loaded[1] ? performance.now() : 0;
@@ -5405,7 +5397,7 @@ function _packPreset(d) {
   w(cl(d.filterSaturation,0,200),           8);
   w(cl(d.filterVignette,0,10)*10,           7); // 0-100 (step 0.1)
   w(cl(d.filterCA,0,10)*10,                 7); // 0-100 (step 0.1)
-  w(d.theme==='light'?1:0,                  1);
+  w(d.arLock?1:0,                             1); // arLock
   while(bits.length%8) bits.push(0);
   const b=new Uint8Array(bits.length/8);
   for(let i=0;i<b.length;i++) b[i]=bits.slice(i*8,i*8+8).reduce((v,bit,j)=>v|(bit<<(7-j)),0);
@@ -5428,7 +5420,7 @@ function _unpackPreset(bytes) {
     filterBrightness:String(r(7)+50), filterContrast:String(r(7)+50),
     filterSaturation:String(r(8)), filterVignette:f(r(7)/10),
     filterCA:f(r(7)/10),
-    theme:r(1)?'light':'dark',
+    arLock:!!r(1),
   };
 }
 
@@ -5450,7 +5442,18 @@ function _presetEncodeOne(p) {
     ff: d.filterFlare ?? '0',
     fb: d.filterBars ?? '0',
     mz: d.maskZoom ?? '1',
+    fhi: d.filterHighlight  ?? '0',
+    fsh: d.filterShadow     ?? '0',
+    fhu: d.filterHue        ?? '0',
+    ftn: d.filterTint       ?? '0',
+    fsp: d.filterSharpness  ?? '0',
+    pl:  d.phoneLandscape   ? 1 : 0,
+    pr:  d.phoneShowRoT     ? 1 : 0,
+    prec:d.phoneShowRec     ? 1 : 0,
+    pd:  d.phoneShowDot     ? 1 : 0,
   };
+  // borderAnimColors はデフォルトと異なる場合のみ保存（コード長削減）
+  if (d.borderAnimColors && d.borderAnimColors !== JSON.stringify(_ANIM_DEFAULTS)) ex.bac = d.borderAnimColors;
   // iwara以外のURL（画像等）はexに保存
   if (d.vid0Url && !_iwaraId(d.vid0Url)) ex.u0 = d.vid0Url;
   if (d.vid1Url && !_iwaraId(d.vid1Url)) ex.u1 = d.vid1Url;
@@ -5480,7 +5483,17 @@ function _presetDecodeOne(code) {
       if (ex.fp != null) data.filterPixel     = ex.fp;
       if (ex.ff != null) data.filterFlare     = ex.ff;
       if (ex.fb != null) data.filterBars      = ex.fb;
-      if (ex.mz != null) data.maskZoom         = ex.mz;
+      if (ex.mz   != null) data.maskZoom        = ex.mz;
+      if (ex.fhi  != null) data.filterHighlight  = ex.fhi;
+      if (ex.fsh  != null) data.filterShadow     = ex.fsh;
+      if (ex.fhu  != null) data.filterHue        = ex.fhu;
+      if (ex.ftn  != null) data.filterTint       = ex.ftn;
+      if (ex.fsp  != null) data.filterSharpness  = ex.fsp;
+      if (ex.pl   != null) data.phoneLandscape   = !!ex.pl;
+      if (ex.pr   != null) data.phoneShowRoT     = !!ex.pr;
+      if (ex.prec != null) data.phoneShowRec     = !!ex.prec;
+      if (ex.pd   != null) data.phoneShowDot     = !!ex.pd;
+      if (ex.bac  != null) data.borderAnimColors = ex.bac;
       // iwara以外のURL（画像等）を復元
       if (ex.u0 != null) { data.vid0Url = ex.u0; data.vid0Name = data.vid0Name || ex.u0.split('/').pop().split('?')[0]; }
       if (ex.u1 != null) { data.vid1Url = ex.u1; data.vid1Name = data.vid1Name || ex.u1.split('/').pop().split('?')[0]; }
