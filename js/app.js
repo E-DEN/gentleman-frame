@@ -5258,7 +5258,7 @@ document.getElementById('presetCodeInput').addEventListener('input', () => { doc
   });
 })());
 
-// ---- JSON / gf2コード D&D → プリセットカード全体で受付 ----
+// ---- JSON / gf~ コード D&D → プリセットカード全体で受付 ----
 ((() => {
   const card = document.getElementById('presetCard');
   const list = document.getElementById('presetList');
@@ -5266,7 +5266,7 @@ document.getElementById('presetCodeInput').addEventListener('input', () => { doc
 
   const _isJsonDrag = e => {
     if (!e.dataTransfer) return false;
-    // テキスト（gf2コードやJSONテキスト）
+    // テキスト（gf~コードやJSONテキスト）
     if (e.dataTransfer.types.includes('text/plain')) return true;
     // ファイルドロップ：JSONファイルのみ（動画・画像は無視）
     if (e.dataTransfer.items) {
