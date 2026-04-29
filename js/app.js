@@ -63,6 +63,31 @@ const _loadedFileName = ['', ''];
 const _loadedPageUrl  = ['', '']; // Iwara等ページURLを記憶（リンク表示用）
 const _loadedSrcUrl   = ['', '']; // 実際にロードしたURL（プリセット復元用）
 
+// ---- プリセット名ホバースライド計算（モジュールレベル: ピッカー解決後など renderPresets 外からも呼べる） ----
+function _calcOverflows(item) {
+  const actions = item.querySelector('.preset-item-actions');
+  if (actions) {
+    actions.style.setProperty('max-width', '80px', 'important');
+    actions.style.setProperty('margin-left', '0', 'important');
+  }
+  item.querySelectorAll('.pname-inner').forEach(inner => {
+    const outer = inner.parentElement;
+    const overflow = inner.scrollWidth - outer.clientWidth;
+    if (overflow > 2) {
+      inner.classList.add('overflows');
+      const fadeZone = outer.clientWidth * 0.03;
+      inner.style.setProperty('--slide-dist', `-${overflow + fadeZone}px`);
+    } else {
+      inner.classList.remove('overflows');
+      inner.style.removeProperty('--slide-dist');
+    }
+  });
+  if (actions) {
+    actions.style.removeProperty('max-width');
+    actions.style.removeProperty('margin-left');
+  }
+}
+
 const _IDB = (() => {
   const DB = 'gentleFrameDB', ST = 'fileHandles';
   let db = null;
@@ -312,7 +337,25 @@ let _canvasInitialized = false; // setCanvasAspectRatio が一度でも呼ばれ
 let _bufferSynced      = false; // 初回CSS表示サイズへのバッファ同期済みか
 let _pendingMask = null; // applySettings から設定。次回 setCanvasAspectRatio で適用される
 let _activePresetIdx = null; // 現在適用中のプリセットのインデックス
-const _missingFiles = new Set(); // 「presetId_slot」形式: このセッションでファイル未発見だったスロット
+const _missingFiles  = new Set(); // 「presetId_slot」形式: このセッションでファイル未発見だったスロット
+const _resolvedFiles = new Set(); // 「presetId_slot」形式: このセッションでファイルロード成功したスロット
+const _pendingFiles  = new Set(); // 「presetId_slot」形式: ダイアログで未選択のままOKしたスロット
+let _shiftHeld = false; // Shift押下状態（削除ボタンアイコン切り替え用）
+const _setDelBtnIcon = (btn, icon) => {
+  if (!btn) return;
+  btn.innerHTML = `<i data-lucide="${icon}"></i>`;
+  lucide.createIcons({ nodes: [btn] });
+};
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Shift' || _shiftHeld) return;
+  _shiftHeld = true;
+  document.querySelector('.preset-item-delete:hover') && _setDelBtnIcon(document.querySelector('.preset-item-delete:hover'), 'trash-2');
+});
+document.addEventListener('keyup', e => {
+  if (e.key !== 'Shift') return;
+  _shiftHeld = false;
+  document.querySelector('.preset-item-delete:hover') && _setDelBtnIcon(document.querySelector('.preset-item-delete:hover'), 'x');
+});
 
 // 初回同期: バッファ解像度はFHD(1920x1080)固定。CSS表示サイズは _dispW/_dispH で追跡。
 {
@@ -4225,10 +4268,6 @@ function applySettings(d) {
         const parsed = JSON.parse(d.borderAnimColors);
         Object.keys(_animColors).forEach(k => { if (parsed[k]) _animColors[k] = parsed[k]; });
       } catch (_) {}
-    } else {
-      // 旧バージョン互換: borderCustomC0/C1
-      if (d.borderCustomC0 != null) _animColors.custom[0] = d.borderCustomC0;
-      if (d.borderCustomC1 != null) _animColors.custom[1] = d.borderCustomC1;
     }
     Object.keys(_animColors).forEach(_syncAnimColors);
     _applyBorderAnim(d.borderAnim);
@@ -4306,6 +4345,227 @@ function savePresets(list) { localStorage.setItem(PRESET_KEY, JSON.stringify(lis
 // HTML特殊文字をエスケープしてXSSを防ぐ
 function _esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---- ファイル再リンク選択ダイアログ（Promise<'files'|'folder'|null>） ----
+// ---- フォルダハンドルからファイル名で FileHandle を取得（モジュールレベル） ----
+async function _tryFromFolder(dirHandle, filename) {
+  try {
+    const fh = await dirHandle.getFileHandle(filename);
+    const perm = await fh.queryPermission({ mode: 'read' });
+    if (perm === 'granted' || await fh.requestPermission({ mode: 'read' }) === 'granted') return fh;
+  } catch {}
+  return null;
+}
+
+// ---- ファイル再リンクダイアログ（スロットごとにファイル選択・フォルダ選択・D&D） ----
+// slots: 解決が必要なスロット番号の配列, slotNames: {si: expectedName}, startHint: FileSystemFileHandle
+// → Promise<Map<si, FileSystemFileHandle> | null>
+function _showFileResolveDialog(slots, slotNames, startHint, preResolvedMap = new Map()) {
+  return new Promise(resolve => {
+    _modalOpen = true;
+    const pickedMap = new Map();
+    let _hint = startHint;
+    const overlay = document.createElement('div');
+    overlay.className = 'gf-resolve-overlay';
+    const dialog = document.createElement('div');
+    dialog.className = 'gf-resolve-dialog';
+    const h = document.createElement('h3'); h.textContent = t('file-resolve-title');
+    const desc = document.createElement('p'); desc.className = 'gf-resolve-desc'; desc.textContent = t('file-resolve-desc');
+    const note = document.createElement('p'); note.className = 'gf-resolve-note'; note.textContent = t('file-resolve-note');
+    const header = document.createElement('div'); header.className = 'gf-resolve-header';
+    header.append(h, desc, note);
+    const slotsWrap = document.createElement('div'); slotsWrap.className = 'gf-resolve-slots';
+    dialog.append(header, slotsWrap);
+
+    const _ACCEPT = [{ description: '動画 / 画像', accept: { 'video/*': ['.mp4','.webm','.mov','.mkv'], 'image/*': ['.jpg','.jpeg','.png','.gif','.webp','.avif'] } }];
+    const slotState = {};
+
+    const _setResolvedFinal = (si, fh, fileName) => {
+      pickedMap.set(si, { fh, name: fileName });
+      const { zone } = slotState[si];
+      zone.querySelector('.gf-rzone-mismatch')?.remove();
+      zone.classList.add('loaded');
+      const lbl = zone.querySelector('.gf-rzone-label');
+      const hint = zone.querySelector('.gf-rzone-hint');
+      const icon = zone.querySelector('.gf-rzone-icon');
+      lbl.textContent = fileName;
+      lbl.style.color = '';
+      hint.style.display = 'none';
+      if (icon) { icon.setAttribute('data-lucide', 'check'); lucide.createIcons({ nodes: [icon] }); }
+      zone.querySelector('.gf-rzone-delete').style.display = 'flex';
+      zone.querySelector('.gf-rzone-folder').style.display = 'none';
+    };
+    const _showMismatch = (si, fh, fileName) => {
+      const { zone } = slotState[si];
+      zone.querySelector('.gf-rzone-mismatch')?.remove();
+      const mismatchEl = document.createElement('div');
+      mismatchEl.className = 'gf-rzone-mismatch';
+      const warnLine = document.createElement('div');
+      warnLine.className = 'gf-rzone-mismatch-warn';
+      warnLine.textContent = '⚠ ' + t('file-resolve-name-warn');
+      const expLine = document.createElement('div');
+      expLine.className = 'gf-rzone-mismatch-table';
+      expLine.innerHTML =
+        `<span class="gf-rzone-mismatch-key">${t('file-mismatch-expected')}</span><span class="gf-rzone-mismatch-val">${slotNames[si] ?? ''}</span>` +
+        `<span class="gf-rzone-mismatch-key">${t('file-mismatch-picked')}</span><span class="gf-rzone-mismatch-val">${fileName}</span>`;
+      const selLine = null;
+      const btnRow = document.createElement('div');
+      btnRow.className = 'gf-rzone-mismatch-btns';
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className = 'gf-rzone-mismatch-accept';
+      acceptBtn.textContent = t('file-resolve-mismatch-accept');
+      acceptBtn.addEventListener('click', e => { e.stopPropagation(); _setResolvedFinal(si, fh, fileName); });
+      const rejectBtn = document.createElement('button');
+      rejectBtn.className = 'gf-rzone-mismatch-reject';
+      rejectBtn.textContent = t('file-resolve-mismatch-reject');
+      rejectBtn.addEventListener('click', e => { e.stopPropagation(); mismatchEl.remove(); });
+      btnRow.append(rejectBtn, acceptBtn);
+      mismatchEl.append(warnLine, expLine, btnRow);
+      zone.querySelector('.drop-text').appendChild(mismatchEl);
+    };
+    const _setResolved = (si, fh, fileName) => {
+      const expected = (slotNames[si] ?? '').toLowerCase();
+      const mismatch = !!fileName && !!expected && fileName.toLowerCase() !== expected;
+      if (mismatch) { _showMismatch(si, fh, fileName); return; }
+      _setResolvedFinal(si, fh, fileName);
+    };
+    const _clearResolved = (si) => {
+      pickedMap.delete(si);
+      const { zone, expectedName } = slotState[si];
+      zone.querySelector('.gf-rzone-mismatch')?.remove();
+      zone.classList.remove('loaded');
+      const lbl = zone.querySelector('.gf-rzone-label');
+      const hint = zone.querySelector('.gf-rzone-hint');
+      const icon = zone.querySelector('.gf-rzone-icon');
+      lbl.textContent = expectedName;
+      lbl.style.color = '';
+      hint.style.display = '';
+      if (icon) { icon.setAttribute('data-lucide', 'upload'); lucide.createIcons({ nodes: [icon] }); }
+      zone.querySelector('.gf-rzone-delete').style.display = 'none';
+      zone.querySelector('.gf-rzone-folder').style.display = '';
+    };
+
+    for (const si of slots) {
+      const expectedName = slotNames[si] ?? '';
+      // セクションラベル
+      const lbl = document.createElement('div');
+      lbl.className = 'gf-slot-label';
+      lbl.textContent = t(si === 0 ? 'bg-title' : 'fg-title');
+      // ※ lbl は後で section に追加するためここでは dialog に追加しない
+
+      // ドロップゾーン本体（.drop-zone 同形式）
+      const zone = document.createElement('div');
+      zone.className = 'gf-slot-dropzone';
+      zone.setAttribute('role', 'button');
+
+      // アイコン
+      const iconEl = document.createElement('div');
+      iconEl.className = 'gf-rzone-icon drop-icon';
+      iconEl.innerHTML = '<i data-lucide="upload"></i>';
+
+      // テキスト列
+      const textWrap = document.createElement('div');
+      textWrap.className = 'drop-text';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'gf-rzone-label';
+      labelEl.textContent = expectedName;
+      const hintEl = document.createElement('div');
+      hintEl.className = 'gf-rzone-hint drop-hint';
+      hintEl.textContent = t('file-resolve-slot-drop');
+      textWrap.append(labelEl, hintEl);
+
+      // フォルダ選択ボタン（右上）
+      const folderBtn = document.createElement('button');
+      folderBtn.className = 'gf-rzone-folder drop-delete';
+      folderBtn.style.cssText = 'display:flex;width:auto;padding:0 6px;border-radius:4px;font-size:10px;right:5px;top:5px;background:rgba(0,0,0,0.08);color:var(--text-muted);border:none;cursor:pointer;align-items:center;gap:3px;height:18px;white-space:nowrap';
+      folderBtn.textContent = t('file-resolve-folder-btn');
+
+      // リセットボタン（右上、解決済み時のみ）
+      const delBtn = document.createElement('button');
+      delBtn.className = 'gf-rzone-delete drop-delete';
+      delBtn.style.cssText = 'display:none;right:5px;top:5px';
+      delBtn.textContent = '✕';
+
+      zone.append(iconEl, textWrap, folderBtn, delBtn);
+
+      // イベント
+      folderBtn.addEventListener('click', async e => {
+        e.stopPropagation();
+        try {
+          const dirHandle = await window.showDirectoryPicker({ ...(_hint ? { startIn: _hint } : {}) });
+          _IDB.set('gf_folder_handle', dirHandle).catch(() => {});
+          const fh = await _tryFromFolder(dirHandle, expectedName);
+          if (fh) { _hint = fh; _IDB.set('gf_folder_hint', fh).catch(() => {}); _setResolved(si, fh, expectedName); }
+          // 同じフォルダで他のスロットのファイルも探す
+          for (const otherSi of slots) {
+            if (otherSi === si) continue;
+            if (pickedMap.has(otherSi)) continue; // すでに解決済み
+            const otherName = slotNames[otherSi] ?? '';
+            if (!otherName) continue;
+            const otherFh = await _tryFromFolder(dirHandle, otherName);
+            if (otherFh) { _IDB.set('gf_folder_hint', otherFh).catch(() => {}); _setResolved(otherSi, otherFh, otherName); }
+          }
+        } catch {}
+      });
+      delBtn.addEventListener('click', e => { e.stopPropagation(); _clearResolved(si); });
+
+      let _dc = 0;
+      zone.addEventListener('dragenter', e => {
+        if (!e.dataTransfer?.types?.includes('Files')) return;
+        e.preventDefault(); _dc++; zone.classList.add('drag-over');
+      });
+      zone.addEventListener('dragover', e => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
+      zone.addEventListener('dragleave', () => { if (--_dc <= 0) { _dc = 0; zone.classList.remove('drag-over'); } });
+      zone.addEventListener('drop', async e => {
+        e.preventDefault(); _dc = 0; zone.classList.remove('drag-over');
+        const item = e.dataTransfer.items?.[0];
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        let fh = null;
+        if (item?.getAsFileSystemHandle) fh = await item.getAsFileSystemHandle().catch(() => null);
+        if (fh?.kind === 'file') { _hint = fh; _IDB.set('gf_folder_hint', fh).catch(() => {}); _setResolved(si, fh, file.name); }
+      });
+      zone.addEventListener('click', async () => {
+        if (zone.querySelector('.gf-rzone-mismatch')) return; // ミスマッチ確認中はファイルピッカー不可
+        try {
+          const [fh] = await window.showOpenFilePicker({ types: _ACCEPT, multiple: false, ...(_hint ? { startIn: _hint } : {}) });
+          const file = await fh.getFile();
+          _hint = fh; _IDB.set('gf_folder_hint', fh).catch(() => {});
+          _setResolved(si, fh, file.name);
+        } catch {}
+      });
+
+      lucide.createIcons({ nodes: [iconEl] }); // DOM追加前は仮呼び出し（後で再呼び出し）
+      slotState[si] = { zone, expectedName };
+      if (preResolvedMap.has(si)) {
+        const { fh, name } = preResolvedMap.get(si);
+        _setResolvedFinal(si, fh, name); // IDB済みスロットはミスマッチ再チェック不要
+      }
+      const section = document.createElement('div');
+      section.className = 'gf-resolve-section';
+      section.append(lbl, zone);
+      slotsWrap.appendChild(section);
+    }
+
+    // フッター
+    const footer = document.createElement('div');
+    footer.className = 'gf-resolve-footer';
+    const cancelBtn = document.createElement('button'); cancelBtn.className = 'gf-resolve-cancel'; cancelBtn.textContent = t('file-resolve-cancel');
+    const okBtn = document.createElement('button'); okBtn.className = 'gf-resolve-cancel gf-resolve-ok'; okBtn.textContent = t('file-resolve-ok');
+    footer.append(cancelBtn, okBtn);
+    dialog.appendChild(footer);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    lucide.createIcons({ nodes: [overlay] }); // DOM追加後に一括描画
+
+    const _close = res => { overlay.remove(); document.removeEventListener('keydown', _onKey); _modalOpen = false; resolve(res); };
+    cancelBtn.addEventListener('click', () => _close(null));
+    okBtn.addEventListener('click', () => _close(pickedMap));
+    overlay.addEventListener('click', e => { if (e.target === overlay) _close(null); });
+    const _onKey = e => { if (e.key === 'Escape') _close(null); };
+    document.addEventListener('keydown', _onKey);
+  });
 }
 
 function _showDelPopup(anchorBtn, msg, onConfirm, okClass) {
@@ -4399,8 +4659,11 @@ function renderPresets() {
     if (n0 || n1) {
       const lines = [[n0, 0], [n1, 1]].filter(([n]) => n)
         .map(([n, si]) => {
-          const missing = p.data.presetId && _missingFiles.has(`${p.data.presetId}_${si}`);
-          return `<span class="preset-file-line${missing ? ' preset-file-missing' : ''}"><span class="pname-inner">${_esc(n)}</span></span>`;
+          const mkey    = p.data.presetId ? `${p.data.presetId}_${si}` : null;
+          const missing  = mkey && _missingFiles.has(mkey);
+          const unlinked = !p.data.presetId && !p.data[`vid${si}Url`];
+          const pending  = mkey && _pendingFiles.has(mkey);
+          return `<span class="preset-file-line${missing ? ' preset-file-missing' : unlinked || pending ? ' preset-file-unlinked' : ''}" data-slot="${si}"><span class="pname-inner">${_esc(n)}</span></span>`;
         })
         .join('');
       fileHint = `<span class="preset-item-files">${lines}</span>`;
@@ -4408,9 +4671,6 @@ function renderPresets() {
       fileHint = `<span class="preset-item-files"><span class="preset-file-line"><span class="pname-inner">${t('preset-no-video')}</span></span></span>`;
     }
     const isActive = i === _activePresetIdx;
-    const saveBtn = isActive
-      ? `<button class="preset-item-del preset-item-save" data-idx="${i}" title="${t('preset-save-title')}"><i data-lucide="save"></i></button>`
-      : '';
     return `<div class="preset-item${isChild ? ' preset-item-child' : ''}${isActive ? ' preset-item--active' : ''}" data-idx="${i}" tabindex="0">
         <span class="preset-drag-handle"><i data-lucide="grip-vertical"></i></span>
         <div class="preset-item-info" data-idx="${i}">
@@ -4418,7 +4678,7 @@ function renderPresets() {
           ${fileHint}
         </div>
         <div class="preset-item-actions">
-          ${saveBtn}
+          ${isActive ? `<button class="preset-item-del preset-item-save" data-idx="${i}" title="${t('preset-save-title')}"><i data-lucide="save"></i></button>` : ''}
           <button class="preset-item-del preset-item-rename" data-idx="${i}" title="${t('preset-rename-title')}"><i data-lucide="pencil"></i></button>
           <button class="preset-item-del preset-item-share" data-idx="${i}" title="${t('preset-copy-title')}"><i data-lucide="copy"></i></button>
           <button class="preset-item-del preset-item-delete" data-idx="${i}" title="${t('preset-del-title')}"><i data-lucide="x"></i></button>
@@ -4476,31 +4736,15 @@ function renderPresets() {
   el.innerHTML = html;
   lucide.createIcons();
 
-  // ---- プリセット名ホバースライド: はみ出す名前に overflows クラスとスライド距離を設定 ----
-  // 非ホバー時: 現在の clientWidth で初期計算
-  // ホバー時: mouseenter で実際のホバー後の clientWidth を使って再計算
-  //           (actions が展開した後の正確な幅でスライド距離を決める)
-  function _calcOverflows(item) {
-    item.querySelectorAll('.pname-inner').forEach(inner => {
-      const outer = inner.parentElement;
-      const overflow = inner.scrollWidth - outer.clientWidth;
-      if (overflow > 2) {
-        inner.classList.add('overflows');
-        // mask-imageのフェードゾーン(3%)分を加算して終端の文字が隠れないようにする
-        const fadeZone = outer.clientWidth * 0.03;
-        inner.style.setProperty('--slide-dist', `-${overflow + fadeZone}px`);
-      } else {
-        inner.classList.remove('overflows');
-        inner.style.removeProperty('--slide-dist');
-      }
+  // ---- プリセット名ホバースライド ----
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      el.querySelectorAll('.preset-item, .preset-folder-header').forEach(item => {
+        _calcOverflows(item);
+        item.addEventListener('mouseenter', () => _calcOverflows(item));
+      });
     });
-  }
-  requestAnimationFrame(() => {
-    el.querySelectorAll('.preset-item, .preset-folder-header').forEach(item => {
-      _calcOverflows(item);
-      item.addEventListener('mouseenter', () => _calcOverflows(item));
-    });
-  });
+  }, 0);
 
   // ---- Folder toggle (header全体クリックで開閉、ボタンは除外) ----
   el.querySelectorAll('.preset-folder-header').forEach(header => {
@@ -4540,14 +4784,94 @@ function renderPresets() {
       _fgFadeStart = 0;
       let needsRender = false;
       let vid1HasSource = false;
+
+      // ---- ローカルファイル欠損スロットを一括ピック（最大1回の操作で両スロット解決） ----
+      // IDB から必要な情報をすべてユーザー操作前に取得（ジェスチャー失効を防ぐ）
+      const [_idbHandles, _startHint, _folderHandle] = await Promise.all([
+        Promise.all([0, 1].map(si =>
+          p.data.presetId ? _IDB.get(`preset_${p.data.presetId}_${si}`).catch(() => null) : Promise.resolve(null)
+        )),
+        _IDB.get('gf_folder_hint').catch(() => null),
+        _IDB.get('gf_folder_handle').catch(() => null),
+      ]);
+      // IDB ハンドルなし・URL なし・ファイル名あり → ピッカーが必要なスロット
+      const _slotsLocal    = [0, 1].filter(si => !p.data[`vid${si}Url`] && !!p.data[`vid${si}Name`]);
+      const _slotsNeedPick = _slotsLocal.filter(si => !_idbHandles[si]);
+      const _prePickedHandles = new Map(); // slot index -> FileSystemFileHandle
+      let _dialogShown = false;
+
+      // ローカルスロットがある場合、presetId を事前に確定（_pendingFiles 追跡に必要）
+      if (_slotsLocal.length > 0 && !p.data.presetId) {
+        const list2 = loadPresets();
+        if (list2[idx] && !list2[idx].data?.presetId) {
+          const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          list2[idx].data.presetId = newId;
+          savePresets(list2);
+          p.data.presetId = newId;
+        } else if (list2[idx]?.data?.presetId) {
+          p.data.presetId = list2[idx].data.presetId;
+        }
+      }
+
+      // IDB で見つかっているスロットをダイアログ前に先行ロード（プレイヤーに即表示）
+      const _preLoadOk = new Map();
+      for (const si of _slotsLocal) {
+        if (_idbHandles[si]) {
+          const ok = await loadVideoFromHandle(si, _idbHandles[si]);
+          _preLoadOk.set(si, ok);
+          if (ok && si === 1) vid1HasSource = true;
+        }
+      }
+
+      if (_slotsLocal.length > 0 && _slotsNeedPick.length > 0 && window.showOpenFilePicker) {
+        // 全ローカルスロットを表示。IDB で発見済みのものは最初から resolved 状態で表示
+        _dialogShown = true;
+        const _slotNames = {};
+        for (const si of _slotsLocal) _slotNames[si] = p.data[`vid${si}Name`] ?? '';
+        const _preResolved = new Map();
+        for (const si of _slotsLocal) {
+          if (_preLoadOk.get(si)) {
+            // 先行ロード成功 → 実際のロード済みファイル名でチェック済み表示
+            _preResolved.set(si, { fh: _idbHandles[si], name: _loadedFileName[si] || p.data[`vid${si}Name`] || '' });
+          }
+        }
+        const _resolvedMap = await _showFileResolveDialog(_slotsLocal, _slotNames, _startHint, _preResolved);
+        if (_resolvedMap) {
+          for (const [si, { fh }] of _resolvedMap) _prePickedHandles.set(si, fh);
+          // ミスマッチ承認で別名になったスロットのプリセット名を更新
+          const _list2 = loadPresets();
+          let _nameChanged = false;
+          for (const [si, { name }] of _resolvedMap) {
+            const _expected = p.data[`vid${si}Name`];
+            if (name && _expected && name !== _expected && _list2[idx]?.data) {
+              _list2[idx].data[`vid${si}Name`] = name;
+              _nameChanged = true;
+            }
+          }
+          if (_nameChanged) { savePresets(_list2); needsRender = true; }
+          // ダイアログで未選択のままOKしたスロットを未解決マーク（次回クリックで再表示）
+          const _pid = p.data.presetId;
+          for (const si of _slotsNeedPick) {
+            const mk = _pid ? `${_pid}_${si}` : null;
+            if (!_resolvedMap.has(si) && mk) { _pendingFiles.add(mk); needsRender = true; }
+            else if (mk) _pendingFiles.delete(mk);
+          }
+        }
+        const _itemEl = document.querySelector(`.preset-item[data-idx="${idx}"]`);
+        if (_itemEl) setTimeout(() => requestAnimationFrame(() => _calcOverflows(_itemEl)), 0);
+      }
+
       for (const i of [0, 1]) {
-        const handle = p.data.presetId
-          ? await _IDB.get(`preset_${p.data.presetId}_${i}`).catch(() => null)
-          : null;
+        // ダイアログ前に先行ロード済みのスロットはスキップ、それ以外は IDB から試行
+        const handle = _idbHandles[i];
         let loaded_ok = false;
-        const _mkey = `${p.data.presetId}_${i}`;
-        if (handle) {
+        const _mkey = p.data.presetId ? `${p.data.presetId}_${i}` : null;
+        if (_preLoadOk.has(i)) {
+          loaded_ok = _preLoadOk.get(i); // 先行ロード済み
+          if (loaded_ok && _mkey) _resolvedFiles.add(_mkey);
+        } else if (handle) {
           loaded_ok = await loadVideoFromHandle(i, handle);
+          if (loaded_ok && _mkey) _resolvedFiles.add(_mkey);
           // ハンドルは削除しない（ファイルが戻ったとき再試行できるよう残す）
         }
         if (!loaded_ok) {
@@ -4555,7 +4879,8 @@ function renderPresets() {
           if (savedUrl) {
             if (i === 1) vid1HasSource = true;
             loaded_ok = true;
-            if (_missingFiles.delete(_mkey)) needsRender = true;
+            if (_mkey && _missingFiles.delete(_mkey)) needsRender = true;
+            if (_mkey) { _resolvedFiles.add(_mkey); needsRender = true; }
             const urlInput = document.getElementById(`urlInput${i}`);
             if (urlInput) urlInput.value = savedUrl;
             await loadVideoFromURL(i, savedUrl);
@@ -4566,13 +4891,38 @@ function renderPresets() {
             }
           } else if (p.data[`vid${i}Name`]) {
             // URLもハンドルも使えないが名前が記録されている → ローカルファイルが消えた/IDB削除済み
-            if (!_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
-            _presetStatusMsg(t('preset-file-missing'), false);
+            // ダイアログで選択の機会があったが未選択の場合は赤字にしない（次回再リンク可能にする）
+            const newHandle = _prePickedHandles.get(i);
+            if (newHandle) {
+              // presetId がなければ新規発行
+              const list2 = loadPresets();
+              if (!list2[idx]?.data?.presetId) {
+                const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                if (list2[idx]) { list2[idx].data.presetId = newId; savePresets(list2); }
+                p.data.presetId = list2[idx]?.data?.presetId;
+              }
+              if (p.data.presetId) {
+                await _IDB.set(`preset_${p.data.presetId}_${i}`, newHandle).catch(() => {});
+                if (_mkey) _missingFiles.delete(_mkey);
+              }
+              loaded_ok = await loadVideoFromHandle(i, newHandle);
+              if (loaded_ok) { needsRender = true; if (_mkey) { _resolvedFiles.add(_mkey); _pendingFiles.delete(_mkey); } }
+            } else if (!window.showOpenFilePicker) {
+              // ピッカー非対応環境のみ即座に欠損扱い
+              if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
+              _presetStatusMsg(t('preset-file-missing'), false);
+            } else if (!_dialogShown) {
+              // ダイアログが一度も開いていない（IDB ハンドルあり側のみ通る等）場合は欠損扱い
+              if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
+            }
+            // ダイアログで未選択のまま OK した場合は何もしない（次回クリックで再表示）
           }
-        } else if (handle) {
-          if (_missingFiles.delete(_mkey)) needsRender = true;
+        } else if (handle || _preLoadOk.has(i)) {
+          if (_mkey && _missingFiles.delete(_mkey)) needsRender = true;
+          if (_mkey && _resolvedFiles.has(_mkey)) {} // already tracked
           if (i === 1) vid1HasSource = true;
         }
+        if (loaded_ok && i === 1) vid1HasSource = true;
       }
       // vid1 がない場合のみここで枠フェードイン開始（vid1 がある場合は onloadedmetadata と同時に開始）
       if (!vid1HasSource && _maskBorderFadeStart === 0) _maskBorderFadeStart = performance.now();
@@ -4652,13 +5002,14 @@ function renderPresets() {
 
   // ---- 削除（プリセット & フォルダ）----
   el.querySelectorAll('.preset-item-delete').forEach(btn => {
+    btn.addEventListener('mouseenter', () => { if (_shiftHeld) _setDelBtnIcon(btn, 'trash-2'); });
+    btn.addEventListener('mouseleave', () => { _setDelBtnIcon(btn, 'x'); });
     btn.addEventListener('click', async e => {
       e.stopPropagation();
       const idx = +btn.dataset.idx;
       const list2 = loadPresets();
       const p = list2[idx];
-      const msgKey = p.type === 'folder' ? 'del-confirm-folder' : 'del-confirm';
-      _showDelPopup(btn, t(msgKey).replace('{name}', p.name), async () => {
+      const doDelete = async () => {
         if (p.type === 'folder') {
           let end = idx + 1;
           while (end < list2.length && list2[end].type !== 'folder') end++;
@@ -4682,7 +5033,13 @@ function renderPresets() {
         }
         savePresets(list2);
         renderPresets();
-      });
+      };
+      if (e.shiftKey) {
+        await doDelete();
+      } else {
+        const msgKey = p.type === 'folder' ? 'del-confirm-folder' : 'del-confirm';
+        _showDelPopup(btn, t(msgKey).replace('{name}', p.name), doDelete);
+      }
     });
   });
 
@@ -4991,6 +5348,29 @@ document.getElementById('presetImportToggleBtn').addEventListener('click', () =>
 _presetsReady = true;
 renderPresets();
 
+// 起動時に欠損スロットを事前検出（IDB にハンドルがないローカルスロットを _missingFiles に追加）
+// IDB 読み取りを並列実行して高速化
+(async () => {
+  const _allPresets = loadPresets();
+  const _checks = [];
+  for (const _pp of _allPresets) {
+    if (!_pp || _pp.type === 'folder' || !_pp.data?.presetId) continue;
+    for (const _si of [0, 1]) {
+      const _name = _pp.data[`vid${_si}Name`];
+      const _url  = _pp.data[`vid${_si}Url`];
+      if (!_name || _url) continue;
+      const _mk = `${_pp.data.presetId}_${_si}`;
+      if (_missingFiles.has(_mk) || _resolvedFiles.has(_mk)) continue;
+      _checks.push({ mk: _mk, key: `preset_${_pp.data.presetId}_${_si}` });
+    }
+  }
+  if (!_checks.length) return;
+  const _results = await Promise.all(_checks.map(c => _IDB.get(c.key).catch(() => null)));
+  let _initNeedsRender = false;
+  _results.forEach((h, i) => { if (!h) { _missingFiles.add(_checks[i].mk); _initNeedsRender = true; } });
+  if (_initNeedsRender) renderPresets();
+})();
+
 // ============================================================
 //  プリセット圧縮コーデック v2
 //  単体共有 : "gf2~<settings27>~<name>~<id0>~<id1>"  (設定+Iwara動画2本で~60文字)
@@ -5001,7 +5381,7 @@ const _B64U = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g
 const _B64D = s => { const b64 = s.replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(b64.padEnd(Math.ceil(b64.length/4)*4,'=')), c => c.charCodeAt(0)); };
 
 // ---- Bit-pack: 157 bits → 20 bytes → 27 base64url chars ----
-const _MSHAPES = ['circle','rect','triangle','diamond','star','hexagon','none','ellipse','phone'];
+const _MSHAPES = ['circle','rect','heart','phone'];
 function _packPreset(d) {
   const bits = [];
   const w = (raw, n) => { const v = Math.round(+raw||0); for (let i=n-1;i>=0;i--) bits.push((v>>i)&1); };
@@ -5074,6 +5454,9 @@ function _presetEncodeOne(p) {
   // iwara以外のURL（画像等）はexに保存
   if (d.vid0Url && !_iwaraId(d.vid0Url)) ex.u0 = d.vid0Url;
   if (d.vid1Url && !_iwaraId(d.vid1Url)) ex.u1 = d.vid1Url;
+  // ローカルファイル名（URLなし）はexに保存
+  if (!d.vid0Url && vid0Name) ex.n0 = vid0Name;
+  if (!d.vid1Url && vid1Name) ex.n1 = vid1Name;
   return base + '~' + _B64U(new TextEncoder().encode(JSON.stringify(ex)));
 }
 function _presetDecodeOne(code) {
@@ -5101,6 +5484,9 @@ function _presetDecodeOne(code) {
       // iwara以外のURL（画像等）を復元
       if (ex.u0 != null) { data.vid0Url = ex.u0; data.vid0Name = data.vid0Name || ex.u0.split('/').pop().split('?')[0]; }
       if (ex.u1 != null) { data.vid1Url = ex.u1; data.vid1Name = data.vid1Name || ex.u1.split('/').pop().split('?')[0]; }
+      // ローカルファイル名を復元
+      if (ex.n0 != null) data.vid0Name = data.vid0Name || ex.n0;
+      if (ex.n1 != null) data.vid1Name = data.vid1Name || ex.n1;
     } catch(e) {}
   }
   return {name:name||'インポート',data};
