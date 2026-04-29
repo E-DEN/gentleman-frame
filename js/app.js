@@ -50,7 +50,7 @@ const S = {
     y: 0,
     w: 400,
     h: 400,
-    shape: 'phone'  // 紳士枠モードをデフォルトに
+    shape: 'rect'
   },
   arLock: false,
   zoomLock: false,  // マスクリサイズ時にズームを自動追従させる
