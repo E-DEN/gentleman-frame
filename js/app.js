@@ -3,7 +3,7 @@
 // ============================================================
 const PRESET_KEY = 'gentleFrame_presets';
 let _presetsReady = false;
-let _maskFollowMode = false;
+let _followMode = 'none'; // 'none' | 'mask' | 'anchor' | 'both'
 let _followTargetX = 0, _followTargetY = 0;
 const _ANIM_DEFAULTS = {
   cm:     ['#22d3ee','#f472b6'],
@@ -560,7 +560,7 @@ let _renderIntervalId = null; // 互換用（現在は未使用）
 
 function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
-  if (_maskFollowMode) {
+  if (_followMode === 'mask' || _followMode === 'both') {
     const lerpK = 0.22; // 1フレームあたりの追従率 (0〜1)
     const cx = _followTargetX - S.mask.w / 2;
     const cy = _followTargetY - S.mask.h / 2;
@@ -3895,7 +3895,7 @@ let _canvasClickMoved = false;
 canvas.addEventListener('mousedown', e => {
   if (e.button === 2) return; // 右クリックは startDrag に渡さない
   _canvasClickMoved = false;  // 追従モード中でもリセット（クリック再生のため）
-  if (_maskFollowMode) return; // 追従モード中はドラッグ/ハンドル操作を無効化
+  if (_followMode !== 'none') return; // 追従モード中はドラッグ/ハンドル操作を無効化
   startDrag(e, canvasCoords(e));
 });
 canvas.addEventListener('click', () => {
@@ -3904,27 +3904,29 @@ canvas.addEventListener('click', () => {
 });
 
 // ---- マスク追従モード (右クリック) ----
-// _maskFollowMode / _followTargetX,Y はファイル先頭で宣言済み
+// _followMode / _followTargetX,Y はファイル先頭で宣言済み
 
-function _setMaskFollow(active) {
-  _maskFollowMode = active;
-  canvasWrap.classList.toggle('mask-follow', active);
+function _setFollowMode(mode) {
+  _followMode = mode;
+  canvasWrap.classList.toggle('mask-follow', mode !== 'none');
+  _presetStatusMsg(t('follow-mode-' + mode), true);
 }
 
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
-  if (_maskFollowMode) {
-    _setMaskFollow(false);
-  } else {
-    const p = canvasCoords(e);
-    _followTargetX = p.x;
-    _followTargetY = p.y;
-    _setMaskFollow(true);
-  }
+  const p = canvasCoords(e);
+  _followTargetX = p.x;
+  _followTargetY = p.y;
+  // none → mask → (fgFixed なら anchor → both) → none とサイクル
+  const hasFgFixed = S.fgFixed;
+  const order = hasFgFixed ? ['none', 'mask', 'anchor', 'both'] : ['none', 'mask'];
+  const idx = order.indexOf(_followMode);
+  const next = order[(idx + 1) % order.length];
+  _setFollowMode(next);
 });
 
 canvas.addEventListener('wheel', e => {
-  if (!_maskFollowMode && !S.maskHovered) return;
+  if (_followMode === 'none' && !S.maskHovered) return;
   e.preventDefault();
   if (e.ctrlKey) {
     // Ctrl+ホイール: マスクズーム
@@ -3959,13 +3961,23 @@ let _modalOpen = false;
 document.addEventListener('mousemove', e => {
   if (_modalOpen) return;
   const p = canvasCoords(e);
-  if (_maskFollowMode) {
-    S.mask.x = Math.round(p.x - S.mask.w / 2);
-    S.mask.y = Math.round(p.y - S.mask.h / 2);
+  if (_followMode !== 'none') {
     _followTargetX = p.x;
     _followTargetY = p.y;
+    if (_followMode === 'mask' || _followMode === 'both') {
+      S.mask.x = Math.round(p.x - S.mask.w / 2);
+      S.mask.y = Math.round(p.y - S.mask.h / 2);
+      _syncOffsetSliders();
+    }
+    if ((_followMode === 'anchor' || _followMode === 'both') && S.fgFixed) {
+      const nx = Math.max(-1920, Math.min(1920, Math.round(p.x - canvas.width  / 2)));
+      const ny = Math.max(-1080, Math.min(1080, Math.round(p.y - canvas.height / 2)));
+      elFgPinX.value = nx; elFgPinY.value = ny;
+      document.getElementById('fgPinXVal').value = nx;
+      document.getElementById('fgPinYVal').value = ny;
+      updateSliderFill(elFgPinX); updateSliderFill(elFgPinY);
+    }
     S.maskHovered = false;
-    _syncOffsetSliders();
     return;
   }
   if (!S.drag.active) {
