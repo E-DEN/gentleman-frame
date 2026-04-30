@@ -112,7 +112,7 @@ const _IDB = (() => {
 // ============================================================
 //  ハンドル
 // ============================================================
-const HANDLE_SZ = 3; // canvas px (half-size)
+const HANDLE_SZ = 3; // canvas座標の半サイズ
 
 function getHandles(m) {
   const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
@@ -240,6 +240,13 @@ function _readCssVars() {
 }
 _readCssVars();
 
+// _syncMaskSliders / _syncOffsetSliders で使うため DOM キャッシュブロックより先に宣言
+const elMaskW    = document.getElementById('maskW');
+const elMaskH    = document.getElementById('maskH');
+const elMaskOffX = document.getElementById('maskOffX');
+const elMaskOffY = document.getElementById('maskOffY');
+const elMaskZoom = document.getElementById('maskZoom');
+
 function _syncAllBuffers(w, h) {
   canvas.width  = w; canvas.height = h;
   renderCvs.width = w; renderCvs.height = h;
@@ -251,16 +258,14 @@ function _syncAllBuffers(w, h) {
 }
 
 function _syncMaskSliders() {
-  const elMW = document.getElementById('maskW');
-  const elMH = document.getElementById('maskH');
   // W と H は固定レンジ [10, 790] → 400 がスライダーの中央になる。
   // 790 超の値はキャンバス上のドラッグで設定可能。テキスト欄は実際値を表示。
-  elMW.value = Math.min(Math.round(S.mask.w), +elMW.max);
-  elMH.value = Math.min(Math.round(S.mask.h), +elMH.max);
+  elMaskW.value = Math.min(Math.round(S.mask.w), +elMaskW.max);
+  elMaskH.value = Math.min(Math.round(S.mask.h), +elMaskH.max);
   document.getElementById('maskWVal').value = Math.round(S.mask.w);
   document.getElementById('maskHVal').value = Math.round(S.mask.h);
-  updateSliderFill(elMW);
-  updateSliderFill(elMH);
+  updateSliderFill(elMaskW);
+  updateSliderFill(elMaskH);
   _syncOffsetSliders();
 }
 
@@ -272,14 +277,12 @@ function _syncOffsetSliders() {
   const offY = S.mask.y - cy;
   const halfW = Math.floor(cw / 2);
   const halfH = Math.floor(ch / 2);
-  const elOX = document.getElementById('maskOffX');
-  const elOY = document.getElementById('maskOffY');
-  elOX.min = -halfW; elOX.max = halfW; elOX.value = offX;
-  elOY.min = -halfH; elOY.max = halfH; elOY.value = offY;
+  elMaskOffX.min = -halfW; elMaskOffX.max = halfW; elMaskOffX.value = offX;
+  elMaskOffY.min = -halfH; elMaskOffY.max = halfH; elMaskOffY.value = offY;
   document.getElementById('maskOffXVal').value = offX;
   document.getElementById('maskOffYVal').value = offY;
-  updateSliderFill(elOX);
-  updateSliderFill(elOY);
+  updateSliderFill(elMaskOffX);
+  updateSliderFill(elMaskOffY);
 }
 
 // pending マスク設定をバッファ座標に変換して適用
@@ -425,38 +428,41 @@ new ResizeObserver(entries => {
 }).observe(canvas);
 
 // 頻繁に参照する DOM 要素をキャッシュ
-const elBorderW       = document.getElementById('borderW');
-const elBorderColor   = document.getElementById('borderColor');
+const elBorderW = document.getElementById('borderW');
+const elBorderColor = document.getElementById('borderColor');
 const elBorderOpacity = document.getElementById('borderOpacity');
-const elBorderAnim    = document.getElementById('borderAnim');
+const elBorderAnim = document.getElementById('borderAnim');
 const elBorderAnimSpeed = document.getElementById('borderAnimSpeed');
 const elBorderAnimBright = document.getElementById('borderAnimBright');
-const elPhoneUiRow    = document.getElementById('phoneUiRow');
+const elPhoneUiRow = document.getElementById('phoneUiRow');
 const elPhoneUiBtnRoT = document.getElementById('phoneUiRoT');
 const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
 const elPhoneUiBtnDot = document.getElementById('phoneUiDot');
 const elPhoneUiBtnRot90 = document.getElementById('phoneUiRot90');
-const elMaskZoom      = document.getElementById('maskZoom');
-const elFgPinX        = document.getElementById('fgPinX');
-const elFgPinY        = document.getElementById('fgPinY');
-const elBlurAmt       = document.getElementById('blurAmt');
-const elFilterVignette  = document.getElementById('filterVignette');
-const elFilterCA        = document.getElementById('filterCA');
-const elFilterTemp      = document.getElementById('filterTemp');
-const elFilterTint      = document.getElementById('filterTint');
+const elFgPinX = document.getElementById('fgPinX');
+const elFgPinY = document.getElementById('fgPinY');
+const elFilterBlur = document.getElementById('filterBlur');
+const elFilterBrightness = document.getElementById('filterBrightness');
+const elFilterContrast = document.getElementById('filterContrast');
+const elFilterSaturation = document.getElementById('filterSaturation');
+const elFilterHue = document.getElementById('filterHue');
+const elFilterVignette = document.getElementById('filterVignette');
+const elFilterCA = document.getElementById('filterCA');
+const elFilterTemp = document.getElementById('filterTemp');
+const elFilterTint = document.getElementById('filterTint');
 const elFilterHighlight = document.getElementById('filterHighlight');
-const elFilterShadow    = document.getElementById('filterShadow');
+const elFilterShadow = document.getElementById('filterShadow');
 const elFilterSharpness = document.getElementById('filterSharpness');
-const elFilterMatte     = document.getElementById('filterMatte');
-const elFilterGrain     = document.getElementById('filterGrain');
-const elFilterPixel     = document.getElementById('filterPixel');
-const elFilterFlare     = document.getElementById('filterFlare');
-const elFilterBars      = document.getElementById('filterBars');
-const elFilterFps       = document.getElementById('filterFps');
-const elProgressFill  = document.getElementById('progressFill');
+const elFilterMatte = document.getElementById('filterMatte');
+const elFilterGrain = document.getElementById('filterGrain');
+const elFilterPixel = document.getElementById('filterPixel');
+const elFilterFlare = document.getElementById('filterFlare');
+const elFilterBars = document.getElementById('filterBars');
+const elFilterFps = document.getElementById('filterFps');
+const elProgressFill = document.getElementById('progressFill');
 const elProgressThumb = document.getElementById('progressThumb');
-const elTimeLabel   = document.getElementById('timeLabel');
-const playBtn       = document.getElementById('playBtn');
+const elTimeLabel = document.getElementById('timeLabel');
+const elPlayBtn = document.getElementById('playBtn');
 
 let _playDelayTimers = [];
 let _compositeT = 0;
@@ -529,10 +535,10 @@ window.addEventListener('focus', () => {
 // ============================================================
 function updateCanvasFilter() {
   if (effectsHidden) { canvas.style.filter = ''; return; }
-  const b  = parseFloat(document.getElementById('filterBrightness').value);
-  const co = parseFloat(document.getElementById('filterContrast').value);
-  const s  = parseFloat(document.getElementById('filterSaturation').value);
-  const h  = parseFloat(document.getElementById('filterHue').value);
+  const b  = parseFloat(elFilterBrightness.value);
+  const co = parseFloat(elFilterContrast.value);
+  const s  = parseFloat(elFilterSaturation.value);
+  const h  = parseFloat(elFilterHue.value);
   canvas.style.filter = (b === 100 && co === 100 && s === 100 && h === 0)
     ? '' : `brightness(${b}%) contrast(${co}%) saturate(${s}%) hue-rotate(${h}deg)`;
 }
@@ -599,7 +605,7 @@ function _renderFrame() {
     ctx.fillRect(0, 0, W, H);
   }
 
-  const blurAmt = parseFloat(elBlurAmt.value);
+  const filterBlur = parseFloat(elFilterBlur.value);
   const pixelAmt = parseFloat(elFilterPixel.value);
 
   // --- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ---
@@ -645,15 +651,15 @@ function _renderFrame() {
 
     // ぼかしありの場合は offCvs にマスクを適用しない
     // （端まで画素データを保ったまま blur し、ctx.clip() で切り抜く）
-    if (!maskHidden && blurAmt <= 0) {
+    if (!maskHidden && filterBlur <= 0) {
       offCtx.globalCompositeOperation = 'destination-in';
       buildMaskPath(offCtx, m);
       offCtx.fill();
       offCtx.globalCompositeOperation = 'source-over';
     }
 
-    if (blurAmt > 0) {
-      const bp = blurAmt * 2;
+    if (filterBlur > 0) {
+      const bp = filterBlur * 2;
       ctx.save();
       if (!maskHidden) { buildMaskPath(ctx, m); ctx.clip(); }
       ctx.filter = `blur(${bp}px)`;
@@ -670,7 +676,7 @@ function _renderFrame() {
   } else if (loaded[0] && !visHidden[1] && !maskHidden && _fgFadeStart !== 0) {
     // 前景なし: マスク内の背景にぼかし/ピクセル化をすりガラス風に適用
     // _fgFadeStart===0 (ロード中) は表示しない
-    if (pixelAmt >= 1 && blurAmt <= 0) {
+    if (pixelAmt >= 1 && filterBlur <= 0) {
       // ピクセル化 — postCvs で縮小→ctx.clip()内でフルサイズ拡大（destination-inのAA縁を回避）
       const pSize = Math.round(pixelAmt * 4);
       const pw = Math.ceil(W / pSize);
@@ -684,9 +690,9 @@ function _renderFrame() {
       ctx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
       ctx.imageSmoothingEnabled = true;
       ctx.restore();
-    } else if (blurAmt > 0) {
+    } else if (filterBlur > 0) {
       // ぼかし (端の薄れ防止のためオーバードロー)
-      const bp = blurAmt * 2;
+      const bp = filterBlur * 2;
       ctx.save();
       buildMaskPath(ctx, m);
       ctx.clip();
@@ -1045,8 +1051,8 @@ function _startRenderLoop() {
   requestAnimationFrame(render);
 }
 
-const _hintBgEl = document.getElementById('hintBg');
-const _hintFgEl = document.getElementById('hintFg');
+const elHintBg = document.getElementById('hintBg');
+const elHintFg = document.getElementById('hintFg');
 let _hintStatePrev = '';
 function _updateCanvasHints() {
   const anyLoaded = loaded[0] || loaded[1];
@@ -1055,10 +1061,10 @@ function _updateCanvasHints() {
   const state = `${showBg}|${showFg}`;
   if (state === _hintStatePrev) return; // 変化なければ DOM 操作しない
   _hintStatePrev = state;
-  _hintBgEl.textContent = showBg ? t('hint-bg') : '';
-  _hintFgEl.textContent = showFg ? t('hint-fg') : '';
-  _hintBgEl.classList.toggle('visible', showBg);
-  _hintFgEl.classList.toggle('visible', showFg);
+  elHintBg.textContent = showBg ? t('hint-bg') : '';
+  elHintFg.textContent = showFg ? t('hint-fg') : '';
+  elHintBg.classList.toggle('visible', showBg);
+  elHintFg.classList.toggle('visible', showFg);
 }
 
 function buildMaskPath(c, m) {
@@ -1101,7 +1107,6 @@ let _phoneShowDot  = true;  // パンチホールカメラ表示
 let _phoneLandscape = false; // 横向きモード
 let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
 let _glassSamplerCtx  = null;
-
 
 function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   if (typeof ctx.roundRect !== 'function') return;
@@ -1258,7 +1263,6 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   _shutterMorphT += ((S.playing ? 1 : 0) - _shutterMorphT) * Math.min(1, (dtMs / 1000) * 7.0);
   const mt = _shutterMorphT;
 
-
   // ---- シャッターボタン ----
   // 縦: 横中央・下寄り、横: 右寄り・縦中央（参考画像に小わせ）
   const sbCx = _land ? scrX + scrW * 0.855 : scrX + scrW / 2;
@@ -1306,8 +1310,6 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
       } catch(e) {}
     }
   }
-
-
 
   // ---- 録画インジケーター（赤丸→赤四角モーフ）＋タイムコード ----
   const pulse = 0.60 + 0.40 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
@@ -2026,23 +2028,23 @@ let _isDraggingPreset = false;
 //  コンテナベース: ゴーストがどのフォルダ内にあるかを毎フレーム検出。
 //  エスケープ/モード追跡ではなく、エリア検出で制御。
 //  対応: どこからでもドラッグ、z-index、フォルダ離脱、
-//           insert between folder items from outside, click threshold.
+//           外部からフォルダアイテム間への挿入、クリック閾値。
 // ============================================================
 let _mDragSrcIdx     = null;
-let _mDraggedEl      = null;   // original element = invisible placeholder
-let _mGhost          = null;   // fixed-position floating clone
+let _mDraggedEl      = null;   // 元要素 = 非表示のプレースホルダー
+let _mGhost          = null;   // fixed-position の浮遊クローン
 let _mPointerOffsetY = 0;
 let _mDraggedH       = 0;
 let _mDragGap        = 2;
-let _mActiveSiblings = [];     // siblings currently being slid
-let _mCurContainer   = null;   // null = root, or .preset-folder DOM element
-let _mFolderTarget   = null;   // closed-folder header for "drop at end"
+let _mActiveSiblings = [];     // 現在スライド中の兄弟要素
+let _mCurContainer   = null;   // null=ルート、または .preset-folder DOM 要素
+let _mFolderTarget   = null;   // 末尾ドロップ用の閉じたフォルダヘッダー
 let _mLastGhostMidY  = 0;
-let _mContainerFollowers = []; // root elements after _mCurContainer when ghost is externally in a folder
-let _mSrcOrigMidY    = 0;      // original midY of drag source element at drag start
-let _mSrcContainerEl = null;   // container (_mCurContainer) at drag start
-let _mLastRefY       = 0;      // reference Y for slide/insert: mouseY for folder drags, ghostMidY otherwise
-let _mAddFolderTarget = false; // true when ghost is over the "新しいフォルダ" button
+let _mContainerFollowers = []; // ゴーストが外部からフォルダ内にいるときの _mCurContainer 以降のルート要素
+let _mSrcOrigMidY    = 0;      // ドラッグ開始時のドラッグ元要素の元 midY
+let _mSrcContainerEl = null;   // ドラッグ開始時のコンテナ（_mCurContainer）
+let _mLastRefY       = 0;      // スライド/挿入の基準Y: フォルダドラッグ時は mouseY、それ以外は ghostMidY
+let _mAddFolderTarget = false; // ゴーストが「新しいフォルダ」ボタン上にあるとき true
 let _mFolderHoverTimer = null; // ホバー展開タイマー
 // 移動閾値を超える前のドラッグ待機状態
 let _mPending        = null;
@@ -2307,7 +2309,7 @@ function _mCalcInsertAt() {
   // アクティブ兄弟要素なし（空のフォルダまたは空のルート）。
   if (_mCurContainer) return +_mCurContainer.dataset.idx + 1;
 
-  return _mDragSrcIdx; // fallback: no change
+  return _mDragSrcIdx; // fallback: 変更なし
 }
 function _mCleanup() {
   _isDraggingPreset = false;
@@ -2379,7 +2381,7 @@ function _mApplyDrop() {
   if (fi > _mDragSrcIdx) fi -= count;
   fi = Math.max(0, fi);
   testList.splice(fi, 0, ...moved);
-  if (JSON.stringify(testList) === JSON.stringify(list2)) return null; // no change
+  if (JSON.stringify(testList) === JSON.stringify(list2)) return null; // 変更なし
   list2.splice(_mDragSrcIdx, count);
   list2.splice(fi, 0, ...moved);
   savePresets(list2);
@@ -2417,7 +2419,7 @@ function _mStartDrag(pending) {
     if (g >= 0 && g < 100) { _mDragGap = g; break; }
   }
   const ghostMidY  = rect.top + rect.height / 2;
-  const initMouseY = rect.top + _mPointerOffsetY;  // cursor Y at drag start
+  const initMouseY = rect.top + _mPointerOffsetY;  // ドラッグ開始時のカーソルY
   _mSrcOrigMidY    = initMouseY;
   _mSrcContainerEl = _mCurContainer;
   _mActiveSiblings = initSibs;
@@ -2611,7 +2613,7 @@ function _showPlayFlash(playing) {
 
 function setPlaying(playing) {
   S.playing = playing;
-  playBtn.innerHTML = `<i data-lucide="${playing ? 'pause' : 'play'}"></i>`;
+  elPlayBtn.innerHTML = `<i data-lucide="${playing ? 'pause' : 'play'}"></i>`;
   lucide.createIcons();
 }
 
@@ -2731,7 +2733,7 @@ document.querySelectorAll('.tbtn').forEach(btn => {
   btn.addEventListener('click', () => triggerTbtnGlow(btn));
 });
 
-playBtn.addEventListener('click', () => {
+elPlayBtn.addEventListener('click', () => {
   if (S.playing) syncPause(); else syncPlay();
 });
 
@@ -2782,7 +2784,7 @@ document.addEventListener('keydown', e => {
     case 'Space':
       e.preventDefault();
       if (S.playing) syncPause(); else syncPlay();
-      triggerTbtnGlow(playBtn);
+      triggerTbtnGlow(elPlayBtn);
       break;
     case 'ArrowLeft':
       e.preventDefault();
@@ -2803,8 +2805,6 @@ document.addEventListener('keydown', e => {
       break;
   }
 });
-
-
 
 // ============================================================
 //  スライダー
@@ -2968,32 +2968,28 @@ bindSlider('offset1', 'offset1Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, 
 bindSlider('maskW',   'maskWVal',   v => `${Math.round(v)}`,    v => {
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
   // スライダー操作時は下限10（テキスト入力は0まで許容）
-  const elW2 = document.getElementById('maskW');
-  if (parseFloat(elW2.value) < 10) { elW2.value = 10; updateSliderFill(elW2); v = 10; document.getElementById('maskWVal').value = 10; }
+  if (parseFloat(elMaskW.value) < 10) { elMaskW.value = 10; updateSliderFill(elMaskW); v = 10; document.getElementById('maskWVal').value = 10; }
   _syncZoomToMaskScale(S.mask.w, v);
   S.mask.w = v;
   if (S.arLock && S.mask.h > 0) {
     const newH = Math.max(0, Math.round(v / ar));
     S.mask.h = newH;
-    const elH = document.getElementById('maskH');
-    elH.value = newH;
+    elMaskH.value = newH;
     document.getElementById('maskHVal').value = newH;
-    updateSliderFill(elH);
+    updateSliderFill(elMaskH);
   }
 });
 bindSlider('maskH',   'maskHVal',   v => `${Math.round(v)}`,    v => {
   const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
   // スライダー操作時は下限10（テキスト入力は0まで許容）
-  const elH2 = document.getElementById('maskH');
-  if (parseFloat(elH2.value) < 10) { elH2.value = 10; updateSliderFill(elH2); v = 10; document.getElementById('maskHVal').value = 10; }
+  if (parseFloat(elMaskH.value) < 10) { elMaskH.value = 10; updateSliderFill(elMaskH); v = 10; document.getElementById('maskHVal').value = 10; }
   S.mask.h = v;
   if (S.arLock && S.mask.w > 0) {
     const newW = Math.max(0, Math.round(v * ar));
     S.mask.w = newW;
-    const elW = document.getElementById('maskW');
-    elW.value = newW;
+    elMaskW.value = newW;
     document.getElementById('maskWVal').value = newW;
-    updateSliderFill(elW);
+    updateSliderFill(elMaskW);
   }
 });
 bindSlider('maskOffX', 'maskOffXVal', v => `${Math.round(v)}`, v => {
@@ -3010,7 +3006,8 @@ bindSlider('borderW', 'borderWVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.to
 bindSlider('maskZoom', 'maskZoomVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(2), null);
 bindSlider('fgPinX',   'fgPinXVal',   v => `${Math.round(v)}`, null);
 bindSlider('fgPinY',   'fgPinYVal',   v => `${Math.round(v)}`, null);
-bindSlider('blurAmt',  'blurAmtVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterBlur', 'filterBlurVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterPixel','filterPixelVal',v => `${Math.round(v)}`, null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderAnimBright', 'borderAnimBrightVal', v => `${Math.round(v)}`, null);
@@ -3361,18 +3358,18 @@ bindSlider('filterContrast',   'filterContrastVal',   v => `${Math.round(v)}`, (
 bindSlider('filterHighlight',  'filterHighlightVal',  v => v === 0 ? '0' : `${v > 0 ? '+' : ''}${Math.round(v)}`, null);
 bindSlider('filterShadow',     'filterShadowVal',     v => v === 0 ? '0' : `${v > 0 ? '+' : ''}${Math.round(v)}`, null);
 bindSlider('filterSaturation', 'filterSaturationVal', v => `${Math.round(v)}`, () => updateCanvasFilter());
-bindSlider('filterHue',       'filterHueVal',       v => v === 0 ? '0' : `${v > 0 ? '+' : ''}${Math.round(v)}`, () => updateCanvasFilter());
+bindSlider('filterHue',        'filterHueVal',        v => v === 0 ? '0' : `${v > 0 ? '+' : ''}${Math.round(v)}`, () => updateCanvasFilter());
 bindSlider('filterTemp',       'filterTempVal',       v => v === 0 ? '0' : `${v > 0 ? '+' : ''}${Math.round(v)}`, null);
 bindSlider('filterTint',       'filterTintVal',       v => v === 0 ? '0' : `${v > 0 ? '+' : ''}${Math.round(v)}`, null);
 bindSlider('filterSharpness',  'filterSharpnessVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('filterVignette',   'filterVignetteVal',   v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterCA',         'filterCAVal',         v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterVignette',   'filterVignetteVal',   v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterMatte',      'filterMatteVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('filterPixel',      'filterPixelVal',      v => `${Math.round(v)}`, null);
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterFps',        'filterFpsVal',        v => v === 0 ? 'OFF' : `${v}`, null);
+
 // スライダードラッグ時のみスナップ（テキスト入力は直値適用）
 elFilterFps.addEventListener('input', e => {
   if (!e.isTrusted) return;
@@ -3396,7 +3393,7 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterVignette', 'filterCA', 'filterTemp', 'filterTint', 'filterSharpness', 'filterMatte', 'filterGrain', 'filterPixel', 'filterFlare', 'filterBars', 'filterFps'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterFlare', 'filterBars', 'filterFps', 'filterPixel'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
@@ -3420,22 +3417,24 @@ document.getElementById('filterResetBtn').addEventListener('click', () => {
 //   filterGrain      : 0–10    (default 0)
 //   filterFlare      : 0–10    (default 0)
 //   filterBars       : 0–10    (default 0)
-//   filterPixel      : 0–10    (default 0)
+//   filterFps        : 0–120   (default 0, 0=制限なし)
+//   filterBlur       : 0–10    (default 0) ← マスクセクション
+//   filterPixel      : 0–10    (default 0) ← マスクセクション
 const _FQP = {
-  //            bright  cont   hl     sh     sat    hue    temp   tint   sharp  ca     vig    matte  grain  flare  bars   pixel
-  cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterFlare: 0,   filterBars: 5,   filterPixel: 0, filterFps: 24 },
-  retro:   { filterBrightness: 105, filterContrast: 88,  filterHighlight: -20, filterShadow: +25, filterSaturation: 58,  filterHue: 0, filterTemp: +22, filterTint:  -8, filterSharpness: 0,   filterCA: 0,   filterVignette: 5,   filterMatte: 7,   filterGrain: 2.5, filterFlare: 1.5, filterBars: 0,   filterPixel: 0, filterFps: 18 },
-  insta:   { filterBrightness: 112, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 128, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 1.5, filterMatte: 0,   filterGrain: 0,   filterFlare: 0.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  pastel:  { filterBrightness: 130, filterContrast: 90,  filterHighlight:   0, filterShadow: +30, filterSaturation: 80,  filterHue: 0, filterTemp:   0, filterTint:  +5, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  neon:    { filterBrightness: 88,  filterContrast: 138, filterHighlight: +20, filterShadow:   0, filterSaturation: 175, filterHue: 0, filterTemp: -18, filterTint: -10, filterSharpness: 0,   filterCA: 1.8, filterVignette: 7,   filterMatte: 0,   filterGrain: 0.5, filterFlare: 3.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  sunset:  { filterBrightness: 108, filterContrast: 112, filterHighlight:   0, filterShadow:   0, filterSaturation: 135, filterHue: 0, filterTemp: +38, filterTint:  -5, filterSharpness: 1,   filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 4.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  cool:    { filterBrightness: 100, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 78,  filterHue: 0, filterTemp: -28, filterTint:   0, filterSharpness: 1.5, filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  dreamy:  { filterBrightness: 108, filterContrast: 78,  filterHighlight: +10, filterShadow: +20, filterSaturation: 85,  filterHue: 0, filterTemp: +15, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 2,   filterMatte: 7,   filterGrain: 0,   filterFlare: 3,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  glitch:  { filterBrightness: 100, filterContrast: 122, filterHighlight:   0, filterShadow:   0, filterSaturation: 120, filterHue: 0, filterTemp:   0, filterTint:   0, filterSharpness: 0,   filterCA: 4.5, filterVignette: 2,   filterMatte: 0,   filterGrain: 2,   filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  noir:    { filterBrightness: 90,  filterContrast: 148, filterHighlight: -30, filterShadow: -20, filterSaturation: 12,  filterHue: 0, filterTemp:  -5, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 8,   filterMatte: 3,   filterGrain: 1.2, filterFlare: 0,   filterBars: 3,   filterPixel: 0, filterFps: 24 },
-  horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
-  trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  //            bright  cont   hl     sh     sat    hue    temp   tint   sharp  ca     vig    matte  grain  flare  bars   fps    blur   pixel
+  cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterFlare: 0,   filterBars: 5,   filterFps: 24, filterBlur: 0, filterPixel: 0 },
+  retro:   { filterBrightness: 105, filterContrast: 88,  filterHighlight: -20, filterShadow: +25, filterSaturation: 58,  filterHue: 0, filterTemp: +22, filterTint:  -8, filterSharpness: 0,   filterCA: 0,   filterVignette: 5,   filterMatte: 7,   filterGrain: 2.5, filterFlare: 1.5, filterBars: 0,   filterFps: 18, filterBlur: 0, filterPixel: 0 },
+  insta:   { filterBrightness: 112, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 128, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 1.5, filterMatte: 0,   filterGrain: 0,   filterFlare: 0.5, filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  pastel:  { filterBrightness: 130, filterContrast: 90,  filterHighlight:   0, filterShadow: +30, filterSaturation: 80,  filterHue: 0, filterTemp:   0, filterTint:  +5, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  neon:    { filterBrightness: 88,  filterContrast: 138, filterHighlight: +20, filterShadow:   0, filterSaturation: 175, filterHue: 0, filterTemp: -18, filterTint: -10, filterSharpness: 0,   filterCA: 1.8, filterVignette: 7,   filterMatte: 0,   filterGrain: 0.5, filterFlare: 3.5, filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  sunset:  { filterBrightness: 108, filterContrast: 112, filterHighlight:   0, filterShadow:   0, filterSaturation: 135, filterHue: 0, filterTemp: +38, filterTint:  -5, filterSharpness: 1,   filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 4.5, filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  cool:    { filterBrightness: 100, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 78,  filterHue: 0, filterTemp: -28, filterTint:   0, filterSharpness: 1.5, filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  dreamy:  { filterBrightness: 108, filterContrast: 78,  filterHighlight: +10, filterShadow: +20, filterSaturation: 85,  filterHue: 0, filterTemp: +15, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 2,   filterMatte: 7,   filterGrain: 0,   filterFlare: 3,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  glitch:  { filterBrightness: 100, filterContrast: 122, filterHighlight:   0, filterShadow:   0, filterSaturation: 120, filterHue: 0, filterTemp:   0, filterTint:   0, filterSharpness: 0,   filterCA: 4.5, filterVignette: 2,   filterMatte: 0,   filterGrain: 2,   filterFlare: 0,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  noir:    { filterBrightness: 90,  filterContrast: 148, filterHighlight: -30, filterShadow: -20, filterSaturation: 12,  filterHue: 0, filterTemp:  -5, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 8,   filterMatte: 3,   filterGrain: 1.2, filterFlare: 0,   filterBars: 3,   filterFps: 24, filterBlur: 0, filterPixel: 0 },
+  horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterFlare: 0,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
+  trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
 };
 document.querySelectorAll('.fqp-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -3626,7 +3625,7 @@ function _updateFgFixedBtn() {
   document.getElementById('fgPinXRow').style.display = S.fgFixed ? '' : 'none';
   document.getElementById('fgPinYRow').style.display = S.fgFixed ? '' : 'none';
   // ズームスライダーはアンカーモードでも操作可能（zoomLock で連動制御）
-  document.getElementById('maskZoom').disabled = false;
+  elMaskZoom.disabled = false;
   document.getElementById('maskZoomVal').disabled = false;
   // 錨アイコンはアンカーモード (fgFixed) の ON/OFF を反映
   const btn = document.getElementById('fgFixedBtn');
@@ -3661,7 +3660,6 @@ document.getElementById('fgFixedBtn').addEventListener('click', () => {
   }
   _updateFgFixedBtn();
 });
-
 
 // ---- マスクリセット ----
 document.getElementById('maskVisBtn').addEventListener('click', () => {
@@ -3715,7 +3713,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
     el.dispatchEvent(new Event('input'));
   };
   _syncMaskSliders();
-  ['blurAmt', 'borderW', 'borderOpacity', 'borderSpeed', 'borderGlow'].forEach(resetSlider);
+  ['filterBlur', 'borderW', 'borderOpacity', 'borderSpeed', 'borderGlow'].forEach(resetSlider);
   document.getElementById('borderColor').value =
     document.getElementById('borderColor').defaultValue || '#ffffff';
   lucide.createIcons();
@@ -3926,8 +3924,6 @@ function applyResize(hid, dx, dy, shiftKey) {
   const snapped = _snapMaskSize(w, h);
   S.mask.x = Math.round(x); S.mask.y = Math.round(y); S.mask.w = snapped.w; S.mask.h = snapped.h;
   // スライダーを同期
-  const elMaskW = document.getElementById('maskW');
-  const elMaskH = document.getElementById('maskH');
   elMaskW.value = S.mask.w;
   document.getElementById('maskWVal').value = S.mask.w;
   elMaskH.value = S.mask.h;
@@ -4458,36 +4454,36 @@ function collectSettings() {
     bufH:          canvas.height,
     maskShape:     S.mask.shape,
     arLock:        S.arLock,
-    borderW:       document.getElementById('borderW').value,
-    borderOpacity: document.getElementById('borderOpacity').value,
-    borderColor:   document.getElementById('borderColor').value,
-    borderAnim:    document.getElementById('borderAnim').value,
-    borderAnimSpeed:  document.getElementById('borderAnimSpeed').value,
-    borderAnimBright: document.getElementById('borderAnimBright').value,
+    borderW:       elBorderW.value,
+    borderOpacity: elBorderOpacity.value,
+    borderColor:   elBorderColor.value,
+    borderAnim:    elBorderAnim.value,
+    borderAnimSpeed:  elBorderAnimSpeed.value,
+    borderAnimBright: elBorderAnimBright.value,
     borderAnimColors: JSON.stringify(_animColors),
-    blurAmt:       document.getElementById('blurAmt').value,
-    maskZoom:      document.getElementById('maskZoom').value,
+    filterBlur:    elFilterBlur.value,
+    filterPixel:      elFilterPixel.value,
+    maskZoom:      elMaskZoom.value,
     fgFixed:       S.fgFixed,
     zoomLock:      S.zoomLock,
-    fgPinX:        document.getElementById('fgPinX').value,
-    fgPinY:        document.getElementById('fgPinY').value,
-    filterBrightness: document.getElementById('filterBrightness').value,
-    filterContrast:   document.getElementById('filterContrast').value,
-    filterHighlight:  document.getElementById('filterHighlight').value,
-    filterShadow:     document.getElementById('filterShadow').value,
-    filterSaturation: document.getElementById('filterSaturation').value,
-    filterHue:        document.getElementById('filterHue').value,
-    filterTemp:       document.getElementById('filterTemp').value,
-    filterTint:       document.getElementById('filterTint').value,
-    filterSharpness:  document.getElementById('filterSharpness').value,
-    filterVignette:   document.getElementById('filterVignette').value,
-    filterCA:         document.getElementById('filterCA').value,
-    filterMatte:      document.getElementById('filterMatte').value,
-    filterGrain:      document.getElementById('filterGrain').value,
-    filterPixel:      document.getElementById('filterPixel').value,
-    filterFlare:      document.getElementById('filterFlare').value,
-    filterBars:       document.getElementById('filterBars').value,
-    filterFps:        document.getElementById('filterFps').value,
+    fgPinX:        elFgPinX.value,
+    fgPinY:        elFgPinY.value,
+    filterBrightness: elFilterBrightness.value,
+    filterContrast:   elFilterContrast.value,
+    filterHighlight:  elFilterHighlight.value,
+    filterShadow:     elFilterShadow.value,
+    filterSaturation: elFilterSaturation.value,
+    filterHue:        elFilterHue.value,
+    filterTemp:       elFilterTemp.value,
+    filterTint:       elFilterTint.value,
+    filterSharpness:  elFilterSharpness.value,
+    filterCA:         elFilterCA.value,
+    filterVignette:   elFilterVignette.value,
+    filterMatte:      elFilterMatte.value,
+    filterGrain:      elFilterGrain.value,
+    filterFlare:      elFilterFlare.value,
+    filterBars:       elFilterBars.value,
+    filterFps:        elFilterFps.value,
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
@@ -4504,14 +4500,14 @@ function applySettings(d) {
     ['vol0','vol0Val'],['offset0','offset0Val'],
     ['vol1','vol1Val'],['offset1','offset1Val'],
     ['maskW','maskWVal'],['maskH','maskHVal'],
-    ['borderW','borderWVal'],['borderOpacity','borderOpacityVal'],['blurAmt','blurAmtVal'],
+    ['borderW','borderWVal'],['borderOpacity','borderOpacityVal'],['filterBlur','filterBlurVal'],
+    ['filterPixel','filterPixelVal'],
     ['filterBrightness','filterBrightnessVal'],['filterContrast','filterContrastVal'],
     ['filterHighlight','filterHighlightVal'],['filterShadow','filterShadowVal'],
-    ['filterSaturation','filterSaturationVal'],['filterHue','filterHueVal'],['filterVignette','filterVignetteVal'],
-    ['filterCA','filterCAVal'],
+    ['filterSaturation','filterSaturationVal'],['filterHue','filterHueVal'],
     ['filterTemp','filterTempVal'],['filterTint','filterTintVal'],['filterSharpness','filterSharpnessVal'],
+    ['filterCA','filterCAVal'],['filterVignette','filterVignetteVal'],
     ['filterMatte','filterMatteVal'],['filterGrain','filterGrainVal'],
-    ['filterPixel','filterPixelVal'],
     ['filterFlare','filterFlareVal'],
     ['filterBars','filterBarsVal'],
     ['filterFps','filterFpsVal'],
@@ -4523,20 +4519,20 @@ function applySettings(d) {
     vol0: d.vol0, offset0: d.offset0,
     vol1: d.vol1, offset1: d.offset1,
     maskW: d.maskW, maskH: d.maskH,
-    borderW: d.borderW, borderOpacity: d.borderOpacity, blurAmt: d.blurAmt,
-    maskZoom: d.maskZoom ?? '1',
-    fgPinX: d.fgPinX ?? '0',
-    fgPinY: d.fgPinY ?? '0',
+    borderW: d.borderW, borderOpacity: d.borderOpacity, filterBlur: d.filterBlur,
+    filterPixel: d.filterPixel,
     filterBrightness: d.filterBrightness, filterContrast: d.filterContrast,
     filterHighlight: d.filterHighlight ?? 0, filterShadow: d.filterShadow ?? 0,
-    filterSaturation: d.filterSaturation, filterHue: d.filterHue ?? 0, filterVignette: d.filterVignette,
-    filterCA: d.filterCA,
+    filterSaturation: d.filterSaturation, filterHue: d.filterHue ?? 0,
     filterTemp: d.filterTemp, filterTint: d.filterTint ?? 0, filterSharpness: d.filterSharpness ?? 0,
+    filterCA: d.filterCA, filterVignette: d.filterVignette,
     filterMatte: d.filterMatte, filterGrain: d.filterGrain,
-    filterPixel: d.filterPixel,
     filterFlare: d.filterFlare,
     filterBars: d.filterBars,
     filterFps: d.filterFps ?? 0,
+    maskZoom: d.maskZoom ?? '1',
+    fgPinX: d.fgPinX ?? '0',
+    fgPinY: d.fgPinY ?? '0',
   };
   sliders.forEach(([id]) => {
     if (vals[id] == null) return;
