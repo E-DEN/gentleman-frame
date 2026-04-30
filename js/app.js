@@ -557,7 +557,7 @@ function updateBarsOverlay() {
 }
 
 // ============================================================
-//  雨ガラスオーバーレイ（WebGL – Codrops RainEffect ベース）
+//  雨オーバーレイ（WebGL – Codrops RainEffect ベース）
 // ============================================================
 const rainOverlay  = document.getElementById('rainOverlay');
 const elFilterRain = document.getElementById('filterRain');
@@ -586,7 +586,6 @@ window._startRainOverlay = function () {
 window._stopRainOverlay = function () {
   GFRainEngine.stop();
 };
-
 
 function _buildBorderGrad(ctx, m, phase, anim, bright) {
   const L  = bright;
@@ -1067,6 +1066,7 @@ function render(now) {
     _fpsLastTime = now;
   }
   _renderFrame();
+  GFRainEngine.tick(); // 雨をメインループに同期（filterFps に追従）
   updateProgress();
   syncMaskDropOverlay();
   _updateCanvasHints();

@@ -257,6 +257,9 @@
     '    fg = blend(border, fg);',
     '  }',
 
+    '  /* Glass-lens tint: drops visible on dark backgrounds; fades out on bright sources */',
+    '  float srcBright = dot(tex.rgb, vec3(0.333, 0.333, 0.333));',
+    '  fg.rgb = fg.rgb + vec3(0.12, 0.15, 0.20) * a * (1.0 - srcBright);',
     '  /* Only output the drop/refraction; transparent where no drops */',
     '  gl_FragColor = fg;',
     '}'
@@ -350,13 +353,10 @@
       });
 
       gl.draw();
-      this._rafId = requestAnimationFrame(this._draw.bind(this));
     },
 
     stop: function () {
       this._stopped = true;
-      if (this._rafId) cancelAnimationFrame(this._rafId);
-      this._rafId = null;
       // Clear the WebGL canvas to transparent
       var rawGl = this.gl.gl;
       rawGl.clearColor(0, 0, 0, 0);
@@ -682,13 +682,10 @@
       this.lastRender = now;
 
       this._updateDrops(timeScale);
-      this._rafId = requestAnimationFrame(this._update.bind(this));
     },
 
     stop: function () {
       this._stopped = true;
-      if (this._rafId) cancelAnimationFrame(this._rafId);
-      this._rafId = null;
     }
   };
 
@@ -781,6 +778,16 @@
 
         _state = { raindrops: raindrops, renderer: renderer };
       });
+    },
+
+    /**
+     * Advance rain by one frame. Call this from the main render loop
+     * so rain framerate is tied to filterFps.
+     */
+    tick: function () {
+      if (!_state) return;
+      _state.raindrops._update();
+      _state.renderer._draw();
     },
 
     /** Stop and clear the overlay. */
