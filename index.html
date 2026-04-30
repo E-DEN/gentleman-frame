@@ -281,17 +281,25 @@
         <input type="text" class="ctrl-val" id="maskZoomVal" value="1.0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row" id="fgPinXRow" style="display:none">
-        <label data-i18n="fg-pin-x">X 位置</label>
+        <label data-i18n="fg-pin-x">アンカー X</label>
         <input type="range" id="fgPinX" min="-1920" max="1920" value="0" step="1">
         <input type="text" class="ctrl-val" id="fgPinXVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row" id="fgPinYRow" style="display:none">
-        <label data-i18n="fg-pin-y">Y 位置</label>
+        <label data-i18n="fg-pin-y">アンカー Y</label>
         <input type="range" id="fgPinY" min="-1080" max="1080" value="0" step="1">
         <input type="text" class="ctrl-val" id="fgPinYVal" value="0" spellcheck="false" autocomplete="off">
       </div>
-        <div class="ctrl-row" id="borderColRow">
-          <label data-i18n="border-col">枠の色</label>
+      <div class="ctrl-row" id="fgPinLerpRow" style="display:none">
+        <label data-i18n="fg-pin-lerp">アンカー追従</label>
+        <input type="range" id="fgPinLerp" min="0" max="100" value="50" step="1">
+        <input type="text" class="ctrl-val" id="fgPinLerpVal" value="50" spellcheck="false" autocomplete="off">
+      </div>      <div class="ctrl-row" id="fgPinOpacityRow" style="display:none">
+        <label data-i18n="fg-pin-opacity">アンカー透過</label>
+        <input type="range" id="fgPinOpacity" min="0" max="100" value="100" step="1">
+        <input type="text" class="ctrl-val" id="fgPinOpacityVal" value="100" spellcheck="false" autocomplete="off">
+      </div>        <div class="ctrl-row" id="borderColRow">
+          <label data-i18n="border-col">枠色</label>
           <input type="color" id="borderColor" value="#ffffff" style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
           <input type="hidden" id="borderAnim" value="none">
           <button id="borderColorSwatch" class="border-color-swatch" data-i18n-title="border-col-pick" title="色を選択"></button>
@@ -323,12 +331,12 @@
           </div>
         </div>
         <div class="ctrl-row">
-          <label data-i18n="border-w">枠の太さ</label>
+          <label data-i18n="border-w">枠太さ</label>
           <input type="range" id="borderW" min="0" max="10" value="1.0" step="0.1">
           <input type="text" class="ctrl-val" id="borderWVal" value="1.0" spellcheck="false" autocomplete="off">
         </div>
         <div class="ctrl-row">
-          <label data-i18n="border-op">枠の透過</label>
+          <label data-i18n="border-op">枠透過</label>
           <input type="range" id="borderOpacity" min="0" max="100" value="100">
           <input type="text" class="ctrl-val" id="borderOpacityVal" value="100" spellcheck="false" autocomplete="off">
         </div>

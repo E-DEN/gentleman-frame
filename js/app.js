@@ -4,6 +4,7 @@
 const PRESET_KEY = 'gentleFrame_presets';
 let _presetsReady = false;
 let _followMode = 'none'; // 'none' | 'mask' | 'anchor' | 'both'
+let _fgPinDispX = 0, _fgPinDispY = 0; // アンカー描画用補間値（lerp）
 let _followTargetX = 0, _followTargetY = 0;
 let _zoomLockBeforeFgFixed = null; // fgFixed ON前のzoomLock値を保持
 let _arLockBeforeAutoLock = null;   // heart/phone自動ON前のarLock値を保持
@@ -626,6 +627,14 @@ function _renderFrame() {
     _syncOffsetSliders();
   }
 
+  // アンカー描画位置を lerp で補間（ドラッグ中も滑らかに追従）
+  const elFgPinLerp = document.getElementById('fgPinLerp');
+  // 表示0-100 → 内部 0.01-1.0 の対数スケール: 0.01 * 100^(x/100)
+  const _rawLerp = elFgPinLerp ? parseFloat(elFgPinLerp.value) : 50;
+  const _pinLerpK = 0.01 * Math.pow(100, _rawLerp / 100);
+  _fgPinDispX += (parseFloat(elFgPinX.value) - _fgPinDispX) * _pinLerpK;
+  _fgPinDispY += (parseFloat(elFgPinY.value) - _fgPinDispY) * _pinLerpK;
+
   const W = canvas.width;
   const H = canvas.height;
   const m = S.mask;
@@ -663,8 +672,8 @@ function _renderFrame() {
       if (S.fgFixed) {
         const mcx = m.x + m.w / 2;
         const mcy = m.y + m.h / 2;
-        const ax  = W / 2 + parseFloat(elFgPinX.value);
-        const ay  = H / 2 + parseFloat(elFgPinY.value);
+        const ax  = W / 2 + _fgPinDispX;
+        const ay  = H / 2 + _fgPinDispY;
         dx = mcx - ax * maskZoom;
         dy = mcy - ay * maskZoom;
       } else {
@@ -986,7 +995,7 @@ function _renderFrame() {
 
   // --- 前景アンカー（phone + fgFixed ON 時、アンカー位置にカメラファインダー型クロスヘア）---
   if (S.fgFixed && S.mask.shape === 'phone' && loaded[1] && !visHidden[1]) {
-    // アンカーマーカーはキャンバス上の独立した点（マスクとは無関係）
+    // アンカーマーカーはスライダー値そのまま（等速・即時追従）
     const ax  = W / 2 + parseFloat(elFgPinX.value);
     const ay  = H / 2 + parseFloat(elFgPinY.value);
     const r   = Math.max(18, Math.round(28 * bufScale));  // コーナーブラケットの中心からの幅
@@ -994,7 +1003,10 @@ function _renderFrame() {
     const ca  = Math.max(5,  Math.round(7  * bufScale));  // 中央十字アーム長
     const lw  = Math.max(1,  1.2 * bufScale);             // ブラケット線幅（細め）
     const clw = Math.max(1,  1.0 * bufScale);             // 中央十字線幅
+    const _fgPinOpacityEl = document.getElementById('fgPinOpacity');
+    const _anchorAlpha = _fgPinOpacityEl ? parseFloat(_fgPinOpacityEl.value) / 100 : 1;
     ctx.save();
+    ctx.globalAlpha = _anchorAlpha;
     ctx.globalCompositeOperation = 'difference';
     ctx.strokeStyle = '#ffffff';
     ctx.lineCap     = 'round';
@@ -3039,6 +3051,8 @@ bindSlider('borderW', 'borderWVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.to
 bindSlider('maskZoom', 'maskZoomVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(2), null);
 bindSlider('fgPinX',   'fgPinXVal',   v => `${Math.round(v)}`, null);
 bindSlider('fgPinY',   'fgPinYVal',   v => `${Math.round(v)}`, null);
+bindSlider('fgPinLerp','fgPinLerpVal',v => `${Math.round(v)}`, null);
+bindSlider('fgPinOpacity','fgPinOpacityVal',v => `${Math.round(v)}`, null);
 bindSlider('filterBlur', 'filterBlurVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterPixel','filterPixelVal',v => `${Math.round(v)}`, null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
@@ -3841,6 +3855,8 @@ function _updateFgFixedBtn() {
   // X/Y スライダーはアンカーモード（fgFixed ON）時のみ表示
   document.getElementById('fgPinXRow').style.display = S.fgFixed ? '' : 'none';
   document.getElementById('fgPinYRow').style.display = S.fgFixed ? '' : 'none';
+  document.getElementById('fgPinLerpRow').style.display = S.fgFixed ? '' : 'none';
+  document.getElementById('fgPinOpacityRow').style.display = S.fgFixed ? '' : 'none';
   // ズームスライダーはアンカーモードでも操作可能（zoomLock で連動制御）
   elMaskZoom.disabled = false;
   document.getElementById('maskZoomVal').disabled = false;
@@ -4685,6 +4701,8 @@ function collectSettings() {
     zoomLock:      S.zoomLock,
     fgPinX:        elFgPinX.value,
     fgPinY:        elFgPinY.value,
+    fgPinLerp:     document.getElementById('fgPinLerp')?.value ?? '50',
+    fgPinOpacity:  document.getElementById('fgPinOpacity')?.value ?? '100',
     filterBrightness: elFilterBrightness.value,
     filterContrast:   elFilterContrast.value,
     filterHighlight:  elFilterHighlight.value,
@@ -4731,6 +4749,8 @@ function applySettings(d) {
     ['maskZoom','maskZoomVal'],
     ['fgPinX','fgPinXVal'],
     ['fgPinY','fgPinYVal'],
+    ['fgPinLerp','fgPinLerpVal'],
+    ['fgPinOpacity','fgPinOpacityVal'],
   ];
   const vals = {
     vol0: d.vol0, offset0: d.offset0,
@@ -4750,6 +4770,8 @@ function applySettings(d) {
     maskZoom: d.maskZoom ?? '1',
     fgPinX: d.fgPinX ?? '0',
     fgPinY: d.fgPinY ?? '0',
+    fgPinLerp: d.fgPinLerp ?? '50',
+    fgPinOpacity: d.fgPinOpacity ?? '100',
   };
   sliders.forEach(([id]) => {
     if (vals[id] == null) return;
