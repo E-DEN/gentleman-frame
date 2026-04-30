@@ -688,7 +688,7 @@
       font-size: 11px;
       line-height: 1.3;
       color: var(--text-muted);
-      width: 68px;
+      width: 90px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -709,7 +709,6 @@
     .ar-lock-icon:hover { opacity: 0.75; }
     .ar-lock-icon.active { opacity: 1; color: var(--accent); }
     .ar-lock-icon svg.lucide { width: 11px; height: 11px; }
-    #filterCard .ctrl-row label { width: 90px; }
     .mute-btn { flex-shrink: 0; margin-left: auto; }
     input[type="range"] {
       -webkit-appearance: none;
