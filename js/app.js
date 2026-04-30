@@ -1026,7 +1026,7 @@ function _renderFrame() {
   }
 
   // --- スマホ形状オーバーレイ ---
-  if (!maskHidden && S.mask.shape === 'phone') {
+  if (!maskHidden && !visHidden[1] && S.mask.shape === 'phone') {
     const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
     const phase = (performance.now() * 0.001 * speed) % 1;
     _drawPhoneFrame(ctx, m, bufScale, 1.0, phase);
