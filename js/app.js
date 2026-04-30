@@ -545,6 +545,17 @@ function updateCanvasFilter() {
     ? '' : `brightness(${b}%) contrast(${co}%) saturate(${s}%) hue-rotate(${h}deg)`;
 }
 
+// シネマバーを canvas 外オーバーレイで描画（CSS filter の影響を受けない）
+const barsOverlay = document.getElementById('barsOverlay');
+function updateBarsOverlay() {
+  const barsAmt = parseFloat(elFilterBars.value);
+  if (barsAmt <= 0 || effectsHidden) { barsOverlay.style.background = ''; return; }
+  // max=10 → 帯の高さ最大 18%（canvas 描画時と同じ比率）
+  const pct = (barsAmt / 10) * 18;  // %
+  barsOverlay.style.background =
+    `linear-gradient(to bottom, #000 ${pct}%, transparent ${pct}%, transparent ${100 - pct}%, #000 ${100 - pct}%)`;
+}
+
 // ============================================================
 //  枠アニメーション用グラデーション生成
 // ============================================================
@@ -891,17 +902,7 @@ function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Cinematic Bars (映画の帯) ---
-  const barsAmt = parseFloat(elFilterBars.value);
-  if (barsAmt > 0) {
-    // max=10 → 帯の高さ最大 = H * 0.18（長め）
-    const barH = Math.round(H * (barsAmt / 10) * 0.18);
-    ctx.save();
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, W, barH);
-    ctx.fillRect(0, H - barH, W, barH);
-    ctx.restore();
-  }
+  // --- Cinematic Bars: canvas 外のオーバーレイで描画 (updateBarsOverlay で制御) ---
   } // end !effectsHidden
 
   // --- マスク枠（フィルターの上に描画）---
@@ -3369,7 +3370,7 @@ bindSlider('filterVignette',   'filterVignetteVal',   v => v % 1 === 0 ? `${Math
 bindSlider('filterMatte',      'filterMatteVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
-bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), updateBarsOverlay);
 bindSlider('filterFps',        'filterFpsVal',        v => v === 0 ? 'OFF' : `${v}`, null);
 
 // スライダードラッグ時のみスナップ（テキスト入力は直値適用）
@@ -3392,6 +3393,7 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
     : '<i data-lucide="eye"></i>';
   lucide.createIcons({ nodes: [btn] });
   updateCanvasFilter();
+  updateBarsOverlay();
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
@@ -4798,6 +4800,7 @@ function applySettings(d) {
     _maskBorderFadeStart = loaded[1] ? performance.now() : 0;
   }
   updateCanvasFilter();
+  updateBarsOverlay();
 }
 
 function loadPresets() { return JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); }
