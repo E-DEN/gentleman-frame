@@ -724,6 +724,7 @@
   // ─── Public API ─────────────────────────────────────────────────────────────
 
   var _state = null;
+  var _generation = 0; // incremented on each stop() to cancel in-flight loadImages callbacks
 
   global.GFRainEngine = {
     /**
@@ -741,10 +742,12 @@
       var opts = intensityToOptions(Math.max(1, Math.min(10, intensity || 5)));
       if (extra.speed != null) opts.globalTimeScale = extra.speed;
 
+      var myGen = ++_generation;
       loadImages([
         { name: 'dropAlpha', src: 'img/drop-alpha.png' },
         { name: 'dropColor',  src: 'img/drop-color.png'  }
       ], function (imgs) {
+        if (myGen !== _generation) return; // stop() was called while images were loading
         if (!imgs.dropAlpha || !imgs.dropColor) {
           console.error('GFRainEngine: drop textures failed to load. Ensure img/drop-alpha.png and img/drop-color.png exist.');
           return;
@@ -782,6 +785,7 @@
 
     /** Stop and clear the overlay. */
     stop: function () {
+      _generation++; // cancel any in-flight loadImages callback
       if (!_state) return;
       _state.raindrops.stop();
       _state.renderer.stop();
