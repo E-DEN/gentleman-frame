@@ -546,15 +546,11 @@ function updateCanvasFilter() {
     ? '' : `brightness(${b}%) contrast(${co}%) saturate(${s}%) hue-rotate(${h}deg)`;
 }
 
-// シネマバーを canvas 外オーバーレイで描画（CSS filter の影響を受けない）
+// シネマバーはキャンバス上に描画（_renderFrame で毎フレーム更新）
+// barsOverlay div は空のプレースホルダーとして残す
 const barsOverlay = document.getElementById('barsOverlay');
 function updateBarsOverlay() {
-  const barsAmt = parseFloat(elFilterBars.value);
-  if (barsAmt <= 0 || effectsHidden) { barsOverlay.style.background = ''; return; }
-  // max=10 → 帯の高さ最大 18%（canvas 描画時と同じ比率）
-  const pct = (barsAmt / 10) * 18;  // %
-  barsOverlay.style.background =
-    `linear-gradient(to bottom, #000 ${pct}%, transparent ${pct}%, transparent ${100 - pct}%, #000 ${100 - pct}%)`;
+  barsOverlay.style.background = '';
 }
 
 // ============================================================
@@ -932,7 +928,19 @@ function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Cinematic Bars: canvas 外のオーバーレイで描画 (updateBarsOverlay で制御) ---
+  // --- Cinematic Bars (canvas 上に描画— CSS filter の影響なし） ---
+  const barsAmt = parseFloat(elFilterBars.value);
+  if (barsAmt > 0) {
+    const barsH = Math.round((barsAmt / 10) * 0.18 * H);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, barsH);
+    ctx.fillRect(0, H - barsH, W, barsH);
+    ctx.restore();
+  }
+
   } // end !effectsHidden
 
   // --- マスク枠（フィルターの上に描画）---

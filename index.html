@@ -62,8 +62,8 @@
         <!-- 雨ガラスオーバーレイ（WebGL – effectsWrap 内で色調補正の対象） -->
         <canvas id="rainOverlay" width="854" height="480" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2"></canvas>
       </div>
-      <!-- シネマバーオーバーレイ（色調補正の対象外・常に純黒） -->
-      <div id="barsOverlay" style="position:absolute;inset:0;pointer-events:none;z-index:5"></div>
+      <!-- シネマバーオーバーレイ（描画はキャンバス側・この div は現在未使用） -->
+      <div id="barsOverlay" style="position:absolute;inset:0;pointer-events:none;z-index:0"></div>
       <div id="canvasLoadOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:20;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;font-size:13px;border-radius:inherit;pointer-events:none">
         <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.75s linear infinite"></div>
         <span id="canvasLoadMsg"></span>
