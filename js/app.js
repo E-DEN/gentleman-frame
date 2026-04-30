@@ -3590,6 +3590,8 @@ document.querySelectorAll('.fqp-btn[data-fqp]').forEach(btn => {
   nameInput.addEventListener('blur', e => {
     // OK/キャンセルボタンへのフォーカス移動の場合は blur 側では動かさない
     if (e.relatedTarget === nameOk || e.relatedTarget === nameCancel) return;
+    // フォームが既に閉じられていれば（Enter や OK で確定済み）スキップ
+    if (nameForm.style.display === 'none') return;
     _commit();
   });
 }
