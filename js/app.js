@@ -191,6 +191,7 @@ renderCvs.width  = canvas.width;
 renderCvs.height = canvas.height;
 const ctx     = renderCvs.getContext('2d', { desynchronized: true });
 const canvasWrap     = document.getElementById('canvasWrap');
+const effectsWrap    = document.getElementById('effectsWrap');
 const maskDropOverlay = document.getElementById('maskDropOverlay');
 let _dispW = canvas.width;   // Canvas CSSピクセル表示サイズ
 let _dispH = canvas.height;
@@ -536,12 +537,12 @@ window.addEventListener('focus', () => {
 //  Canvas CSS フィルター（明るさ / コントラスト / 彩度）
 // ============================================================
 function updateCanvasFilter() {
-  if (effectsHidden) { canvas.style.filter = ''; return; }
+  if (effectsHidden) { effectsWrap.style.filter = ''; return; }
   const b  = parseFloat(elFilterBrightness.value);
   const co = parseFloat(elFilterContrast.value);
   const s  = parseFloat(elFilterSaturation.value);
   const h  = parseFloat(elFilterHue.value);
-  canvas.style.filter = (b === 100 && co === 100 && s === 100 && h === 0)
+  effectsWrap.style.filter = (b === 100 && co === 100 && s === 100 && h === 0)
     ? '' : `brightness(${b}%) contrast(${co}%) saturate(${s}%) hue-rotate(${h}deg)`;
 }
 
@@ -557,8 +558,37 @@ function updateBarsOverlay() {
 }
 
 // ============================================================
-//  枠アニメーション用グラデーション生成
+//  雨ガラスオーバーレイ（WebGL – Codrops RainEffect ベース）
 // ============================================================
+const rainOverlay  = document.getElementById('rainOverlay');
+const elFilterRain = document.getElementById('filterRain');
+
+// 雨サブ行の表示切替
+function _rainSubVisible(v) {
+  ['rainSpeedRow', 'rainRefractionRow', 'rainShadowRow'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = v > 0 ? '' : 'none';
+  });
+}
+
+window._startRainOverlay = function () {
+  const amt = parseInt(elFilterRain.value, 10);
+  if (amt > 0) {
+    const elSpeed  = document.getElementById('rainSpeed');
+    const elRef    = document.getElementById('rainRefraction');
+    const elShadow = document.getElementById('rainShadow');
+    GFRainEngine.start(rainOverlay, canvas, amt, {
+      speed:      elSpeed  ? parseFloat(elSpeed.value)          : 1,
+      refraction: elRef    ? parseFloat(elRef.value)            : 200,
+      shadow:     elShadow ? parseInt(elShadow.value, 10) === 1 : false
+    });
+  }
+};
+window._stopRainOverlay = function () {
+  GFRainEngine.stop();
+};
+
+
 function _buildBorderGrad(ctx, m, phase, anim, bright) {
   const L  = bright;
   const cx = m.x + m.w / 2;
@@ -3372,6 +3402,15 @@ bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), updateBarsOverlay);
 bindSlider('filterFps',        'filterFpsVal',        v => v === 0 ? 'OFF' : `${v}`, null);
+bindSlider('filterRain',       'filterRainVal',       v => `${Math.round(v)}`, v => {
+  _rainSubVisible(v);
+  if (v > 0 && !effectsHidden) _startRainOverlay(); else _stopRainOverlay();
+});
+bindSlider('rainSpeed',      'rainSpeedVal',      v => v.toFixed(1),        () => { if (parseInt(elFilterRain.value, 10) > 0 && !effectsHidden) _startRainOverlay(); });
+bindSlider('rainRefraction', 'rainRefractionVal', v => `${Math.round(v)}`,   () => { if (parseInt(elFilterRain.value, 10) > 0 && !effectsHidden) _startRainOverlay(); });
+bindSlider('rainShadow',     'rainShadowVal',     v => v === 1 ? 'ON' : 'OFF', () => { if (parseInt(elFilterRain.value, 10) > 0 && !effectsHidden) _startRainOverlay(); });
+// 雨サブ行の初期表示
+_rainSubVisible(parseInt(elFilterRain.value, 10));
 
 // スライダードラッグ時のみスナップ（テキスト入力は直値適用）
 elFilterFps.addEventListener('input', e => {
@@ -3394,10 +3433,12 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
   lucide.createIcons({ nodes: [btn] });
   updateCanvasFilter();
   updateBarsOverlay();
+  if (effectsHidden) _stopRainOverlay();
+  else if (parseInt(elFilterRain.value, 10) > 0) _startRainOverlay();
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterFlare', 'filterBars', 'filterFps', 'filterPixel'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterFlare', 'filterBars', 'filterFps', 'filterPixel', 'filterRain'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
@@ -3445,7 +3486,8 @@ const _FQP_FILTER_KEYS = [
   'filterBrightness','filterContrast','filterHighlight','filterShadow',
   'filterSaturation','filterHue','filterTemp','filterTint',
   'filterSharpness','filterCA','filterVignette','filterMatte',
-  'filterGrain','filterFlare','filterBars','filterFps','filterBlur','filterPixel'
+  'filterGrain','filterFlare','filterBars','filterFps','filterBlur','filterPixel','filterRain',
+  'rainSpeed','rainRefraction','rainShadow'
 ];
 const _FQP_CUSTOM_KEY = 'gf-fqp-custom';
 
@@ -4801,6 +4843,8 @@ function applySettings(d) {
   }
   updateCanvasFilter();
   updateBarsOverlay();
+  const rAmt = parseInt(elFilterRain.value, 10);
+  if (rAmt > 0 && !effectsHidden) _startRainOverlay(); else _stopRainOverlay();
 }
 
 function loadPresets() { return JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); }
