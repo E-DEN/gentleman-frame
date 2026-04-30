@@ -214,6 +214,11 @@ const caCvs = document.createElement('canvas');
 caCvs.width  = canvas.width;
 caCvs.height = canvas.height;
 const caCtx  = caCvs.getContext('2d');
+// モーションブラー用バッファ
+let _mblurCvs = document.createElement('canvas');
+_mblurCvs.width  = canvas.width;
+_mblurCvs.height = canvas.height;
+let _mblurCtx = _mblurCvs.getContext('2d');
 
 // グレイン用オフスクリーンキャンバス（固定 256×256 タイル）
 const grainCvs = document.createElement('canvas');
@@ -242,6 +247,7 @@ function _syncAllBuffers(w, h) {
   postCvs.width = w; postCvs.height = h;
   chCvs.width   = w; chCvs.height  = h;
   caCvs.width   = w; caCvs.height  = h;
+  if (_mblurCvs) { _mblurCvs.width = w; _mblurCvs.height = h; }
 }
 
 function _syncMaskSliders() {
@@ -446,6 +452,7 @@ const elFilterGrain     = document.getElementById('filterGrain');
 const elFilterPixel     = document.getElementById('filterPixel');
 const elFilterFlare     = document.getElementById('filterFlare');
 const elFilterBars      = document.getElementById('filterBars');
+const elFilterFps       = document.getElementById('filterFps');
 const elProgressFill  = document.getElementById('progressFill');
 const elProgressThumb = document.getElementById('progressThumb');
 const elTimeLabel   = document.getElementById('timeLabel');
@@ -1001,11 +1008,34 @@ function _renderFrame() {
   }
 }
 
-function render() {
+let _fpsLastTime = 0;
+// FPS スナップ値 (インデックス 0=OFF, 1↑=実fps)
+const _FPS_SNAPS = [0, 18, 23.976, 24, 29.97, 30, 48, 59.94, 60, 120];
+
+function render(now) {
+  // filterFps: 0=制限なし、それ以外=fps上限で間引き
+  const fpsLimit = parseFloat(elFilterFps.value) || 0;
+  if (fpsLimit > 0) {
+    const interval = 1000 / fpsLimit;
+    if (now - _fpsLastTime < interval - 0.5) {
+      requestAnimationFrame(render);
+      return;
+    }
+    // モーションブラー: スキップ中に溜まった前フレームを薄く重ねて blit
+    displayCtx.globalAlpha = 0.35;
+    displayCtx.drawImage(_mblurCvs, 0, 0);
+    displayCtx.globalAlpha = 1;
+    _fpsLastTime = now;
+  }
   _renderFrame();
   updateProgress();
   syncMaskDropOverlay();
   _updateCanvasHints();
+  // 今フレームを保存（次フレームのブラー用）
+  if (fpsLimit > 0) {
+    _mblurCtx.clearRect(0, 0, _mblurCvs.width, _mblurCvs.height);
+    _mblurCtx.drawImage(renderCvs, 0, 0);
+  }
   displayCtx.drawImage(renderCvs, 0, 0);
   requestAnimationFrame(render);
 }
@@ -3342,6 +3372,18 @@ bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math
 bindSlider('filterPixel',      'filterPixelVal',      v => `${Math.round(v)}`, null);
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterFps',        'filterFpsVal',        v => v === 0 ? 'OFF' : `${v}`, null);
+// スライダードラッグ時のみスナップ（テキスト入力は直値適用）
+elFilterFps.addEventListener('input', e => {
+  if (!e.isTrusted) return;
+  const v = parseFloat(elFilterFps.value);
+  const snapped = _FPS_SNAPS.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a);
+  if (snapped !== v) {
+    elFilterFps.value = snapped;
+    document.getElementById('filterFpsVal').value = snapped === 0 ? 'OFF' : `${snapped}`;
+    updateSliderFill(elFilterFps);
+  }
+});
 
 document.getElementById('filterVisBtn').addEventListener('click', () => {
   effectsHidden = !effectsHidden;
@@ -3354,7 +3396,7 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterVignette', 'filterCA', 'filterTemp', 'filterTint', 'filterSharpness', 'filterMatte', 'filterGrain', 'filterPixel', 'filterFlare', 'filterBars'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterVignette', 'filterCA', 'filterTemp', 'filterTint', 'filterSharpness', 'filterMatte', 'filterGrain', 'filterPixel', 'filterFlare', 'filterBars', 'filterFps'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
@@ -3381,19 +3423,19 @@ document.getElementById('filterResetBtn').addEventListener('click', () => {
 //   filterPixel      : 0–10    (default 0)
 const _FQP = {
   //            bright  cont   hl     sh     sat    hue    temp   tint   sharp  ca     vig    matte  grain  flare  bars   pixel
-  cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterFlare: 0,   filterBars: 5,   filterPixel: 0 },
-  retro:   { filterBrightness: 105, filterContrast: 88,  filterHighlight: -20, filterShadow: +25, filterSaturation: 58,  filterHue: 0, filterTemp: +22, filterTint:  -8, filterSharpness: 0,   filterCA: 0,   filterVignette: 5,   filterMatte: 7,   filterGrain: 2.5, filterFlare: 1.5, filterBars: 0,   filterPixel: 0 },
-  insta:   { filterBrightness: 112, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 128, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 1.5, filterMatte: 0,   filterGrain: 0,   filterFlare: 0.5, filterBars: 0,   filterPixel: 0 },
-  pastel:  { filterBrightness: 130, filterContrast: 90,  filterHighlight:   0, filterShadow: +30, filterSaturation: 80,  filterHue: 0, filterTemp:   0, filterTint:  +5, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterPixel: 0 },
-  neon:    { filterBrightness: 88,  filterContrast: 138, filterHighlight: +20, filterShadow:   0, filterSaturation: 175, filterHue: 0, filterTemp: -18, filterTint: -10, filterSharpness: 0,   filterCA: 1.8, filterVignette: 7,   filterMatte: 0,   filterGrain: 0.5, filterFlare: 3.5, filterBars: 0,   filterPixel: 0 },
-  sunset:  { filterBrightness: 108, filterContrast: 112, filterHighlight:   0, filterShadow:   0, filterSaturation: 135, filterHue: 0, filterTemp: +38, filterTint:  -5, filterSharpness: 1,   filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 4.5, filterBars: 0,   filterPixel: 0 },
-  cool:    { filterBrightness: 100, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 78,  filterHue: 0, filterTemp: -28, filterTint:   0, filterSharpness: 1.5, filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterPixel: 0 },
-  dreamy:  { filterBrightness: 108, filterContrast: 78,  filterHighlight: +10, filterShadow: +20, filterSaturation: 85,  filterHue: 0, filterTemp: +15, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 2,   filterMatte: 7,   filterGrain: 0,   filterFlare: 3,   filterBars: 0,   filterPixel: 0 },
-  glitch:  { filterBrightness: 100, filterContrast: 122, filterHighlight:   0, filterShadow:   0, filterSaturation: 120, filterHue: 0, filterTemp:   0, filterTint:   0, filterSharpness: 0,   filterCA: 4.5, filterVignette: 2,   filterMatte: 0,   filterGrain: 2,   filterFlare: 0,   filterBars: 0,   filterPixel: 0 },
-  noir:    { filterBrightness: 90,  filterContrast: 148, filterHighlight: -30, filterShadow: -20, filterSaturation: 12,  filterHue: 0, filterTemp:  -5, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 8,   filterMatte: 3,   filterGrain: 1.2, filterFlare: 0,   filterBars: 3,   filterPixel: 0 },
-  horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterFlare: 0,   filterBars: 0,   filterPixel: 0 },
-  modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBars: 0,   filterPixel: 0 },
-  trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBars: 0,   filterPixel: 0 },
+  cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterFlare: 0,   filterBars: 5,   filterPixel: 0, filterFps: 24 },
+  retro:   { filterBrightness: 105, filterContrast: 88,  filterHighlight: -20, filterShadow: +25, filterSaturation: 58,  filterHue: 0, filterTemp: +22, filterTint:  -8, filterSharpness: 0,   filterCA: 0,   filterVignette: 5,   filterMatte: 7,   filterGrain: 2.5, filterFlare: 1.5, filterBars: 0,   filterPixel: 0, filterFps: 18 },
+  insta:   { filterBrightness: 112, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 128, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 1.5, filterMatte: 0,   filterGrain: 0,   filterFlare: 0.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  pastel:  { filterBrightness: 130, filterContrast: 90,  filterHighlight:   0, filterShadow: +30, filterSaturation: 80,  filterHue: 0, filterTemp:   0, filterTint:  +5, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  neon:    { filterBrightness: 88,  filterContrast: 138, filterHighlight: +20, filterShadow:   0, filterSaturation: 175, filterHue: 0, filterTemp: -18, filterTint: -10, filterSharpness: 0,   filterCA: 1.8, filterVignette: 7,   filterMatte: 0,   filterGrain: 0.5, filterFlare: 3.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  sunset:  { filterBrightness: 108, filterContrast: 112, filterHighlight:   0, filterShadow:   0, filterSaturation: 135, filterHue: 0, filterTemp: +38, filterTint:  -5, filterSharpness: 1,   filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 4.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  cool:    { filterBrightness: 100, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 78,  filterHue: 0, filterTemp: -28, filterTint:   0, filterSharpness: 1.5, filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  dreamy:  { filterBrightness: 108, filterContrast: 78,  filterHighlight: +10, filterShadow: +20, filterSaturation: 85,  filterHue: 0, filterTemp: +15, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 2,   filterMatte: 7,   filterGrain: 0,   filterFlare: 3,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  glitch:  { filterBrightness: 100, filterContrast: 122, filterHighlight:   0, filterShadow:   0, filterSaturation: 120, filterHue: 0, filterTemp:   0, filterTint:   0, filterSharpness: 0,   filterCA: 4.5, filterVignette: 2,   filterMatte: 0,   filterGrain: 2,   filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  noir:    { filterBrightness: 90,  filterContrast: 148, filterHighlight: -30, filterShadow: -20, filterSaturation: 12,  filterHue: 0, filterTemp:  -5, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 8,   filterMatte: 3,   filterGrain: 1.2, filterFlare: 0,   filterBars: 3,   filterPixel: 0, filterFps: 24 },
+  horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterFlare: 0,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBars: 0,   filterPixel: 0, filterFps: 0 },
+  trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBars: 0,   filterPixel: 0, filterFps: 0 },
 };
 document.querySelectorAll('.fqp-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -4445,6 +4487,7 @@ function collectSettings() {
     filterPixel:      document.getElementById('filterPixel').value,
     filterFlare:      document.getElementById('filterFlare').value,
     filterBars:       document.getElementById('filterBars').value,
+    filterFps:        document.getElementById('filterFps').value,
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
@@ -4471,6 +4514,7 @@ function applySettings(d) {
     ['filterPixel','filterPixelVal'],
     ['filterFlare','filterFlareVal'],
     ['filterBars','filterBarsVal'],
+    ['filterFps','filterFpsVal'],
     ['maskZoom','maskZoomVal'],
     ['fgPinX','fgPinXVal'],
     ['fgPinY','fgPinYVal'],
@@ -4492,6 +4536,7 @@ function applySettings(d) {
     filterPixel: d.filterPixel,
     filterFlare: d.filterFlare,
     filterBars: d.filterBars,
+    filterFps: d.filterFps ?? 0,
   };
   sliders.forEach(([id]) => {
     if (vals[id] == null) return;
