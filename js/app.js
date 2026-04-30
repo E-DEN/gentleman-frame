@@ -364,11 +364,13 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Shift' || _shiftHeld) return;
   _shiftHeld = true;
   document.querySelector('.preset-item-delete:hover') && _setDelBtnIcon(document.querySelector('.preset-item-delete:hover'), 'trash-2');
+  document.querySelector('.fqp-custom-del:hover') && _setDelBtnIcon(document.querySelector('.fqp-custom-del:hover'), 'trash-2');
 });
 document.addEventListener('keyup', e => {
   if (e.key !== 'Shift') return;
   _shiftHeld = false;
   document.querySelector('.preset-item-delete:hover') && _setDelBtnIcon(document.querySelector('.preset-item-delete:hover'), 'x');
+  document.querySelector('.fqp-custom-del:hover') && _setDelBtnIcon(document.querySelector('.fqp-custom-del:hover'), 'x');
 });
 
 // 初回同期: バッファ解像度はFHD(1920x1080)固定。CSS表示サイズは _dispW/_dispH で追跡。
@@ -3436,18 +3438,162 @@ const _FQP = {
   modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
   trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBars: 0,   filterFps: 0,  filterBlur: 0, filterPixel: 0 },
 };
-document.querySelectorAll('.fqp-btn').forEach(btn => {
+// ---- カスタムフィルタープリセット ----
+const _FQP_FILTER_KEYS = [
+  'filterBrightness','filterContrast','filterHighlight','filterShadow',
+  'filterSaturation','filterHue','filterTemp','filterTint',
+  'filterSharpness','filterCA','filterVignette','filterMatte',
+  'filterGrain','filterFlare','filterBars','filterFps','filterBlur','filterPixel'
+];
+const _FQP_CUSTOM_KEY = 'gf-fqp-custom';
+
+function _collectFilterParams() {
+  return Object.fromEntries(_FQP_FILTER_KEYS.map(id => [id, parseFloat(document.getElementById(id)?.value ?? 0)]));
+}
+function _loadCustomFQP()        { try { return JSON.parse(localStorage.getItem(_FQP_CUSTOM_KEY) || '[]'); } catch { return []; } }
+function _saveCustomFQPList(lst) { localStorage.setItem(_FQP_CUSTOM_KEY, JSON.stringify(lst)); }
+
+function _applyFQPParams(params) {
+  Object.entries(params).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = val;
+    el.dispatchEvent(new Event('input'));
+  });
+}
+
+function _renderCustomFQP() {
+  const container = document.getElementById('filterQuickPresets');
+  if (!container) return;
+  // 既存のカスタムボタンを削除（fqpSaveWrapは残す）
+  container.querySelectorAll('.fqp-custom-btn').forEach(el => el.remove());
+  const saveWrap = document.getElementById('fqpSaveWrap');
+  _loadCustomFQP().forEach((item, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'fqp-btn fqp-custom-btn';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'fqp-custom-name';
+    const nameInner = document.createElement('span');
+    nameInner.className = 'pname-inner';
+    nameInner.textContent = item.name;
+    nameSpan.appendChild(nameInner);
+    const del = document.createElement('button');
+    del.className = 'fqp-custom-del';
+    del.title = t('fqp-custom-del-title');
+    del.innerHTML = '<i data-lucide="x"></i>';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      if (e.shiftKey) {
+        const lst = _loadCustomFQP(); lst.splice(idx, 1);
+        _saveCustomFQPList(lst); _renderCustomFQP();
+      } else {
+        _showDelPopup(del, t('del-confirm').replace('{name}', item.name), () => {
+          const lst = _loadCustomFQP(); lst.splice(idx, 1);
+          _saveCustomFQPList(lst); _renderCustomFQP();
+        });
+      }
+    });
+    del.addEventListener('mouseenter', () => { if (_shiftHeld) _setDelBtnIcon(del, 'trash-2'); });
+    del.addEventListener('mouseleave', () => { _setDelBtnIcon(del, 'x'); });
+    btn.appendChild(nameSpan);
+    btn.addEventListener('click', () => _applyFQPParams(item.params));
+    btn.appendChild(del);
+    // F2 でリネーム
+    btn.addEventListener('keydown', e => {
+      if (e.key !== 'F2') return;
+      e.preventDefault();
+      const inner = btn.querySelector('.pname-inner');
+      if (!inner || inner.contentEditable === 'true') return;
+      const prev = inner.textContent;
+      inner.contentEditable = 'plaintext-only';
+      inner.classList.remove('overflows');
+      inner.style.removeProperty('--slide-dist');
+      inner.focus();
+      const sel = window.getSelection(), range = document.createRange();
+      range.selectNodeContents(inner); sel.removeAllRanges(); sel.addRange(range);
+      const commit = () => {
+        inner.contentEditable = 'false';
+        const next = inner.textContent.trim().slice(0, 20) || prev;
+        inner.textContent = next;
+        const lst = _loadCustomFQP();
+        if (lst[idx]) { lst[idx].name = next; _saveCustomFQPList(lst); }
+        requestAnimationFrame(_calcOverflow);
+      };
+      inner.addEventListener('blur', commit, { once: true });
+      const _renameKeydown = ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); inner.removeEventListener('keydown', _renameKeydown); inner.blur(); }
+        if (ev.key === 'Escape') { inner.removeEventListener('keydown', _renameKeydown); inner.textContent = prev; inner.blur(); }
+      };
+      inner.addEventListener('keydown', _renameKeydown);
+    });
+    const _calcOverflow = () => {
+      const inner = btn.querySelector('.pname-inner');
+      const outer = btn.querySelector('.fqp-custom-name');
+      if (!inner || !outer) return;
+      const overflow = inner.scrollWidth - outer.clientWidth;
+      if (overflow > 2) {
+        inner.classList.add('overflows');
+        inner.style.setProperty('--slide-dist', `-${overflow}px`);
+      } else {
+        inner.classList.remove('overflows');
+        inner.style.removeProperty('--slide-dist');
+      }
+    };
+    btn.addEventListener('mouseenter', () => requestAnimationFrame(_calcOverflow));
+    container.insertBefore(btn, saveWrap);
+    lucide.createIcons({ nodes: [del] });
+    // 挿入直後にもオーバーフロー判定（初回表示でマスクを適用するため）
+    requestAnimationFrame(_calcOverflow);
+  });
+}
+
+document.querySelectorAll('.fqp-btn[data-fqp]').forEach(btn => {
   btn.addEventListener('click', () => {
     const p = _FQP[btn.dataset.fqp];
-    if (!p) return;
-    Object.entries(p).forEach(([id, val]) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.value = val;
-      el.dispatchEvent(new Event('input'));
-    });
+    if (p) _applyFQPParams(p);
   });
 });
+
+// ---- カスタムFQP 保存フォーム ----
+{
+  const saveBtn    = document.getElementById('fqpSaveBtn');
+  const nameForm   = document.getElementById('fqpNameForm');
+  const nameInput  = document.getElementById('fqpNameInput');
+  const nameOk     = document.getElementById('fqpNameOk');
+  const nameCancel = document.getElementById('fqpNameCancel');
+  lucide.createIcons({ nodes: [nameOk, nameCancel] });
+
+  const _openForm  = () => { saveBtn.style.display = 'none'; nameForm.style.display = 'inline-flex'; nameInput.value = ''; nameInput.focus(); };
+  const _closeForm = () => { nameForm.style.display = 'none'; saveBtn.style.display = ''; };
+  let _fqpCommitting = false;
+  const _commit    = () => {
+    if (_fqpCommitting) return;
+    _fqpCommitting = true;
+    const name = nameInput.value.trim();
+    if (name) {
+      const lst = _loadCustomFQP();
+      lst.push({ name, params: _collectFilterParams() });
+      _saveCustomFQPList(lst);
+      _renderCustomFQP();
+    }
+    _closeForm();
+    _fqpCommitting = false;
+  };
+
+  saveBtn.addEventListener('click', _openForm);
+  nameOk.addEventListener('click', _commit);
+  nameCancel.addEventListener('click', _closeForm);
+  nameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); _commit(); }
+    if (e.key === 'Escape') { e.stopPropagation(); _closeForm(); }
+  });
+  nameInput.addEventListener('blur', e => {
+    // OK/キャンセルボタンへのフォーカス移動の場合は blur 側では動かさない
+    if (e.relatedTarget === nameOk || e.relatedTarget === nameCancel) return;
+    _commit();
+  });
+}
+_renderCustomFQP();
 
 // ミュートボタン
 const _muteVolume = [null, null]; // ミュート前の音量を保持
@@ -3496,7 +3642,32 @@ let _phoneMaskState    = null; // phone 時の最後の状態
 let _nonPhoneMaskState = null; // 非phone 時の最後の状態
 
 document.querySelectorAll('.shape-btn').forEach(btn => {
+  // press中は全ボタンの active を外して「押した」予告を見せる
+  btn.addEventListener('pointerdown', () => {
+    if (btn.disabled) return;
+    document.querySelectorAll('.shape-btn').forEach(b => {
+      b.classList.add('_was-active');
+      if (b.classList.contains('active')) b.classList.add('_had-active');
+      b.classList.remove('active');
+    });
+    // ボタン外で離したら元の active を復元
+    const onUp = e => {
+      document.removeEventListener('pointerup', onUp);
+      // click が同じボタン上で発火する場合は click 側でクリーンアップ済み
+      // ここで _was-active が残っていれば「外で離した」= キャンセル
+      const pending = document.querySelector('.shape-btn._was-active');
+      if (pending) {
+        document.querySelectorAll('.shape-btn._was-active').forEach(b => {
+          if (b.classList.contains('_had-active')) b.classList.add('active');
+          b.classList.remove('_was-active', '_had-active');
+        });
+      }
+    };
+    document.addEventListener('pointerup', onUp);
+  });
   btn.addEventListener('click', () => {
+    // _was-active クリーンアップ（click が成立した場合は復元不要）
+    document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('_was-active', '_had-active'));
     if (btn.disabled) return;
     const prevShape = S.mask.shape;
     const newShape  = btn.dataset.shape;
@@ -3630,7 +3801,7 @@ function _updateFgFixedBtn() {
   // 錨アイコンはアンカーモード (fgFixed) の ON/OFF を反映
   const btn = document.getElementById('fgFixedBtn');
   btn.classList.toggle('active', S.fgFixed);
-  btn.title = t(S.fgFixed ? 'fg-anchor-hide' : 'fg-anchor-show');
+  btn.title = t('fg-anchor-show');
 }
 
 // ズームロック ON 時、マスク幅の変化率に比例して maskZoom を追従させる
