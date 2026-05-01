@@ -563,6 +563,21 @@ window._stopRainOverlay = function () {
   GFRainEngine.stop();
 };
 
+function _brightHex(hex, bright) {
+  if (bright === 70) return hex;
+  const n = parseInt(hex.replace('#',''), 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >>  8) & 0xff;
+  const b =  n        & 0xff;
+  if (bright <= 70) {
+    const t = bright / 70;
+    return `rgb(${Math.round(r*t)},${Math.round(g*t)},${Math.round(b*t)})`;
+  } else {
+    const t = (bright - 70) / 30;
+    return `rgb(${Math.round(r+(255-r)*t)},${Math.round(g+(255-g)*t)},${Math.round(b+(255-b)*t)})`;
+  }
+}
+
 function _buildBorderGrad(ctx, m, phase, anim, bright) {
   const L  = bright;
   const cx = m.x + m.w / 2;
@@ -577,9 +592,9 @@ function _buildBorderGrad(ctx, m, phase, anim, bright) {
     for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60},100%,${L}%)`);
   } else if (_animColors[anim]) {
     const [c0, c1] = _animColors[anim];
-    g.addColorStop(0,   c0);
-    g.addColorStop(0.5, c1);
-    g.addColorStop(1,   c0);
+    g.addColorStop(0,   _brightHex(c0, bright));
+    g.addColorStop(0.5, _brightHex(c1, bright));
+    g.addColorStop(1,   _brightHex(c0, bright));
   }
   return g;
 }

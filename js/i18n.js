@@ -74,7 +74,7 @@ registerLang('ja', '日本語', {
   'border-anim':'アニメ','border-anim-rainbow':'レインボー',
   'border-anim-cm':'シアン/マゼンタ','border-anim-sakura':'サクラ',
   'border-anim-cyber':'サイバー','border-anim-fire':'ファイア','border-anim-pink':'ピンク',
-  'border-speed':'枠の速度','border-bright':'枠の輝度',
+  'border-speed':'枠速度','border-bright':'枠輝度',
   'brightness':'明るさ','contrast':'コントラスト','saturation':'彩度','filter-hue':'色相',
   'ca':'色収差','vignette':'ビネット',
   'filter-temp':'色温度','filter-matte':'マット','filter-grain':'フィルム粒子',
