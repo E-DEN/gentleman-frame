@@ -1147,21 +1147,30 @@ const _FPS_SNAPS = [0, 18, 23.976, 24, 29.97, 30, 48, 59.94, 60, 120];
 function render(now) {
   // filterFps: 0=制限なし、それ以外=fps上限で間引き
   const fpsLimit = parseFloat(elFilterFps.value) || 0;
+  const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value);
+  // _blitMblur: _mblurCvs を blur フィルター込みで displayCtx に描画
+  // (スキップフレームでも実フレームと同じ blur を適用してチラつきを防ぐ)
+  const _blitMblur = (alpha) => {
+    if (gb > 0) {
+      svgGblurEl.setAttribute('stdDeviation', gb);
+      displayCtx.filter = 'url(#gblur)';
+    }
+    displayCtx.globalAlpha = alpha;
+    displayCtx.drawImage(_mblurCvs, 0, 0);
+    displayCtx.filter = 'none';
+    displayCtx.globalAlpha = 1;
+  };
   if (fpsLimit > 0) {
     const interval = 1000 / fpsLimit;
     if (now - _fpsLastTime < interval - 0.5) {
       // FPS スキップ: 映像はスキップするが枠は毎フレーム更新
-      displayCtx.globalAlpha = 0.35;
-      displayCtx.drawImage(_mblurCvs, 0, 0);
-      displayCtx.globalAlpha = 1;
+      _blitMblur(0.35);
       _drawOverlays();
       requestAnimationFrame(render);
       return;
     }
     // モーションブラー: スキップ中に溜まった前フレームを薄く重ねて blit
-    displayCtx.globalAlpha = 0.35;
-    displayCtx.drawImage(_mblurCvs, 0, 0);
-    displayCtx.globalAlpha = 1;
+    _blitMblur(0.35);
     _fpsLastTime = now;
   }
   _renderFrame();
@@ -1175,7 +1184,6 @@ function render(now) {
     _mblurCtx.drawImage(renderCvs, 0, 0);
   }
   // 全体ぼかし: CSS filterではなくcanvas描画時に適用
-  const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value);
   if (gb > 0) {
     svgGblurEl.setAttribute('stdDeviation', gb);
     displayCtx.filter = 'url(#gblur)';
