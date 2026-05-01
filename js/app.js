@@ -1060,7 +1060,7 @@ function _drawOverlays() {
   // --- 前景アンカー（phone + fgFixed ON 時）---
   // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
   anchorCtx.clearRect(0, 0, W, H);
-  if (S.fgFixed && S.mask.shape === 'phone' && loaded[1] && !visHidden[1]) {
+  if (S.fgFixed && S.mask.shape === 'phone' && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0])) {
     const ax  = W / 2 + parseFloat(elFgPinX.value);
     const ay  = H / 2 + parseFloat(elFgPinY.value);
     const r   = Math.max(18, Math.round(28 * bufScale));
