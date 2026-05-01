@@ -197,9 +197,12 @@ const effectsWrap    = document.getElementById('effectsWrap');
 const svgGblurEl     = document.getElementById('svgGblur');
 const maskDropOverlay = document.getElementById('maskDropOverlay');
 // overlayCanvas: effectsWrap 外側に配置 → CSS filter (hue-rotate 等) の影響を受けない
-// 枠・リサイズハンドル・アンカー・スマホ枠をここに描画
+// 枠・リサイズハンドル・スマホ枠をここに描画
 const overlayCanvas  = document.getElementById('overlayCanvas');
 const overlayCtx     = overlayCanvas.getContext('2d');
+// anchorCanvas: CSS mix-blend-mode:difference で下レイヤーとネガポジ反転合成
+const anchorCanvas   = document.getElementById('anchorCanvas');
+const anchorCtx      = anchorCanvas.getContext('2d');
 let _dispW = canvas.width;   // Canvas CSSピクセル表示サイズ
 let _dispH = canvas.height;
 
@@ -259,6 +262,7 @@ function _syncAllBuffers(w, h) {
   canvas.width  = w; canvas.height = h;
   renderCvs.width = w; renderCvs.height = h;
   overlayCanvas.width = w; overlayCanvas.height = h;
+  anchorCanvas.width  = w; anchorCanvas.height  = h;
   offCvs.width  = w; offCvs.height = h;
   postCvs.width = w; postCvs.height = h;
   chCvs.width   = w; chCvs.height  = h;
@@ -1054,6 +1058,8 @@ function _drawOverlays() {
   }
 
   // --- 前景アンカー（phone + fgFixed ON 時）---
+  // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
+  anchorCtx.clearRect(0, 0, W, H);
   if (S.fgFixed && S.mask.shape === 'phone' && loaded[1] && !visHidden[1]) {
     const ax  = W / 2 + parseFloat(elFgPinX.value);
     const ay  = H / 2 + parseFloat(elFgPinY.value);
@@ -1064,25 +1070,26 @@ function _drawOverlays() {
     const clw = Math.max(1,  1.0 * bufScale);
     const _fgPinOpacityEl = document.getElementById('fgPinOpacity');
     const _anchorAlpha = _fgPinOpacityEl ? parseFloat(_fgPinOpacityEl.value) / 100 : 1;
-    dCtx.save();
-    dCtx.globalAlpha = _anchorAlpha;
-    dCtx.globalCompositeOperation = 'difference';
-    dCtx.strokeStyle = '#ffffff';
-    dCtx.lineCap     = 'round';
-    dCtx.lineJoin    = 'round';
-    dCtx.lineWidth = lw;
-    dCtx.beginPath();
-    dCtx.moveTo(ax - r, ay - r + abw); dCtx.lineTo(ax - r, ay - r); dCtx.lineTo(ax - r + abw, ay - r); // TL
-    dCtx.moveTo(ax + r - abw, ay - r); dCtx.lineTo(ax + r, ay - r); dCtx.lineTo(ax + r, ay - r + abw); // TR
-    dCtx.moveTo(ax - r, ay + r - abw); dCtx.lineTo(ax - r, ay + r); dCtx.lineTo(ax - r + abw, ay + r); // BL
-    dCtx.moveTo(ax + r - abw, ay + r); dCtx.lineTo(ax + r, ay + r); dCtx.lineTo(ax + r, ay + r - abw); // BR
-    dCtx.stroke();
-    dCtx.lineWidth = clw;
-    dCtx.beginPath();
-    dCtx.moveTo(ax - ca, ay); dCtx.lineTo(ax + ca, ay);
-    dCtx.moveTo(ax, ay - ca); dCtx.lineTo(ax, ay + ca);
-    dCtx.stroke();
-    dCtx.restore();
+    anchorCtx.save();
+    anchorCtx.globalAlpha = _anchorAlpha;
+    // globalCompositeOperation はデフォルト source-over のまま
+    // ネガポジ反転は CSS mix-blend-mode:difference が担当
+    anchorCtx.strokeStyle = '#ffffff';
+    anchorCtx.lineCap     = 'round';
+    anchorCtx.lineJoin    = 'round';
+    anchorCtx.lineWidth = lw;
+    anchorCtx.beginPath();
+    anchorCtx.moveTo(ax - r, ay - r + abw); anchorCtx.lineTo(ax - r, ay - r); anchorCtx.lineTo(ax - r + abw, ay - r); // TL
+    anchorCtx.moveTo(ax + r - abw, ay - r); anchorCtx.lineTo(ax + r, ay - r); anchorCtx.lineTo(ax + r, ay - r + abw); // TR
+    anchorCtx.moveTo(ax - r, ay + r - abw); anchorCtx.lineTo(ax - r, ay + r); anchorCtx.lineTo(ax - r + abw, ay + r); // BL
+    anchorCtx.moveTo(ax + r - abw, ay + r); anchorCtx.lineTo(ax + r, ay + r); anchorCtx.lineTo(ax + r, ay + r - abw); // BR
+    anchorCtx.stroke();
+    anchorCtx.lineWidth = clw;
+    anchorCtx.beginPath();
+    anchorCtx.moveTo(ax - ca, ay); anchorCtx.lineTo(ax + ca, ay);
+    anchorCtx.moveTo(ax, ay - ca); anchorCtx.lineTo(ax, ay + ca);
+    anchorCtx.stroke();
+    anchorCtx.restore();
   }
 
   // --- スマホ枠オーバーレイ ---
