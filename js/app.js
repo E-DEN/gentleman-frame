@@ -5,6 +5,7 @@ const PRESET_KEY = 'gentleFrame_presets';
 let _presetsReady = false;
 let _followMode = 'none'; // 'none' | 'mask' | 'anchor' | 'both'
 let _fgPinDispX = 0, _fgPinDispY = 0; // アンカー描画用補間値（lerp）
+let _fgZoomDisp = 1; // ズーム補間値（lerp）
 let _followTargetX = 0, _followTargetY = 0;
 let _zoomLockBeforeFgFixed = null; // fgFixed ON前のzoomLock値を保持
 let _arLockBeforeAutoLock = null;   // heart/phone自動ON前のarLock値を保持
@@ -634,6 +635,7 @@ function _renderFrame() {
   const _pinLerpK = 0.01 * Math.pow(100, _rawLerp / 100);
   _fgPinDispX += (parseFloat(elFgPinX.value) - _fgPinDispX) * _pinLerpK;
   _fgPinDispY += (parseFloat(elFgPinY.value) - _fgPinDispY) * _pinLerpK;
+  _fgZoomDisp += (parseFloat(elMaskZoom.value) - _fgZoomDisp) * _pinLerpK;
 
   const W = canvas.width;
   const H = canvas.height;
@@ -664,8 +666,8 @@ function _renderFrame() {
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
-    const maskZoom = parseFloat(elMaskZoom.value);
-    if (Math.abs(maskZoom - 1) > 0.001 || S.fgFixed) {
+    const maskZoom = _fgZoomDisp;
+    if (Math.abs(maskZoom - 1) > 0.001 || Math.abs(parseFloat(elMaskZoom.value) - 1) > 0.001 || S.fgFixed) {
       // Mode 1（OFF）: マスク中央を zoom の基点にする（マスク追従）
       // Mode 2（ON） : ビデオのアンカー点（fgPinX/Yでパン）がマスク中央に重なるよう描画
       let dx, dy;
