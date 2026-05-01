@@ -196,13 +196,14 @@ const canvasWrap     = document.getElementById('canvasWrap');
 const effectsWrap    = document.getElementById('effectsWrap');
 const svgGblurEl     = document.getElementById('svgGblur');
 const maskDropOverlay = document.getElementById('maskDropOverlay');
+// anchorCanvas: CSS mix-blend-mode:difference で映像のみとネガポジ反転合成
+// z-index:4 = overlayCanvas(枠)より下なので枠の色を巻き込まない
+const anchorCanvas   = document.getElementById('anchorCanvas');
+const anchorCtx      = anchorCanvas.getContext('2d');
 // overlayCanvas: effectsWrap 外側に配置 → CSS filter (hue-rotate 等) の影響を受けない
 // 枠・リサイズハンドル・スマホ枠をここに描画
 const overlayCanvas  = document.getElementById('overlayCanvas');
 const overlayCtx     = overlayCanvas.getContext('2d');
-// anchorCanvas: CSS mix-blend-mode:difference で下レイヤーとネガポジ反転合成
-const anchorCanvas   = document.getElementById('anchorCanvas');
-const anchorCtx      = anchorCanvas.getContext('2d');
 let _dispW = canvas.width;   // Canvas CSSピクセル表示サイズ
 let _dispH = canvas.height;
 
