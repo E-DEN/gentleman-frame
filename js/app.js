@@ -196,6 +196,10 @@ const canvasWrap     = document.getElementById('canvasWrap');
 const effectsWrap    = document.getElementById('effectsWrap');
 const svgGblurEl     = document.getElementById('svgGblur');
 const maskDropOverlay = document.getElementById('maskDropOverlay');
+// overlayCanvas: effectsWrap 外側に配置 → CSS filter (hue-rotate 等) の影響を受けない
+// 枠・リサイズハンドル・アンカー・スマホ枠をここに描画
+const overlayCanvas  = document.getElementById('overlayCanvas');
+const overlayCtx     = overlayCanvas.getContext('2d');
 let _dispW = canvas.width;   // Canvas CSSピクセル表示サイズ
 let _dispH = canvas.height;
 
@@ -254,6 +258,7 @@ const elMaskZoom = document.getElementById('maskZoom');
 function _syncAllBuffers(w, h) {
   canvas.width  = w; canvas.height = h;
   renderCvs.width = w; renderCvs.height = h;
+  overlayCanvas.width = w; overlayCanvas.height = h;
   offCvs.width  = w; offCvs.height = h;
   postCvs.width = w; postCvs.height = h;
   chCvs.width   = w; chCvs.height  = h;
@@ -990,9 +995,11 @@ function _renderFrame() {
 }
 
 // マスク枠・ハンドル・アンカー・スマホフレームをぼかしより後に描画する
-// → blur の影響を受けない
-function _drawOverlays(dCtx) {
+// → effectsWrap 外側の overlayCanvas に描くため CSS filter 非適用
+function _drawOverlays() {
+  const dCtx = overlayCtx;
   const W = canvas.width, H = canvas.height;
+  dCtx.clearRect(0, 0, W, H);
   const m = S.mask;
   const bufScale = _lastBufScale;
   const maskHidden = S.maskHidden;
@@ -1096,6 +1103,11 @@ function render(now) {
   if (fpsLimit > 0) {
     const interval = 1000 / fpsLimit;
     if (now - _fpsLastTime < interval - 0.5) {
+      // FPS スキップ: 映像はスキップするが枠は毎フレーム更新
+      displayCtx.globalAlpha = 0.35;
+      displayCtx.drawImage(_mblurCvs, 0, 0);
+      displayCtx.globalAlpha = 1;
+      _drawOverlays();
       requestAnimationFrame(render);
       return;
     }
@@ -1116,7 +1128,6 @@ function render(now) {
     _mblurCtx.drawImage(renderCvs, 0, 0);
   }
   // 全体ぼかし: CSS filterではなくcanvas描画時に適用
-  // → _drawOverlays() で後から描く枠・ハンドルは blur の影響を受けない
   const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value);
   if (gb > 0) {
     svgGblurEl.setAttribute('stdDeviation', gb);
@@ -1126,7 +1137,8 @@ function render(now) {
   } else {
     displayCtx.drawImage(renderCvs, 0, 0);
   }
-  _drawOverlays(displayCtx);
+  // 枠・ハンドルは overlayCanvas (effectsWrap外) に描画 → filter非適用
+  _drawOverlays();
   requestAnimationFrame(render);
 }
 
