@@ -756,9 +756,48 @@ function _renderFrame() {
       ctx.globalAlpha = 1; ctx.restore();
     }
   } else if (loaded[0] && !visHidden[1] && !maskHidden && _fgFadeStart !== 0) {
-    // 前景なし: マスク内の背景にぼかし/ピクセル化をすりガラス風に適用
-    // _fgFadeStart===0 (ロード中) は表示しない
-    if (pixelAmt >= 1 && maskBlur <= 0) {
+    // 前景なし かつ アンカーモード ON → 動画1をアンカー位置で描画
+    if (S.fgFixed) {
+      offCtx.clearRect(0, 0, W, H);
+      const maskZoom = _fgZoomDisp;
+      const mcx = m.x + m.w / 2;
+      const mcy = m.y + m.h / 2;
+      const ax  = W / 2 + _fgPinDispX;
+      const ay  = H / 2 + _fgPinDispY;
+      const dx  = mcx - ax * maskZoom;
+      const dy  = mcy - ay * maskZoom;
+      offCtx.drawImage(getMediaSrc(0), dx, dy, W * maskZoom, H * maskZoom);
+      if (pixelAmt >= 1) {
+        const pSize = Math.round(pixelAmt * 4);
+        const pw = Math.ceil(W / pSize);
+        const ph = Math.ceil(H / pSize);
+        postCtx.clearRect(0, 0, W, H);
+        postCtx.drawImage(offCvs, 0, 0, pw, ph);
+        offCtx.clearRect(0, 0, W, H);
+        offCtx.imageSmoothingEnabled = false;
+        offCtx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
+        offCtx.imageSmoothingEnabled = true;
+      }
+      if (maskBlur <= 0) {
+        offCtx.globalCompositeOperation = 'destination-in';
+        buildMaskPath(offCtx, m);
+        offCtx.fill();
+        offCtx.globalCompositeOperation = 'source-over';
+        ctx.save(); ctx.globalAlpha = fgAlpha;
+        ctx.drawImage(offCvs, 0, 0);
+        ctx.globalAlpha = 1; ctx.restore();
+      } else {
+        const bp = maskBlur * 2;
+        ctx.save();
+        buildMaskPath(ctx, m); ctx.clip();
+        ctx.filter = `blur(${bp}px)`;
+        ctx.globalAlpha = fgAlpha;
+        ctx.drawImage(offCvs, 0, 0);
+        ctx.filter = 'none'; ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    // 前景なし かつ アンカーモード OFF → すりガラス風
+    } else if (pixelAmt >= 1 && maskBlur <= 0) {
       // ピクセル化 — postCvs で縮小→ctx.clip()内でフルサイズ拡大（destination-inのAA縁を回避）
       const pSize = Math.round(pixelAmt * 4);
       const pw = Math.ceil(W / pSize);
