@@ -342,7 +342,8 @@ function setCanvasAspectRatio(w, h) {
         if (newH > h) { newH = h; newW = Math.round(newH * targetW / targetH); }
         S.mask.w = newW; S.mask.h = newH;
       } else if (S.mask.shape === 'glasses') {
-        S.mask.w = Math.min(640, w); S.mask.h = Math.min(220, h);
+        const _gs = _glassesInitSize(w, h);
+        S.mask.w = _gs.w; S.mask.h = _gs.h;
       } else {
         S.mask.w = Math.min(400, w);
         S.mask.h = Math.min(400, h);
@@ -406,7 +407,9 @@ document.addEventListener('keyup', e => {
     S.mask.w = _mw; S.mask.h = _mh;
     S.arLock = true;
   } else if (S.mask.shape === 'glasses') {
-    S.mask.w = Math.min(640, BUF_W); S.mask.h = Math.min(220, BUF_H);
+    const _gs = _glassesInitSize(BUF_W, BUF_H);
+    S.mask.w = _gs.w; S.mask.h = _gs.h;
+    S.arLock = true;
   } else {
     S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
   }
@@ -447,7 +450,9 @@ new ResizeObserver(entries => {
     S.mask.w = _mw; S.mask.h = _mh;
     S.arLock = true;
   } else if (S.mask.shape === 'glasses') {
-    S.mask.w = Math.min(640, BUF_W); S.mask.h = Math.min(220, BUF_H);
+    const _gs = _glassesInitSize(BUF_W, BUF_H);
+    S.mask.w = _gs.w; S.mask.h = _gs.h;
+    S.arLock = true;
   } else {
     S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
   }
@@ -1290,6 +1295,15 @@ function _glassesMatrix(g, m) {
   // SVG viewBox 座標系 → キャンバス座標系への変換行列
   const sx = m.w / g.vw, sy = m.h / g.vh;
   return new DOMMatrix([_GS * sx, 0, 0, _GS * sy, g.ox * sx + m.x, g.oy * sy + m.y]);
+}
+
+// 現在のスタイルの vw/vh 比でマスクの初期サイズを計算する
+function _glassesInitSize(cw, ch) {
+  const g = _GLASSES_STYLES[(S.mask.glassesStyle || 0) % _GLASSES_STYLES.length];
+  let gw = Math.min(640, cw);
+  let gh = Math.round(gw * g.vh / g.vw);
+  if (gh > ch) { gh = ch; gw = Math.round(gh * g.vw / g.vh); }
+  return { w: gw, h: gh };
 }
 
 function buildMaskPath(c, m) {
@@ -4022,13 +4036,13 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       S.mask.x = newX; S.mask.y = newY;
       if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'glasses') {
-      // glasses → デフォルト 640×220、arLock しない（自由リサイズ）
+      // glasses → スタイルの vw/vh 比でサイズ決定、AR ロック
       const cw = canvas.width, ch = canvas.height;
-      const gw = Math.min(640, cw);
-      const gh = Math.min(220, ch);
-      S.mask.w = gw; S.mask.h = gh;
-      S.mask.x = Math.round((cw - gw) / 2);
-      S.mask.y = Math.round((ch - gh) / 2);
+      const _gs = _glassesInitSize(cw, ch);
+      S.mask.w = _gs.w; S.mask.h = _gs.h;
+      S.mask.x = Math.round((cw - _gs.w) / 2);
+      S.mask.y = Math.round((ch - _gs.h) / 2);
+      if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
     } else {
       if (_arLockBeforeAutoLock !== null) {
         S.arLock = _arLockBeforeAutoLock;
@@ -4074,6 +4088,14 @@ elGlassesStyleBtns.forEach(btn => {
     const idx = parseInt(btn.dataset.gstyle);
     S.mask.glassesStyle = idx;
     elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === idx));
+    // スタイル変更時に vw/vh 比でリサイズしてロック
+    const cw = canvas.width, ch = canvas.height;
+    const _gs = _glassesInitSize(cw, ch);
+    S.mask.w = _gs.w; S.mask.h = _gs.h;
+    S.mask.x = Math.round((cw - _gs.w) / 2);
+    S.mask.y = Math.round((ch - _gs.h) / 2);
+    if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
+    _syncMaskSliders();
   });
 });
 
@@ -4174,14 +4196,15 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
       if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
     }
   } else if (S.mask.shape === 'glasses') {
-    dw = Math.min(640, cw); dh = Math.min(220, ch);
+    const _gs = _glassesInitSize(cw, ch);
+    dw = _gs.w; dh = _gs.h;
   } else {
     dw = 400; dh = 400;
   }
   S.mask.w = dw;
   S.mask.h = dh;
   // shape はそのまま
-  S.arLock = (S.mask.shape === 'phone' || S.mask.shape === 'heart'); // phone/heart は AR ロックを維持
+  S.arLock = (S.mask.shape === 'phone' || S.mask.shape === 'heart' || S.mask.shape === 'glasses'); // phone/heart/glasses は AR ロックを維持
   _updateArLockBtn();
   // phone の保存状態も更新
   if (S.mask.shape === 'phone') {
