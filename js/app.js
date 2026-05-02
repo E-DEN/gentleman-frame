@@ -3146,7 +3146,7 @@ function bindSlider(id, valId, fmt, onChange) {
   resetBtn.title = t('slider-reset');
   resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
   resetBtn.addEventListener('click', () => {
-    // maskW / maskH は phone 形状のとき初期値が異なる
+    // maskW / maskH は phone/glasses 形状のとき初期値が異なる
     const id = el.id;
     if ((id === 'maskW' || id === 'maskH') && S.mask.shape === 'phone') {
       const cw = canvas.width, ch = canvas.height;
@@ -3162,6 +3162,10 @@ function bindSlider(id, valId, fmt, onChange) {
         if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
       }
       el.value = id === 'maskW' ? dw : dh;
+    } else if ((id === 'maskW' || id === 'maskH') && S.mask.shape === 'glasses') {
+      const cw = canvas.width, ch = canvas.height;
+      const _gs = _glassesInitSize(cw, ch);
+      el.value = id === 'maskW' ? _gs.w : _gs.h;
     } else {
       el.value = el.defaultValue;
     }
