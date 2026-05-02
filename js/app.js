@@ -340,6 +340,8 @@ function setCanvasAspectRatio(w, h) {
         let newH = Math.round(newW * targetH / targetW);
         if (newH > h) { newH = h; newW = Math.round(newH * targetW / targetH); }
         S.mask.w = newW; S.mask.h = newH;
+      } else if (S.mask.shape === 'glasses') {
+        S.mask.w = Math.min(640, w); S.mask.h = Math.min(220, h);
       } else {
         S.mask.w = Math.min(400, w);
         S.mask.h = Math.min(400, h);
@@ -402,6 +404,8 @@ document.addEventListener('keyup', e => {
     if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
     S.mask.w = _mw; S.mask.h = _mh;
     S.arLock = true;
+  } else if (S.mask.shape === 'glasses') {
+    S.mask.w = Math.min(640, BUF_W); S.mask.h = Math.min(220, BUF_H);
   } else {
     S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
   }
@@ -434,6 +438,8 @@ new ResizeObserver(entries => {
     if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
     S.mask.w = _mw; S.mask.h = _mh;
     S.arLock = true;
+  } else if (S.mask.shape === 'glasses') {
+    S.mask.w = Math.min(640, BUF_W); S.mask.h = Math.min(220, BUF_H);
   } else {
     S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
   }
@@ -736,15 +742,15 @@ function _renderFrame() {
     // （端まで画素データを保ったまま blur し、ctx.clip() で切り抜く）
     if (!maskHidden && maskBlur <= 0) {
       offCtx.globalCompositeOperation = 'destination-in';
-      buildMaskPath(offCtx, m);
-      offCtx.fill();
+      const _gp0 = buildMaskPath(offCtx, m);
+      _gp0 ? offCtx.fill(_gp0) : offCtx.fill();
       offCtx.globalCompositeOperation = 'source-over';
     }
 
     if (maskBlur > 0) {
       const bp = maskBlur * 2;
       ctx.save();
-      if (!maskHidden) { buildMaskPath(ctx, m); ctx.clip(); }
+      if (!maskHidden) { const _gp1 = buildMaskPath(ctx, m); _gp1 ? ctx.clip(_gp1) : ctx.clip(); }
       ctx.filter = `blur(${bp}px)`;
       ctx.globalAlpha = fgAlpha;
       ctx.drawImage(offCvs, 0, 0);
@@ -781,8 +787,8 @@ function _renderFrame() {
       }
       if (maskBlur <= 0) {
         offCtx.globalCompositeOperation = 'destination-in';
-        buildMaskPath(offCtx, m);
-        offCtx.fill();
+        const _gp2 = buildMaskPath(offCtx, m);
+        _gp2 ? offCtx.fill(_gp2) : offCtx.fill();
         offCtx.globalCompositeOperation = 'source-over';
         ctx.save(); ctx.globalAlpha = fgAlpha;
         ctx.drawImage(offCvs, 0, 0);
@@ -790,7 +796,7 @@ function _renderFrame() {
       } else {
         const bp = maskBlur * 2;
         ctx.save();
-        buildMaskPath(ctx, m); ctx.clip();
+        const _gp3 = buildMaskPath(ctx, m); _gp3 ? ctx.clip(_gp3) : ctx.clip();
         ctx.filter = `blur(${bp}px)`;
         ctx.globalAlpha = fgAlpha;
         ctx.drawImage(offCvs, 0, 0);
@@ -806,8 +812,8 @@ function _renderFrame() {
       postCtx.clearRect(0, 0, W, H);
       postCtx.drawImage(getMediaSrc(0), 0, 0, pw, ph);
       ctx.save();
-      buildMaskPath(ctx, m);
-      ctx.clip();
+      const _gp4 = buildMaskPath(ctx, m);
+      _gp4 ? ctx.clip(_gp4) : ctx.clip();
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
       ctx.imageSmoothingEnabled = true;
@@ -816,8 +822,8 @@ function _renderFrame() {
       // ぼかし (端の薄れ防止のためオーバードロー)
       const bp = maskBlur * 2;
       ctx.save();
-      buildMaskPath(ctx, m);
-      ctx.clip();
+      const _gp5 = buildMaskPath(ctx, m);
+      _gp5 ? ctx.clip(_gp5) : ctx.clip();
       ctx.filter = `blur(${bp}px)`;
       ctx.drawImage(getMediaSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
       ctx.filter = 'none';
@@ -1050,7 +1056,7 @@ function _drawOverlays() {
 
   // --- マスク枠 ---
   const bw = parseFloat(elBorderW.value);
-  if (bw > 0 && !maskHidden && !visHidden[1]) {
+  if (bw > 0 && !maskHidden && !visHidden[1] && S.mask.shape !== 'glasses') {
     let borderFadeA;
     if (_fgFadeStart === 0) {
       borderFadeA = 0;
@@ -1076,8 +1082,8 @@ function _drawOverlays() {
       } else {
         dCtx.strokeStyle = elBorderColor.value;
       }
-      buildMaskPath(dCtx, m);
-      dCtx.stroke();
+      const _gp6 = buildMaskPath(dCtx, m);
+      _gp6 ? dCtx.stroke(_gp6) : dCtx.stroke();
       dCtx.restore();
     }
   }
@@ -1137,6 +1143,11 @@ function _drawOverlays() {
     const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
     const phase = (performance.now() * 0.001 * speed) % 1;
     _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase);
+  }
+
+  // --- メガネ枠オーバーレイ ---
+  if (!maskHidden && !visHidden[1] && S.mask.shape === 'glasses') {
+    _drawGlassesFrame(dCtx, m, bufScale);
   }
 }
 
@@ -1218,7 +1229,32 @@ function _updateCanvasHints() {
   elHintFg.classList.toggle('visible', showFg);
 }
 
+// レンズ部分のみ（2つの楕円サブパス）— nonzero fill で動画がレンズ領域に表示される
+const _GLASSES_PATH_STR = `M102.573,53.456c0,0,12.758-0.298,17.883,5.008c0,0.06,3.339,3.102,2.147,10.73c0.061-0.12-0.061,12.28-8.348,16.932c0,0.06-6.914,3.576-15.976,1.669c0.18,0.12-9.299-0.357-13.115-8.347c0.12,0.06-4.591-6.438-2.861-18.6C82.304,60.908,83.556,53.398,102.573,53.456z M39.159,53.456c19.016-0.058,20.268,7.452,20.268,7.392c1.729,12.163-2.981,18.66-2.861,18.6c-3.816,7.989-13.295,8.467-13.115,8.347c-9.061,1.907-15.976-1.609-15.976-1.669c-8.287-4.651-8.407-17.052-8.347-16.932c-1.192-7.629,2.147-10.67,2.147-10.73C26.402,53.158,39.159,53.456,39.159,53.456z`;
+// フレーム描画用の完全パス（外輪フレーム + レンズ穴 evenodd）
+const _GLASSES_FULL_PATH_STR = `M40.161,50.06c0,0-12.056-0.4-28.666,3.805c0.06,0.137-0.502,0.235-0.507,0.761c0.027,0.027,0,4.312,0,4.312s0.153,0.375,0.761,0.761c-0.077-0.049,0.96,0.944,1.269,2.791c0.06,0.003,0.93,11.669,6.849,21.563c0,0,2.452,7.609,18.518,7.609c0,0.086,14.882,0.254,20.294-9.385c0.084,0.253,5.581-8.033,6.342-15.729c-0.169,0.423,0.592-4.607,0.507-6.089c-0.038,0.042,1.808-0.883,5.338-1c3.527,0.118,5.377,1.042,5.336,1c-0.085,1.481,0.677,6.512,0.507,6.089c0.762,7.695,6.258,15.981,6.342,15.729c5.412,9.639,20.295,9.471,20.295,9.385c16.066,0,18.518-7.609,18.518-7.609c5.92-9.894,6.79-21.56,6.85-21.563c0.311-1.847,1.348-2.839,1.269-2.791c0.611-0.387,0.761-0.761,0.761-0.761s-0.026-4.285,0-4.312c-0.003-0.526-0.566-0.624-0.507-0.761c-16.609-4.206-28.666-3.805-28.666-3.805c-13.908,0-19.025,3.849-19.025,3.805c-3.931,2.03-6.088,1.566-6.088,1.523c-1.602-0.502-3.532-0.674-4.84-0.735v-0.027c0,0-0.283-0.005-0.75,0.003c-0.469-0.008-0.752-0.003-0.752-0.003v0.027c-1.308,0.061-3.236,0.232-4.84,0.735c0,0.043-2.154,0.507-6.088-1.523C59.187,53.909,54.072,50.06,40.161,50.06z M102.573,53.456c0,0,12.758-0.298,17.883,5.008c0,0.06,3.339,3.102,2.147,10.73c0.061-0.12-0.061,12.28-8.348,16.932c0,0.06-6.914,3.576-15.976,1.669c0.18,0.12-9.299-0.357-13.115-8.347c0.12,0.06-4.591-6.438-2.861-18.6C82.304,60.908,83.556,53.398,102.573,53.456z M39.159,53.456c19.016-0.058,20.268,7.452,20.268,7.392c1.729,12.163-2.981,18.66-2.861,18.6c-3.816,7.989-13.295,8.467-13.115,8.347c-9.061,1.907-15.976-1.609-15.976-1.669c-8.287-4.651-8.407-17.052-8.347-16.932c-1.192-7.629,2.147-10.67,2.147-10.73C26.402,53.158,39.159,53.456,39.159,53.456z`;
+// 外輪フレームのみのパス（レンズ穴サブパスなし）— 外輪だけ太いストロークで描くため
+const _GLASSES_OUTER_PATH_STR = `M40.161,50.06c0,0-12.056-0.4-28.666,3.805c0.06,0.137-0.502,0.235-0.507,0.761c0.027,0.027,0,4.312,0,4.312s0.153,0.375,0.761,0.761c-0.077-0.049,0.96,0.944,1.269,2.791c0.06,0.003,0.93,11.669,6.849,21.563c0,0,2.452,7.609,18.518,7.609c0,0.086,14.882,0.254,20.294-9.385c0.084,0.253,5.581-8.033,6.342-15.729c-0.169,0.423,0.592-4.607,0.507-6.089c-0.038,0.042,1.808-0.883,5.338-1c3.527,0.118,5.377,1.042,5.336,1c-0.085,1.481,0.677,6.512,0.507,6.089c0.762,7.695,6.258,15.981,6.342,15.729c5.412,9.639,20.295,9.471,20.295,9.385c16.066,0,18.518-7.609,18.518-7.609c5.92-9.894,6.79-21.56,6.85-21.563c0.311-1.847,1.348-2.839,1.269-2.791c0.611-0.387,0.761-0.761,0.761-0.761s-0.026-4.285,0-4.312c-0.003-0.526-0.566-0.624-0.507-0.761c-16.609-4.206-28.666-3.805-28.666-3.805c-13.908,0-19.025,3.849-19.025,3.805c-3.931,2.03-6.088,1.566-6.088,1.523c-1.602-0.502-3.532-0.674-4.84-0.735v-0.027c0,0-0.283-0.005-0.75,0.003c-0.469-0.008-0.752-0.003-0.752-0.003v0.027c-1.308,0.061-3.236,0.232-4.84,0.735c0,0.043-2.154,0.507-6.088-1.523C59.187,53.909,54.072,50.06,40.161,50.06z`;
+let _glassesMaskFramePath = null; // 完全パス Path2D キャッシュ
+let _glassesOuterPath = null;     // 外輪のみ Path2D キャッシュ
+let _glassesMaskPath = null; // Path2D キャッシュ
+// glasses SVGコンテンツの実際のbbox (viewBox 141.73×141.73 内のメガネ内容領域)
+const _GF_CX = 11, _GF_CY = 50, _GF_CW = 120, _GF_CH = 41;
+
 function buildMaskPath(c, m) {
+  if (m.shape === 'glasses') {
+    // glasses は Path2D を返す (fill-rule: evenodd が必要なため呼び出し側で指定)
+    // c.beginPath() は呼ばない
+    if (!_glassesMaskPath) _glassesMaskPath = new Path2D(_GLASSES_PATH_STR);
+    // コンテンツbboxをマスク枠いっぱいに非等比スケール（引き延ばしOK）
+    const _sx = m.w / _GF_CW, _sy = m.h / _GF_CH;
+    const tx = m.x - _GF_CX * _sx, ty = m.y - _GF_CY * _sy;
+    const mat = new DOMMatrix([_sx, 0, 0, _sy, tx, ty]);
+    const p = new Path2D();
+    p.addPath(_glassesMaskPath, mat);
+    return p;
+  }
+  // 他のシェイプは従来通り c に描いて null を返す
   c.beginPath();
   if (m.shape === 'rect') {
     c.rect(m.x, m.y, m.w, m.h);
@@ -1258,6 +1294,50 @@ let _phoneShowDot  = true;  // パンチホールカメラ表示
 let _phoneLandscape = false; // 横向きモード
 let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
 let _glassSamplerCtx  = null;
+
+function _drawGlassesFrame(ctx, m, bufScale) {
+  const bw = parseFloat(elBorderW.value);
+  if (!_glassesOuterPath) _glassesOuterPath = new Path2D(_GLASSES_OUTER_PATH_STR);
+  if (!_glassesMaskPath)  _glassesMaskPath  = new Path2D(_GLASSES_PATH_STR);
+  // コンテンツbboxをマスク枠いっぱいに非等比スケール（引き延ばしOK）
+  const _sx = m.w / _GF_CW, _sy = m.h / _GF_CH;
+  const tx = m.x - _GF_CX * _sx, ty = m.y - _GF_CY * _sy;
+  const mat = new DOMMatrix([_sx, 0, 0, _sy, tx, ty]);
+  const pOuter = new Path2D();
+  pOuter.addPath(_glassesOuterPath, mat);
+  const pLens = new Path2D();
+  pLens.addPath(_glassesMaskPath, mat);
+
+  const s  = bufScale || 1;
+  const sw      = Math.max(1.5, 2.5 * s); // 外輪は固定（スマホ本体と同一）
+  const sw_lens = bw * s;                  // レンズ輪郭のみ枠太さスライダーに連動
+
+  const anim    = elBorderAnim.value;
+  const speed   = parseFloat(elBorderAnimSpeed.value) * 0.1;
+  const phase   = (performance.now() * 0.001 * speed) % 1;
+  const bright  = parseInt(elBorderAnimBright.value, 10);
+  const opacity = parseInt(elBorderOpacity.value, 10) / 100;
+  const strokeStyle = anim !== 'none'
+    ? _buildBorderGrad(ctx, m, phase, anim, bright)
+    : elBorderColor.value;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur  = 4;
+  ctx.globalAlpha = opacity;
+  ctx.lineJoin    = 'round';
+  ctx.lineCap     = 'round';
+  ctx.strokeStyle = strokeStyle;
+  // 外輪フレーム（固定太さ、常に描画）
+  ctx.lineWidth = sw;
+  ctx.stroke(pOuter);
+  // レンズ輪郭（枠太さスライダーが 0 より大きいときのみ）
+  if (bw > 0) {
+    ctx.lineWidth = sw_lens;
+    ctx.stroke(pLens);
+  }
+  ctx.restore();
+}
 
 function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   if (typeof ctx.roundRect !== 'function') return;
@@ -3891,8 +3971,15 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       S.mask.w = newW; S.mask.h = newH;
       S.mask.x = newX; S.mask.y = newY;
       if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
+    } else if (newShape === 'glasses') {
+      // glasses → デフォルト 640×220、arLock しない（自由リサイズ）
+      const cw = canvas.width, ch = canvas.height;
+      const gw = Math.min(640, cw);
+      const gh = Math.min(220, ch);
+      S.mask.w = gw; S.mask.h = gh;
+      S.mask.x = Math.round((cw - gw) / 2);
+      S.mask.y = Math.round((ch - gh) / 2);
     } else {
-      // phone/heart以外に切り替えたら元のロック状態を復元
       if (_arLockBeforeAutoLock !== null) {
         S.arLock = _arLockBeforeAutoLock;
         _arLockBeforeAutoLock = null;
@@ -4027,11 +4114,11 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
       dh = Math.round(dw * targetH / targetW);
       if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
     }
+  } else if (S.mask.shape === 'glasses') {
+    dw = Math.min(640, cw); dh = Math.min(220, ch);
   } else {
     dw = 400; dh = 400;
   }
-  S.mask.x = Math.round((cw - dw) / 2);
-  S.mask.y = Math.round((ch - dh) / 2);
   S.mask.w = dw;
   S.mask.h = dh;
   // shape はそのまま
@@ -4178,6 +4265,7 @@ function hitTestMask(px, py) {
     return tc.isPointInPath(px - x, py - y);
   }
   if (shape === 'phone') return px >= x && px <= x + w && py >= y && py <= y + h;
+  if (shape === 'glasses') return px >= x && px <= x + w && py >= y && py <= y + h;
   return false;
 }
 
@@ -4373,6 +4461,7 @@ canvas.addEventListener('wheel', e => {
     _syncZoomToMaskScale(oldW, snapped.w);
     S.mask.w = snapped.w;
     S.mask.h = snapped.h;
+    // マスク中心を固定してリサイズ（中心から広げる）
     S.mask.x = Math.round(cx - snapped.w / 2);
     S.mask.y = Math.round(cy - snapped.h / 2);
     _followTargetX = cx;
