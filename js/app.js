@@ -1300,7 +1300,7 @@ function _glassesMatrix(g, m) {
 // 現在のスタイルの vw/vh 比でマスクの初期サイズを計算する
 function _glassesInitSize(cw, ch) {
   const g = _GLASSES_STYLES[(S.mask.glassesStyle || 0) % _GLASSES_STYLES.length];
-  let gw = Math.min(640, cw);
+  let gw = Math.min(800, cw);
   let gh = Math.round(gw * g.vh / g.vw);
   if (gh > ch) { gh = ch; gw = Math.round(gh * g.vw / g.vh); }
   return { w: gw, h: gh };
