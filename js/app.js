@@ -340,7 +340,7 @@ function setCanvasAspectRatio(w, h) {
         let newH = Math.round(newW * targetH / targetW);
         if (newH > h) { newH = h; newW = Math.round(newH * targetW / targetH); }
         S.mask.w = newW; S.mask.h = newH;
-      } else if (S.mask.shape === 'glasses') {
+      } else if (S.mask.shape === 'glasses' || S.mask.shape === 'glasses2') {
         S.mask.w = Math.min(640, w); S.mask.h = Math.min(220, h);
       } else {
         S.mask.w = Math.min(400, w);
@@ -404,7 +404,7 @@ document.addEventListener('keyup', e => {
     if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
     S.mask.w = _mw; S.mask.h = _mh;
     S.arLock = true;
-  } else if (S.mask.shape === 'glasses') {
+  } else if (S.mask.shape === 'glasses' || S.mask.shape === 'glasses2') {
     S.mask.w = Math.min(640, BUF_W); S.mask.h = Math.min(220, BUF_H);
   } else {
     S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
@@ -414,6 +414,12 @@ document.addEventListener('keyup', e => {
   _bufferSynced = true;
   _syncMaskSliders();
   document.getElementById('phoneUiRow').style.display = S.mask.shape === 'phone' ? '' : 'none';
+  const _isGlasses = S.mask.shape === 'glasses' || S.mask.shape === 'glasses2';
+  document.getElementById('glassesUiRow').style.display = _isGlasses ? '' : 'none';
+  if (_isGlasses) {
+    document.getElementById('glassesUiSquare').classList.toggle('active', S.mask.shape === 'glasses');
+    document.getElementById('glassesUiRound').classList.toggle('active', S.mask.shape === 'glasses2');
+  }
   _updateArLockBtn();
   _updateFgFixedBtn();
 }
@@ -438,7 +444,7 @@ new ResizeObserver(entries => {
     if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
     S.mask.w = _mw; S.mask.h = _mh;
     S.arLock = true;
-  } else if (S.mask.shape === 'glasses') {
+  } else if (S.mask.shape === 'glasses' || S.mask.shape === 'glasses2') {
     S.mask.w = Math.min(640, BUF_W); S.mask.h = Math.min(220, BUF_H);
   } else {
     S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
@@ -457,6 +463,9 @@ const elBorderAnim = document.getElementById('borderAnim');
 const elBorderAnimSpeed = document.getElementById('borderAnimSpeed');
 const elBorderAnimBright = document.getElementById('borderAnimBright');
 const elPhoneUiRow = document.getElementById('phoneUiRow');
+const elGlassesUiRow = document.getElementById('glassesUiRow');
+const elGlassesUiBtnSquare = document.getElementById('glassesUiSquare');
+const elGlassesUiBtnRound  = document.getElementById('glassesUiRound');
 const elPhoneUiBtnRoT = document.getElementById('phoneUiRoT');
 const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
 const elPhoneUiBtnDot = document.getElementById('phoneUiDot');
@@ -1056,7 +1065,7 @@ function _drawOverlays() {
 
   // --- マスク枠 ---
   const bw = parseFloat(elBorderW.value);
-  if (bw > 0 && !maskHidden && !visHidden[1] && S.mask.shape !== 'glasses') {
+  if (bw > 0 && !maskHidden && !visHidden[1] && S.mask.shape !== 'glasses' && S.mask.shape !== 'glasses2') {
     let borderFadeA;
     if (_fgFadeStart === 0) {
       borderFadeA = 0;
@@ -1146,7 +1155,7 @@ function _drawOverlays() {
   }
 
   // --- メガネ枠オーバーレイ ---
-  if (!maskHidden && !visHidden[1] && S.mask.shape === 'glasses') {
+  if (!maskHidden && !visHidden[1] && (S.mask.shape === 'glasses' || S.mask.shape === 'glasses2')) {
     _drawGlassesFrame(dCtx, m, bufScale);
   }
 }
@@ -1241,17 +1250,33 @@ let _glassesMaskPath = null; // Path2D キャッシュ
 // glasses SVGコンテンツの実際のbbox (viewBox 141.73×141.73 内のメガネ内容領域)
 const _GF_CX = 11, _GF_CY = 50, _GF_CW = 120, _GF_CH = 41;
 
+// ---- 丸メガネ (glasses2) ----
+// レンズ円のみ（クリップマスク用）
+const _GLASSES2_PATH_STR = `M38.673,51.624c22.591-0.237,22.002,18.873,21.941,18.873C59.554,81.762,50.233,86.952,50.233,87.01c-12.916,7.373-23.767-0.646-23.827-0.707c-11.266-8.199-8.789-21.35-8.729-21.47C20.861,50.562,38.673,51.624,38.673,51.624z M103.058,51.624c-22.591-0.237-22.002,18.873-21.941,18.873c1.061,11.266,10.382,16.456,10.382,16.514c12.915,7.373,23.767-0.646,23.826-0.707c11.266-8.199,8.789-21.35,8.729-21.47C120.869,50.562,103.058,51.624,103.058,51.624z`;
+// 外輪＋ブリッジ＋ノーズパッド（レンズ穴なし）— 外輪太ストローク用
+const _GLASSES2_OUTER_PATH_STR = `M15.793,68.775l0.003,0.065l0.013,0.055C15.804,68.867,15.798,68.827,15.793,68.775z M15.801,66.928c-0.022,0.545-0.03,1.167-0.008,1.847c0.005,0.052,0.011,0.092,0.016,0.12l-0.013-0.055c0.158,4.921,1.792,12.897,9.661,18.625c0.063,0.063,11.732,8.688,25.622,0.762c0-0.063,10.021-5.645,11.162-17.758c0.063,0,0.699-20.548-23.592-20.294c0,0-4.146-0.248-8.928,1.034c-2.321,0.625-4.795,1.609-7.016,3.159c-1.31,0.681-2.578,1.418-3.588,2.149c-0.002-0.058-5.433,3.028-7.356,3.298c0.068-0.003-2.029,0.867-2.029,1.775c-0.008,0.014,0,2.283,0,2.283s0.09,0.439,1.015,0.508c0.03,0.065,3.53-1.323,5.049,4.459l-0.003-0.065C15.76,68.48,15.725,67.828,15.801,66.928z M125.938,68.775l-0.003,0.065l-0.013,0.055C125.927,68.867,125.932,68.827,125.938,68.775z M125.93,66.928c0.021,0.545,0.03,1.167,0.008,1.847c-0.006,0.052-0.011,0.092-0.016,0.12l0.013-0.055c-0.157,4.921-1.792,12.897-9.661,18.625c-0.063,0.063-11.732,8.688-25.621,0.762c0-0.063-10.021-5.645-11.162-17.758c-0.063,0-0.698-20.548,23.592-20.294c0,0,4.146-0.248,8.928,1.034c2.321,0.625,4.796,1.609,7.016,3.159c1.31,0.681,2.578,1.418,3.588,2.149c0.002-0.058,5.433,3.028,7.355,3.298c-0.067-0.003,2.029,0.867,2.029,1.775c0.009,0.014,0,2.283,0,2.283s-0.09,0.439-1.014,0.508c-0.03,0.065-3.53-1.323-5.05,4.459l0.003-0.065C125.971,68.48,126.006,67.828,125.93,66.928z M63.609,65.728c4.343-1.868,7.256-1.65,7.256-1.65s-0.002-1.579,0-1.585c-5.017,0-7.463,1.394-7.521,1.332c-1.083,0.688-2.119,0.494-2.119,0.494s0.109,1.746,0.137,1.729C62.158,66.41,63.609,65.745,63.609,65.728z M70.865,64.078c0,0,2.913-0.218,7.256,1.65c0,0.018,1.451,0.682,2.247,0.319c0.028,0.017,0.138-1.729,0.138-1.729s-1.037,0.194-2.12-0.494c-0.058,0.063-2.504-1.332-7.521-1.332C70.863,62.499,70.865,64.078,70.865,64.078z M62.927,69.888c0,0-1.292-0.728-2.321,2.005c0.041-0.008-2.161,5.601-2.161,5.601s-1.244,2.688,1.342,3.998c0.008,0.044,2.237,0.794,3.184-2.212C62.952,79.211,65.35,70.097,62.927,69.888z M78.803,69.888c0,0,1.293-0.728,2.321,2.005c-0.04-0.008,2.161,5.601,2.161,5.601s1.244,2.688-1.343,3.998c-0.008,0.044-2.237,0.794-3.184-2.212C78.779,79.211,76.381,70.097,78.803,69.888z`;
+let _glasses2MaskPath = null;
+let _glasses2OuterPath = null;
+// glasses2 SVGコンテンツのbbox (viewBox 141.73×141.73 内)
+const _GF2_CX = 9, _GF2_CY = 49, _GF2_CW = 124, _GF2_CH = 42;
+
 function buildMaskPath(c, m) {
-  if (m.shape === 'glasses') {
-    // glasses は Path2D を返す (fill-rule: evenodd が必要なため呼び出し側で指定)
+  if (m.shape === 'glasses' || m.shape === 'glasses2') {
+    // glasses/glasses2 は Path2D を返す (fill-rule: evenodd が必要なため呼び出し側で指定)
     // c.beginPath() は呼ばない
-    if (!_glassesMaskPath) _glassesMaskPath = new Path2D(_GLASSES_PATH_STR);
+    const isG2 = m.shape === 'glasses2';
+    const pathStr = isG2 ? _GLASSES2_PATH_STR : _GLASSES_PATH_STR;
+    const cx = isG2 ? _GF2_CX : _GF_CX, cy = isG2 ? _GF2_CY : _GF_CY;
+    const cw = isG2 ? _GF2_CW : _GF_CW, ch = isG2 ? _GF2_CH : _GF_CH;
+    if (isG2) { if (!_glasses2MaskPath) _glasses2MaskPath = new Path2D(pathStr); }
+    else      { if (!_glassesMaskPath)  _glassesMaskPath  = new Path2D(pathStr); }
+    const cached = isG2 ? _glasses2MaskPath : _glassesMaskPath;
     // コンテンツbboxをマスク枠いっぱいに非等比スケール（引き延ばしOK）
-    const _sx = m.w / _GF_CW, _sy = m.h / _GF_CH;
-    const tx = m.x - _GF_CX * _sx, ty = m.y - _GF_CY * _sy;
+    const _sx = m.w / cw, _sy = m.h / ch;
+    const tx = m.x - cx * _sx, ty = m.y - cy * _sy;
     const mat = new DOMMatrix([_sx, 0, 0, _sy, tx, ty]);
     const p = new Path2D();
-    p.addPath(_glassesMaskPath, mat);
+    p.addPath(cached, mat);
     return p;
   }
   // 他のシェイプは従来通り c に描いて null を返す
@@ -1297,16 +1322,28 @@ let _glassSamplerCtx  = null;
 
 function _drawGlassesFrame(ctx, m, bufScale) {
   const bw = parseFloat(elBorderW.value);
-  if (!_glassesOuterPath) _glassesOuterPath = new Path2D(_GLASSES_OUTER_PATH_STR);
-  if (!_glassesMaskPath)  _glassesMaskPath  = new Path2D(_GLASSES_PATH_STR);
-  // コンテンツbboxをマスク枠いっぱいに非等比スケール（引き延ばしOK）
-  const _sx = m.w / _GF_CW, _sy = m.h / _GF_CH;
-  const tx = m.x - _GF_CX * _sx, ty = m.y - _GF_CY * _sy;
+  const isG2 = m.shape === 'glasses2';
+  const outerStr = isG2 ? _GLASSES2_OUTER_PATH_STR : _GLASSES_OUTER_PATH_STR;
+  const lensStr  = isG2 ? _GLASSES2_PATH_STR        : _GLASSES_PATH_STR;
+  const cx = isG2 ? _GF2_CX : _GF_CX, cy = isG2 ? _GF2_CY : _GF_CY;
+  const cw = isG2 ? _GF2_CW : _GF_CW, ch = isG2 ? _GF2_CH : _GF_CH;
+  if (isG2) {
+    if (!_glasses2OuterPath) _glasses2OuterPath = new Path2D(outerStr);
+    if (!_glasses2MaskPath)  _glasses2MaskPath  = new Path2D(lensStr);
+  } else {
+    if (!_glassesOuterPath) _glassesOuterPath = new Path2D(outerStr);
+    if (!_glassesMaskPath)  _glassesMaskPath  = new Path2D(lensStr);
+  }
+  const outerCache = isG2 ? _glasses2OuterPath : _glassesOuterPath;
+  const lensCache  = isG2 ? _glasses2MaskPath  : _glassesMaskPath;
+
+  const _sx = m.w / cw, _sy = m.h / ch;
+  const tx = m.x - cx * _sx, ty = m.y - cy * _sy;
   const mat = new DOMMatrix([_sx, 0, 0, _sy, tx, ty]);
   const pOuter = new Path2D();
-  pOuter.addPath(_glassesOuterPath, mat);
+  pOuter.addPath(outerCache, mat);
   const pLens = new Path2D();
-  pLens.addPath(_glassesMaskPath, mat);
+  pLens.addPath(lensCache, mat);
 
   const s  = bufScale || 1;
   const sw      = Math.max(1.5, 2.5 * s); // 外輪は固定（スマホ本体と同一）
@@ -3922,6 +3959,11 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     btn.classList.add('active');
     S.mask.shape = newShape;
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
+    elGlassesUiRow.style.display = (newShape === 'glasses' || newShape === 'glasses2') ? '' : 'none';
+    if (newShape === 'glasses' || newShape === 'glasses2') {
+      elGlassesUiBtnSquare.classList.toggle('active', newShape === 'glasses');
+      elGlassesUiBtnRound.classList.toggle('active', newShape === 'glasses2');
+    }
     _updateFgFixedBtn();
 
     // --- phone ↔ 非phone の状態スワップ（形状固有処理より先に行う）---
@@ -3971,8 +4013,8 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       S.mask.w = newW; S.mask.h = newH;
       S.mask.x = newX; S.mask.y = newY;
       if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
-    } else if (newShape === 'glasses') {
-      // glasses → デフォルト 640×220、arLock しない（自由リサイズ）
+    } else if (newShape === 'glasses' || newShape === 'glasses2') {
+      // glasses/glasses2 → デフォルト 640×220、arLock しない（自由リサイズ）
       const cw = canvas.width, ch = canvas.height;
       const gw = Math.min(640, cw);
       const gh = Math.min(220, ch);
@@ -4016,6 +4058,20 @@ elPhoneUiBtnRot90.addEventListener('click', () => {
   S.mask.x = Math.round((cw - S.mask.w) / 2);
   S.mask.y = Math.round((ch - S.mask.h) / 2);
   _syncMaskSliders();
+});
+
+// ---- メガネ サブタイプ ボタン ----
+[elGlassesUiBtnSquare, elGlassesUiBtnRound].forEach(btn => {
+  btn.addEventListener('click', () => {
+    const shape = btn === elGlassesUiBtnSquare ? 'glasses' : 'glasses2';
+    S.mask.shape = shape;
+    elGlassesUiBtnSquare.classList.toggle('active', shape === 'glasses');
+    elGlassesUiBtnRound.classList.toggle('active', shape === 'glasses2');
+    // shape-btn アクティブ状態を glasses グループボタンに保持
+    document.querySelectorAll('.shape-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.shape === 'glasses');
+    });
+  });
 });
 
 function _updateArLockBtn() {
@@ -4114,7 +4170,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
       dh = Math.round(dw * targetH / targetW);
       if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
     }
-  } else if (S.mask.shape === 'glasses') {
+  } else if (S.mask.shape === 'glasses' || S.mask.shape === 'glasses2') {
     dw = Math.min(640, cw); dh = Math.min(220, ch);
   } else {
     dw = 400; dh = 400;
@@ -4265,7 +4321,7 @@ function hitTestMask(px, py) {
     return tc.isPointInPath(px - x, py - y);
   }
   if (shape === 'phone') return px >= x && px <= x + w && py >= y && py <= y + h;
-  if (shape === 'glasses') return px >= x && px <= x + w && py >= y && py <= y + h;
+  if (shape === 'glasses' || shape === 'glasses2') return px >= x && px <= x + w && py >= y && py <= y + h;
   return false;
 }
 
@@ -4997,10 +5053,18 @@ function applySettings(d) {
   }
   if (d.maskShape) {
     S.mask.shape = d.maskShape;
+    const isGlasses = d.maskShape === 'glasses' || d.maskShape === 'glasses2';
     document.querySelectorAll('.shape-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.shape === d.maskShape);
+      // glasses2 はグループボタン 'glasses' を active にする
+      const match = isGlasses ? b.dataset.shape === 'glasses' : b.dataset.shape === d.maskShape;
+      b.classList.toggle('active', match);
     });
     elPhoneUiRow.style.display = d.maskShape === 'phone' ? '' : 'none';
+    elGlassesUiRow.style.display = isGlasses ? '' : 'none';
+    if (isGlasses) {
+      elGlassesUiBtnSquare.classList.toggle('active', d.maskShape === 'glasses');
+      elGlassesUiBtnRound.classList.toggle('active', d.maskShape === 'glasses2');
+    }
     _updateFgFixedBtn();
   }
   if (d.phoneLandscape != null) {

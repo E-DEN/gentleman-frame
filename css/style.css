@@ -1152,6 +1152,33 @@
     .phone-ui-btn svg { width: 13px; height: 13px; }
     .phone-ui-spacer { display: block; }
 
+    /* Glasses sub-type toggles */
+    .glasses-ui-group {
+      display: flex;
+      gap: 4px;
+    }
+    .glasses-ui-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 22px;
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      opacity: 0.40;
+      padding: 0;
+      transition: border-color 0.15s, color 0.15s, opacity 0.15s;
+      font-family: inherit;
+    }
+    .glasses-ui-btn:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .glasses-ui-btn.active { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .glasses-ui-btn:active { transform: scale(0.90); transition: transform 0.07s, border-color 0.12s, color 0.12s; }
+    .glasses-ui-btn svg { width: 13px; height: 13px; }
+
     input[type="color"] {
       width: 34px;
       height: 26px;
