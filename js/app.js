@@ -1381,8 +1381,8 @@ function _drawGlassesFrame(ctx, m, bufScale) {
     : elBorderColor.value;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.45)';
-  ctx.shadowBlur  = 4;
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur  = 4 * s;
   ctx.globalAlpha = opacity;
   ctx.lineJoin    = 'round';
   ctx.lineCap     = 'round';
