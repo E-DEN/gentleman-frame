@@ -420,6 +420,9 @@ document.addEventListener('keyup', e => {
   document.getElementById('phoneUiRow').style.display = S.mask.shape === 'phone' ? '' : 'none';
   const _isGlasses = S.mask.shape === 'glasses';
   document.getElementById('glassesUiRow').style.display = _isGlasses ? '' : 'none';
+  const _isFrameShape = S.mask.shape === 'phone' || _isGlasses;
+  document.getElementById('frameBlurRow').style.display = _isFrameShape ? '' : 'none';
+  document.getElementById('frameTintRow').style.display = _isFrameShape ? '' : 'none';
   if (_isGlasses) {
     const _gsi = S.mask.glassesStyle || 0;
     document.querySelectorAll('.glasses-ui-btn[data-gstyle]').forEach(b =>
@@ -469,6 +472,8 @@ const elBorderOpacity = document.getElementById('borderOpacity');
 const elBorderAnim = document.getElementById('borderAnim');
 const elBorderAnimSpeed = document.getElementById('borderAnimSpeed');
 const elBorderAnimBright = document.getElementById('borderAnimBright');
+const elFrameBlur  = document.getElementById('frameBlur');
+const elFrameTint  = document.getElementById('frameTint');
 const elPhoneUiRow = document.getElementById('phoneUiRow');
 const elGlassesUiRow = document.getElementById('glassesUiRow');
 const elGlassesStyleBtns = Array.from(document.querySelectorAll('.glasses-ui-btn[data-gstyle]'));
@@ -1087,7 +1092,7 @@ function _drawOverlays() {
     if (borderFadeA > 0) {
       const anim = elBorderAnim.value;
       dCtx.save();
-      dCtx.lineWidth   = bw * bufScale;
+      dCtx.lineWidth   = bw * 1.5 * bufScale;
       dCtx.globalAlpha = (parseInt(elBorderOpacity.value, 10) / 100) * borderFadeA;
       if (anim !== 'none') {
         const speed  = parseFloat(elBorderAnimSpeed.value) * 0.1;
@@ -1292,25 +1297,26 @@ const _GLASSES_STYLES = [
 const _glassesPaths = Array(_GLASSES_STYLES.length).fill(null);
 
 function _glassesMatrix(g, m) {
-  // SVG viewBox 座標系 → キャンバス座標系への変換行列
-  const sx = m.w / g.vw, sy = m.h / g.vh;
-  return new DOMMatrix([_GS * sx, 0, 0, _GS * sy, g.ox * sx + m.x, g.oy * sy + m.y]);
+  // SVG viewBox 座標系 → キャンバス座標系への変換行列（ユニフォームスケールでレターボックス配置）
+  const s = Math.min(m.w / g.vw, m.h / g.vh);
+  const dx = (m.w - g.vw * s) / 2;
+  const dy = (m.h - g.vh * s) / 2;
+  return new DOMMatrix([_GS * s, 0, 0, _GS * s, g.ox * s + m.x + dx, g.oy * s + m.y + dy]);
 }
 
-// 現在のスタイルの vw/vh 比でマスクの初期サイズを計算する
+// 全スタイル共通の固定初期サイズ（800×320）— スタイル固有のアス比はレターボックスで収まる
 function _glassesInitSize(cw, ch) {
-  const g = _GLASSES_STYLES[(S.mask.glassesStyle || 0) % _GLASSES_STYLES.length];
-  let gw = Math.min(800, cw);
-  let gh = Math.round(gw * g.vh / g.vw);
-  if (gh > ch) { gh = ch; gw = Math.round(gh * g.vw / g.vh); }
-  return { w: gw, h: gh };
+  return { w: Math.min(800, cw), h: Math.min(320, ch) };
 }
 
 function buildMaskPath(c, m) {
   if (m.shape === 'glasses') {
     const idx = (S.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
     const g = _GLASSES_STYLES[idx];
-    if (!_glassesPaths[idx]) _glassesPaths[idx] = { lens: new Path2D(g.lens), full: new Path2D(g.full) };
+    if (!_glassesPaths[idx]) {
+      const frameStr = (g.full.match(/M[^M]*/g) || []).slice(2).join('');
+      _glassesPaths[idx] = { lens: new Path2D(g.lens), full: new Path2D(g.full), frame: new Path2D(frameStr) };
+    }
     const p = new Path2D();
     p.addPath(_glassesPaths[idx].lens, _glassesMatrix(g, m));
     return p;
@@ -1360,16 +1366,21 @@ function _drawGlassesFrame(ctx, m, bufScale) {
   const bw = parseFloat(elBorderW.value);
   const idx = (S.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
   const g = _GLASSES_STYLES[idx];
-  if (!_glassesPaths[idx]) _glassesPaths[idx] = { lens: new Path2D(g.lens), full: new Path2D(g.full) };
+  if (!_glassesPaths[idx]) {
+    const frameStr = (g.full.match(/M[^M]*/g) || []).slice(2).join('');
+    _glassesPaths[idx] = { lens: new Path2D(g.lens), full: new Path2D(g.full), frame: new Path2D(frameStr) };
+  }
   const mat = _glassesMatrix(g, m);
   const pFull = new Path2D();
   pFull.addPath(_glassesPaths[idx].full, mat);
+  const pFrame = new Path2D();
+  pFrame.addPath(_glassesPaths[idx].frame, mat);
   const pLens = new Path2D();
   pLens.addPath(_glassesPaths[idx].lens, mat);
 
   const s  = bufScale || 1;
   const sw      = Math.max(1.5, 2.5 * s); // 外輪固定（スマホ本体と同一）
-  const sw_lens = bw * s;                  // レンズ輪郭はスライダー連動
+  const sw_lens = bw * 1.5 * s;           // 内枠: スライダー1 = 1.5バッファpx（外枠最小値と同等）
 
   const anim    = elBorderAnim.value;
   const speed   = parseFloat(elBorderAnimSpeed.value) * 0.1;
@@ -1380,6 +1391,7 @@ function _drawGlassesFrame(ctx, m, bufScale) {
     ? _buildBorderGrad(ctx, m, phase, anim, bright)
     : elBorderColor.value;
 
+  // ① ストローク先描画
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.55)';
   ctx.shadowBlur  = 4 * s;
@@ -1387,15 +1399,43 @@ function _drawGlassesFrame(ctx, m, bufScale) {
   ctx.lineJoin    = 'round';
   ctx.lineCap     = 'round';
   ctx.strokeStyle = strokeStyle;
-  // 外輪フレーム（固定太さ、常に描画）
   ctx.lineWidth = sw;
-  ctx.stroke(pFull);
-  // レンズ輪郭（枠太さスライダーが 0 より大きいときのみ）
+  ctx.stroke(pFrame);              // 外枠（ブリッジ・ノーズパッド等）: 常時表示・固定太さ
   if (bw > 0) {
     ctx.lineWidth = sw_lens;
-    ctx.stroke(pLens);
+    ctx.stroke(pLens);             // 内枠（レンズ輪郭）: bw > 0 時のみ・スライダー連動
   }
   ctx.restore();
+
+  // ② ブラー/ティントをストロークの背面に合成（destination-over）
+  {
+    const _fb = parseFloat(elFrameBlur.value);
+    const _ft = parseInt(elFrameTint.value, 10);
+    if (_fb > 0 || _ft !== 0) {
+      postCtx.clearRect(0, 0, postCvs.width, postCvs.height);
+      if (_fb > 0) {
+        postCtx.filter = `blur(${_fb * s}px)`;
+        postCtx.drawImage(renderCvs, 0, 0);
+        postCtx.filter = 'none';
+      } else {
+        postCtx.drawImage(renderCvs, 0, 0);
+      }
+      if (_ft !== 0) {
+        postCtx.globalAlpha = Math.abs(_ft) / 100;
+        postCtx.fillStyle = _ft > 0 ? elBorderColor.value : '#000000';
+        postCtx.fillRect(0, 0, postCvs.width, postCvs.height);
+        postCtx.globalAlpha = 1;
+      }
+      postCtx.globalCompositeOperation = 'destination-in';
+      postCtx.fill(pFull, 'evenodd');
+      postCtx.globalCompositeOperation = 'source-over';
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.drawImage(postCvs, 0, 0);
+      ctx.restore();
+    }
+  }
 }
 
 function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
@@ -1508,24 +1548,26 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   }
   ctx.restore();
 
-  // ---- ホームインジケーター ----
-  ctx.save();
-  if (_animOn) ctx.globalAlpha = opacity * _homeA;
-  if (!_land) {
-    const hiW = scrW * 0.26, hiH = Math.max(2.5, Math.round(3 * s));
-    ctx.beginPath();
-    ctx.roundRect(scrX + (scrW - hiW) / 2, scrY + scrH + (mLong2 - hiH) / 2, hiW, hiH, hiH / 2);
-    ctx.fillStyle = colHome;
-    ctx.fill();
-  } else {
-    // 横向き: ホームバーは右辺中央（縦棒）
-    const hiH = scrH * 0.26, hiW = Math.max(2.5, Math.round(3 * s));
-    ctx.beginPath();
-    ctx.roundRect(scrX + scrW + (mLong2 - hiW) / 2, scrY + (scrH - hiH) / 2, hiW, hiH, hiW / 2);
-    ctx.fillStyle = colHome;
-    ctx.fill();
+  // ---- ホームインジケーター（固定グレー＋シャドウ → 枠色に依存しない）----
+  {
+    ctx.save();
+    ctx.globalAlpha = opacity * (_animOn ? _homeA : 1.0);
+    ctx.fillStyle = 'rgba(180,180,180,0.75)';
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur  = Math.max(2, Math.round(3 * s));
+    if (!_land) {
+      const hiW = scrW * 0.26, hiH = Math.max(2.5, Math.round(3 * s));
+      ctx.beginPath();
+      ctx.roundRect(scrX + (scrW - hiW) / 2, scrY + scrH + (mLong2 - hiH) / 2, hiW, hiH, hiH / 2);
+      ctx.fill();
+    } else {
+      const hiH = scrH * 0.26, hiW = Math.max(2.5, Math.round(3 * s));
+      ctx.beginPath();
+      ctx.roundRect(scrX + scrW + (mLong2 - hiW) / 2, scrY + (scrH - hiH) / 2, hiW, hiH, hiW / 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   // ---- 三等分グリッド（Rule of Thirds）----
   if (_phoneShowRoT) {
@@ -1672,6 +1714,40 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   } // end _phoneShowRec
 
   ctx.restore();
+
+  // --- ベゼル ブラー/ティントをすべての描画の背面に合成（destination-over）---
+  {
+    const _fb = parseFloat(elFrameBlur.value);
+    const _ft = parseInt(elFrameTint.value, 10);
+    if (_fb > 0 || _ft !== 0) {
+      const scrRb = Math.round(Math.min(scrW, scrH) * 0.11);
+      const bezelPath = new Path2D();
+      bezelPath.roundRect(bx, by, bw, bh, bodyR);
+      bezelPath.roundRect(scrX, scrY, scrW, scrH, scrRb);
+      postCtx.clearRect(0, 0, postCvs.width, postCvs.height);
+      if (_fb > 0) {
+        postCtx.filter = `blur(${_fb * s}px)`;
+        postCtx.drawImage(renderCvs, 0, 0);
+        postCtx.filter = 'none';
+      } else {
+        postCtx.drawImage(renderCvs, 0, 0);
+      }
+      if (_ft !== 0) {
+        postCtx.globalAlpha = Math.abs(_ft) / 100;
+        postCtx.fillStyle = _ft > 0 ? elBorderColor.value : '#000000';
+        postCtx.fillRect(0, 0, postCvs.width, postCvs.height);
+        postCtx.globalAlpha = 1;
+      }
+      postCtx.globalCompositeOperation = 'destination-in';
+      postCtx.fill(bezelPath, 'evenodd');
+      postCtx.globalCompositeOperation = 'source-over';
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.drawImage(postCvs, 0, 0);
+      ctx.restore();
+    }
+  }
 }
 
 _startRenderLoop();
@@ -3307,6 +3383,8 @@ bindSlider('maskPixel','maskPixelVal',v => `${Math.round(v)}`, null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderAnimBright', 'borderAnimBrightVal', v => `${Math.round(v)}`, null);
+bindSlider('frameBlur', 'frameBlurVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('frameTint', 'frameTintVal', v => `${Math.round(v)}`, null);
 let _syncBorderSwatch    = () => {};
 let _closeBorderColorPop = () => {};
 let _syncAnimColors      = (_anim) => {};
@@ -3986,6 +4064,9 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     S.mask.shape = newShape;
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
     elGlassesUiRow.style.display = newShape === 'glasses' ? '' : 'none';
+    const _isFrameShape2 = newShape === 'phone' || newShape === 'glasses';
+    document.getElementById('frameBlurRow').style.display = _isFrameShape2 ? '' : 'none';
+    document.getElementById('frameTintRow').style.display = _isFrameShape2 ? '' : 'none';
     if (newShape === 'glasses') {
       const _gsi = S.mask.glassesStyle || 0;
       elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === _gsi));
@@ -4048,6 +4129,12 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       S.mask.y = Math.round((ch - _gs.h) / 2);
       if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
     } else {
+      // glasses からの切り替え: 横長のままになるので高さで正方形に戻す
+      if (prevShape === 'glasses') {
+        const side = S.mask.h;
+        S.mask.w = side;
+        S.mask.x = Math.round((canvas.width - side) / 2);
+      }
       if (_arLockBeforeAutoLock !== null) {
         S.arLock = _arLockBeforeAutoLock;
         _arLockBeforeAutoLock = null;
@@ -4226,7 +4313,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
     el.dispatchEvent(new Event('input'));
   };
   _syncMaskSliders();
-  ['maskBlur', 'borderW', 'borderOpacity', 'borderSpeed', 'borderGlow'].forEach(resetSlider);
+  ['maskBlur', 'borderW', 'borderOpacity', 'borderSpeed', 'borderGlow', 'frameBlur', 'frameTint'].forEach(resetSlider);
   document.getElementById('borderColor').value =
     document.getElementById('borderColor').defaultValue || '#ffffff';
   lucide.createIcons();
@@ -5091,6 +5178,9 @@ function applySettings(d) {
     });
     elPhoneUiRow.style.display = loadShape === 'phone' ? '' : 'none';
     elGlassesUiRow.style.display = isGlasses ? '' : 'none';
+    const _isFrameShape3 = loadShape === 'phone' || isGlasses;
+    document.getElementById('frameBlurRow').style.display = _isFrameShape3 ? '' : 'none';
+    document.getElementById('frameTintRow').style.display = _isFrameShape3 ? '' : 'none';
     if (isGlasses) {
       if (d.glassesStyle != null) S.mask.glassesStyle = d.glassesStyle;
       const gsi = S.mask.glassesStyle || 0;

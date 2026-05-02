@@ -55,6 +55,8 @@
     "border-anim-aurora": "오로라",
     "border-speed": "속도",
     "border-bright": "밝기",
+    "frame-blur": "프레임 블러",
+    "frame-tint": "프레임 색조",
     "brightness": "밝기",
     "contrast": "대비",
     "saturation": "채도",
