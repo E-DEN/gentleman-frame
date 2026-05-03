@@ -44,7 +44,7 @@ function _setZoneLoaded(zone, isLoaded) {
 // ============================================================
 //  状態
 // ============================================================
-const S = {
+const state = {
   playing: false,
   maskHovered: false,
   anchorHovered: false,
@@ -275,10 +275,10 @@ function _syncAllBuffers(w, h) {
 function _syncMaskSliders() {
   // W と H は固定レンジ [10, 790] → 400 がスライダーの中央になる。
   // 790 超の値はキャンバス上のドラッグで設定可能。テキスト欄は実際値を表示。
-  elMaskW.value = Math.min(Math.round(S.mask.w), +elMaskW.max);
-  elMaskH.value = Math.min(Math.round(S.mask.h), +elMaskH.max);
-  document.getElementById('maskWVal').value = Math.round(S.mask.w);
-  document.getElementById('maskHVal').value = Math.round(S.mask.h);
+  elMaskW.value = Math.min(Math.round(state.mask.w), +elMaskW.max);
+  elMaskH.value = Math.min(Math.round(state.mask.h), +elMaskH.max);
+  document.getElementById('maskWVal').value = Math.round(state.mask.w);
+  document.getElementById('maskHVal').value = Math.round(state.mask.h);
   updateSliderFill(elMaskW);
   updateSliderFill(elMaskH);
   _syncOffsetSliders();
@@ -286,10 +286,10 @@ function _syncMaskSliders() {
 
 function _syncOffsetSliders() {
   const cw = canvas.width, ch = canvas.height;
-  const cx = Math.round((cw - S.mask.w) / 2);
-  const cy = Math.round((ch - S.mask.h) / 2);
-  const offX = S.mask.x - cx;
-  const offY = S.mask.y - cy;
+  const cx = Math.round((cw - state.mask.w) / 2);
+  const cy = Math.round((ch - state.mask.h) / 2);
+  const offX = state.mask.x - cx;
+  const offY = state.mask.y - cy;
   const halfW = Math.floor(cw / 2);
   const halfH = Math.floor(ch / 2);
   elMaskOffX.min = -halfW; elMaskOffX.max = halfW; elMaskOffX.value = offX;
@@ -304,10 +304,10 @@ function _syncOffsetSliders() {
 function _applyMaskFromPm(pm, cw, ch) {
   if (!pm || !pm.srcW || !pm.srcH || pm.x == null) return false;
   const sx = cw / pm.srcW, sy = ch / pm.srcH;
-  S.mask.w = Math.max(1, Math.min(Math.round(pm.w * sx), cw));
-  S.mask.h = Math.max(1, Math.min(Math.round(pm.h * sy), ch));
-  S.mask.x = Math.max(0, Math.min(Math.round(pm.x * sx), cw - S.mask.w));
-  S.mask.y = Math.max(0, Math.min(Math.round(pm.y * sy), ch - S.mask.h));
+  state.mask.w = Math.max(1, Math.min(Math.round(pm.w * sx), cw));
+  state.mask.h = Math.max(1, Math.min(Math.round(pm.h * sy), ch));
+  state.mask.x = Math.max(0, Math.min(Math.round(pm.x * sx), cw - state.mask.w));
+  state.mask.y = Math.max(0, Math.min(Math.round(pm.y * sy), ch - state.mask.h));
   return true;
 }
 
@@ -327,30 +327,30 @@ function setCanvasAspectRatio(w, h) {
     const pm = _pendingMask;
     _pendingMask = null;
     if (!_applyMaskFromPm(pm, w, h)) {
-      if (S.mask.shape === 'phone') {
+      if (state.mask.shape === 'phone') {
         const targetW = 360, targetH = 780;
         let newW = Math.min(targetW, w);
         let newH = Math.round(newW * targetH / targetW);
         if (newH > h) { newH = h; newW = Math.round(newH * targetW / targetH); }
-        S.mask.w = newW; S.mask.h = newH;
-      } else if (S.mask.shape === 'glasses') {
+        state.mask.w = newW; state.mask.h = newH;
+      } else if (state.mask.shape === 'glasses') {
         const _gs = _glassesInitSize(w, h);
-        S.mask.w = _gs.w; S.mask.h = _gs.h;
+        state.mask.w = _gs.w; state.mask.h = _gs.h;
       } else {
-        S.mask.w = Math.min(400, w);
-        S.mask.h = Math.min(400, h);
+        state.mask.w = Math.min(400, w);
+        state.mask.h = Math.min(400, h);
       }
-      S.mask.x = Math.round((w - S.mask.w) / 2);
-      S.mask.y = Math.round((h - S.mask.h) / 2);
+      state.mask.x = Math.round((w - state.mask.w) / 2);
+      state.mask.y = Math.round((h - state.mask.h) / 2);
     }
   } else {
     // 動画解像度変化: 比率を維持してマスクをスケール
     const sx = w / _prevBufW;
     const sy = h / _prevBufH;
-    S.mask.x = Math.round(S.mask.x * sx);
-    S.mask.y = Math.round(S.mask.y * sy);
-    S.mask.w = Math.round(S.mask.w * sx);
-    S.mask.h = Math.round(S.mask.h * sy);
+    state.mask.x = Math.round(state.mask.x * sx);
+    state.mask.y = Math.round(state.mask.y * sy);
+    state.mask.w = Math.round(state.mask.w * sx);
+    state.mask.h = Math.round(state.mask.h * sy);
   }
   _prevBufW = w;
   _prevBufH = h;
@@ -391,32 +391,32 @@ document.addEventListener('keyup', e => {
   _syncAllBuffers(BUF_W, BUF_H);
   _prevBufW = BUF_W; _prevBufH = BUF_H;
   if (iw > 0) { _dispW = iw; _dispH = Math.round(iw / _canvasAR); }
-  if (S.mask.shape === 'phone') {
+  if (state.mask.shape === 'phone') {
     const _tW = 360, _tH = 780;
     let _mw = Math.min(_tW, BUF_W);
     let _mh = Math.round(_mw * _tH / _tW);
     if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
-    S.mask.w = _mw; S.mask.h = _mh;
-    S.arLock = true;
-  } else if (S.mask.shape === 'glasses') {
+    state.mask.w = _mw; state.mask.h = _mh;
+    state.arLock = true;
+  } else if (state.mask.shape === 'glasses') {
     const _gs = _glassesInitSize(BUF_W, BUF_H);
-    S.mask.w = _gs.w; S.mask.h = _gs.h;
-    S.arLock = true;
+    state.mask.w = _gs.w; state.mask.h = _gs.h;
+    state.arLock = true;
   } else {
-    S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+    state.mask.w = Math.min(400, BUF_W); state.mask.h = Math.min(400, BUF_H);
   }
-  S.mask.x = Math.round((BUF_W - S.mask.w) / 2);
-  S.mask.y = Math.round((BUF_H - S.mask.h) / 2);
+  state.mask.x = Math.round((BUF_W - state.mask.w) / 2);
+  state.mask.y = Math.round((BUF_H - state.mask.h) / 2);
   _bufferSynced = true;
   _syncMaskSliders();
-  document.getElementById('phoneUiRow').style.display = S.mask.shape === 'phone' ? '' : 'none';
-  const _isGlasses = S.mask.shape === 'glasses';
+  document.getElementById('phoneUiRow').style.display = state.mask.shape === 'phone' ? '' : 'none';
+  const _isGlasses = state.mask.shape === 'glasses';
   document.getElementById('glassesUiRow').style.display = _isGlasses ? '' : 'none';
-  const _isFrameShape = S.mask.shape === 'phone' || _isGlasses;
+  const _isFrameShape = state.mask.shape === 'phone' || _isGlasses;
   document.getElementById('frameBlurRow').style.display = _isFrameShape ? '' : 'none';
   document.getElementById('frameTintRow').style.display = _isFrameShape ? '' : 'none';
   if (_isGlasses) {
-    const _gsi = S.mask.glassesStyle || 0;
+    const _gsi = state.mask.glassesStyle || 0;
     document.querySelectorAll('.glasses-ui-btn[data-gstyle]').forEach(b =>
       b.classList.toggle('active', parseInt(b.dataset.gstyle) === _gsi));
   }
@@ -437,22 +437,22 @@ new ResizeObserver(entries => {
   const BUF_W = 1920, BUF_H = 1080;
   _syncAllBuffers(BUF_W, BUF_H);
   _prevBufW = BUF_W; _prevBufH = BUF_H;
-  if (S.mask.shape === 'phone') {
+  if (state.mask.shape === 'phone') {
     const _tW = 360, _tH = 780;
     let _mw = Math.min(_tW, BUF_W);
     let _mh = Math.round(_mw * _tH / _tW);
     if (_mh > BUF_H) { _mh = BUF_H; _mw = Math.round(_mh * _tW / _tH); }
-    S.mask.w = _mw; S.mask.h = _mh;
-    S.arLock = true;
-  } else if (S.mask.shape === 'glasses') {
+    state.mask.w = _mw; state.mask.h = _mh;
+    state.arLock = true;
+  } else if (state.mask.shape === 'glasses') {
     const _gs = _glassesInitSize(BUF_W, BUF_H);
-    S.mask.w = _gs.w; S.mask.h = _gs.h;
-    S.arLock = true;
+    state.mask.w = _gs.w; state.mask.h = _gs.h;
+    state.arLock = true;
   } else {
-    S.mask.w = Math.min(400, BUF_W); S.mask.h = Math.min(400, BUF_H);
+    state.mask.w = Math.min(400, BUF_W); state.mask.h = Math.min(400, BUF_H);
   }
-  S.mask.x = Math.round((BUF_W - S.mask.w) / 2);
-  S.mask.y = Math.round((BUF_H - S.mask.h) / 2);
+  state.mask.x = Math.round((BUF_W - state.mask.w) / 2);
+  state.mask.y = Math.round((BUF_H - state.mask.h) / 2);
   _bufferSynced = true;
   _syncMaskSliders();
 }).observe(canvas);
@@ -523,7 +523,7 @@ function _scheduleResync(initialDelay = 100) {
   _resyncTimer = setTimeout(_doResync, initialDelay);
 }
 async function _doResync() {
-  if (!S.playing || _compositeSeekPending) return;
+  if (!state.playing || _compositeSeekPending) return;
   if (!loaded[0] || !loaded[1]) return;
   if (mediaType[0] !== 'video' || mediaType[1] !== 'video') return;
   // play() 呼び出し直後はまだ paused のままのことがある → リスケジュールして待つ
@@ -543,7 +543,7 @@ async function _doResync() {
     await new Promise(res => {
       vid[1].addEventListener('seeked', res, { once: true });
     });
-    if (S.playing && !_compositeSeekPending) {
+    if (state.playing && !_compositeSeekPending) {
       // シーク中に vid[0] が進んだ分の残差を playbackRate で吸収
       const postDiff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
       vid[1].playbackRate = postDiff < -0.016 ? 1.08 : postDiff > 0.016 ? 0.94 : 1.0;
@@ -567,10 +567,10 @@ async function _doResync() {
 
 // バックグラウンド復帰時に即座再同期（動画が進んでいる場合のみ。復帰後のズレが大きいことがあるため）
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && S.playing) _scheduleResync(80);
+  if (document.visibilityState === 'visible' && state.playing) _scheduleResync(80);
 });
 window.addEventListener('focus', () => {
-  if (S.playing) _scheduleResync(80);
+  if (state.playing) _scheduleResync(80);
 });
 
 // ============================================================
@@ -698,10 +698,10 @@ function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
   if (_followMode === 'mask') {
     const lerpK = 0.22; // 1フレームあたりの追従率 (0〜1)
-    const cx = _followTargetX - S.mask.w / 2;
-    const cy = _followTargetY - S.mask.h / 2;
-    S.mask.x = Math.round(S.mask.x + (cx - S.mask.x) * lerpK);
-    S.mask.y = Math.round(S.mask.y + (cy - S.mask.y) * lerpK);
+    const cx = _followTargetX - state.mask.w / 2;
+    const cy = _followTargetY - state.mask.h / 2;
+    state.mask.x = Math.round(state.mask.x + (cx - state.mask.x) * lerpK);
+    state.mask.y = Math.round(state.mask.y + (cy - state.mask.y) * lerpK);
     _syncOffsetSliders();
   }
 
@@ -715,7 +715,7 @@ function _renderFrame() {
 
   const W = canvas.width;
   const H = canvas.height;
-  const m = S.mask;
+  const m = state.mask;
   // バッファ → 表示CSS px の拡大率。動画解像度が高いほど > 1 になる。
   // lineWidth などの「見た目固定」値はこの係数で補正する。
   // バッファ → 表示CSS px の拡大率。動画解像度が高いほど > 1 になる。
@@ -745,11 +745,11 @@ function _renderFrame() {
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
     const maskZoom = _fgZoomDisp;
-    if (Math.abs(maskZoom - 1) > 0.001 || Math.abs(parseFloat(elMaskZoom.value) - 1) > 0.001 || S.fgFixed) {
+    if (Math.abs(maskZoom - 1) > 0.001 || Math.abs(parseFloat(elMaskZoom.value) - 1) > 0.001 || state.fgFixed) {
       // Mode 1（OFF）: マスク中央を zoom の基点にする（マスク追従）
       // Mode 2（ON） : ビデオのアンカー点（fgPinX/Yでパン）がマスク中央に重なるよう描画
       let dx, dy;
-      if (S.fgFixed) {
+      if (state.fgFixed) {
         const mcx = m.x + m.w / 2;
         const mcy = m.y + m.h / 2;
         const ax  = W / 2 + _fgPinDispX;
@@ -805,7 +805,7 @@ function _renderFrame() {
     }
   } else if (loaded[0] && !visHidden[1] && !maskHidden && _fgFadeStart !== 0) {
     // 前景なし かつ アンカーモード ON → 動画1をアンカー位置で描画
-    if (S.fgFixed) {
+    if (state.fgFixed) {
       offCtx.clearRect(0, 0, W, H);
       const maskZoom = _fgZoomDisp;
       const mcx = m.x + m.w / 2;
@@ -1064,7 +1064,7 @@ function _renderFrame() {
 
   // --- コンポジット時刻 ---
   const _rafNow = performance.now();
-  if (S.playing && !_compositeSeekPending) {
+  if (state.playing && !_compositeSeekPending) {
     const [o1, o2] = _getOffsets();
     if (loaded[0] && mediaType[0] === 'video' && !vid[0].paused && vid[0].readyState >= 2) {
       _compositeT = vid[0].currentTime - o1;
@@ -1080,7 +1080,7 @@ function _renderFrame() {
       if (_refDur > 0) _compositeT = Math.min(_compositeT, _refDur);
     }
     _compositeLastRaf = _rafNow;
-  } else if (!S.playing || _compositeSeekPending) {
+  } else if (!state.playing || _compositeSeekPending) {
     _compositeLastRaf = null;
   }
 }
@@ -1091,13 +1091,13 @@ function _drawOverlays() {
   const dCtx = overlayCtx;
   const W = canvas.width, H = canvas.height;
   dCtx.clearRect(0, 0, W, H);
-  const m = S.mask;
+  const m = state.mask;
   const bufScale = _lastBufScale;
-  const maskHidden = S.maskHidden;
+  const maskHidden = state.maskHidden;
 
   // --- マスク枠 ---
   const bw = parseFloat(elBorderW.value);
-  if (bw > 0 && !maskHidden && !visHidden[1] && S.mask.shape !== 'glasses') {
+  if (bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
     let borderFadeA;
     if (_fgFadeStart === 0) {
       borderFadeA = 0;
@@ -1130,7 +1130,7 @@ function _drawOverlays() {
   }
 
   // --- リサイズハンドル ---
-  if ((S.maskHovered || S.drag.active || S.maskTouched) && !maskHidden && !visHidden[1] && _followMode === 'none' && S.drag.mode !== 'fg-anchor') {
+  if ((state.maskHovered || state.drag.active || state.maskTouched) && !maskHidden && !visHidden[1] && _followMode === 'none' && state.drag.mode !== 'fg-anchor') {
     dCtx.save();
     const accent = _cachedAccent;
     const hSz = Math.max(1, Math.round(HANDLE_SZ * bufScale));
@@ -1147,7 +1147,7 @@ function _drawOverlays() {
   // --- 前景アンカー（phone + fgFixed ON 時）---
   // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
   anchorCtx.clearRect(0, 0, W, H);
-  if (S.fgFixed && S.mask.shape === 'phone' && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0])) {
+  if (state.fgFixed && state.mask.shape === 'phone' && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0])) {
     const ax  = W / 2 + parseFloat(elFgPinX.value);
     const ay  = H / 2 + parseFloat(elFgPinY.value);
     const r   = Math.max(18, Math.round(28 * bufScale));
@@ -1179,14 +1179,14 @@ function _drawOverlays() {
   }
 
   // --- スマホ枠オーバーレイ ---
-  if (!maskHidden && !visHidden[1] && S.mask.shape === 'phone') {
+  if (!maskHidden && !visHidden[1] && state.mask.shape === 'phone') {
     const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
     const phase = (performance.now() * 0.001 * speed) % 1;
     _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase);
   }
 
   // --- メガネ枠オーバーレイ ---
-  if (!maskHidden && !visHidden[1] && S.mask.shape === 'glasses') {
+  if (!maskHidden && !visHidden[1] && state.mask.shape === 'glasses') {
     _drawGlassesFrame(dCtx, m, bufScale);
   }
 }
@@ -1333,7 +1333,7 @@ function _glassesInitSize(cw, ch) {
 
 function buildMaskPath(c, m) {
   if (m.shape === 'glasses') {
-    const idx = (S.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
+    const idx = (state.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
     const g = _GLASSES_STYLES[idx];
     if (!_glassesPaths[idx]) {
       const frameStr = (g.full.match(/M[^M]*/g) || []).slice(2).join('');
@@ -1386,7 +1386,7 @@ let _glassSamplerCtx  = null;
 
 function _drawGlassesFrame(ctx, m, bufScale) {
   const bw = parseFloat(elBorderW.value);
-  const idx = (S.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
+  const idx = (state.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
   const g = _GLASSES_STYLES[idx];
   if (!_glassesPaths[idx]) {
     const frameStr = (g.full.match(/M[^M]*/g) || []).slice(2).join('');
@@ -1617,7 +1617,7 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   const nowMs = performance.now();
   const dtMs  = Math.min(50, _shutterMorphLast > 0 ? nowMs - _shutterMorphLast : 16);
   _shutterMorphLast = nowMs;
-  _shutterMorphT += ((S.playing ? 1 : 0) - _shutterMorphT) * Math.min(1, (dtMs / 1000) * 7.0);
+  _shutterMorphT += ((state.playing ? 1 : 0) - _shutterMorphT) * Math.min(1, (dtMs / 1000) * 7.0);
   const mt = _shutterMorphT;
 
   // ---- シャッターボタン ----
@@ -2368,7 +2368,7 @@ function clearVideo(index) {
 // syncMaskDropOverlay: 値が変化した時だけDOMを更新 (毎フレーム style書き込みを避ける)
 function syncMaskDropOverlay() {
   const cw = canvas.width, ch = canvas.height;
-  const { x, y, w, h, shape } = S.mask;
+  const { x, y, w, h, shape } = state.mask;
   const left   = `${x / cw * 100}%`;
   const top    = `${y / ch * 100}%`;
   const width  = `${w / cw * 100}%`;
@@ -3008,7 +3008,7 @@ function _showPlayFlash(playing) {
 }
 
 function setPlaying(playing) {
-  S.playing = playing;
+  state.playing = playing;
   elPlayBtn.innerHTML = `<i data-lucide="${playing ? 'pause' : 'play'}"></i>`;
   lucide.createIcons();
 }
@@ -3042,13 +3042,13 @@ async function _applyCompositeT(T) {
   }));
 
   _compositeSeekPending = false;
-  if (!S.playing) return;
+  if (!state.playing) return;
 
   [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].playbackRate = 1.0; });
   [o1, o2].forEach((o, i) => {
     if (!loaded[i] || mediaType[i] !== 'video') return;
     if (T + o < 0) {
-      const t = setTimeout(() => { if (S.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(T + o) * 1000);
+      const t = setTimeout(() => { if (state.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(T + o) * 1000);
       _playDelayTimers.push(t);
     } else {
       vid[i].play().catch(() => {});
@@ -3084,7 +3084,7 @@ async function syncPlay() {
       if (!loaded[i] || mediaType[i] !== 'video') return;
       const o = i === 0 ? o1 : o2;
       if (_compositeT + o < 0) {
-        const t = setTimeout(() => { if (S.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(_compositeT + o) * 1000);
+        const t = setTimeout(() => { if (state.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(_compositeT + o) * 1000);
         _playDelayTimers.push(t);
       } else {
         vid[i].play().catch(() => {});
@@ -3130,7 +3130,7 @@ document.querySelectorAll('.tbtn').forEach(btn => {
 });
 
 elPlayBtn.addEventListener('click', () => {
-  if (S.playing) syncPause(); else syncPlay();
+  if (state.playing) syncPause(); else syncPlay();
 });
 
 const stopBtn = document.getElementById('stopBtn');
@@ -3179,7 +3179,7 @@ document.addEventListener('keydown', e => {
     }
     case 'Space':
       e.preventDefault();
-      if (S.playing) syncPause(); else syncPlay();
+      if (state.playing) syncPause(); else syncPlay();
       triggerTbtnGlow(elPlayBtn);
       break;
     case 'ArrowLeft':
@@ -3254,7 +3254,7 @@ function bindSlider(id, valId, fmt, onChange) {
   resetBtn.addEventListener('click', () => {
     // maskW / maskH は phone/glasses 形状のとき初期値が異なる
     const id = el.id;
-    if ((id === 'maskW' || id === 'maskH') && S.mask.shape === 'phone') {
+    if ((id === 'maskW' || id === 'maskH') && state.mask.shape === 'phone') {
       const cw = canvas.width, ch = canvas.height;
       const targetW = 360, targetH = 780;
       let dw, dh;
@@ -3268,7 +3268,7 @@ function bindSlider(id, valId, fmt, onChange) {
         if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
       }
       el.value = id === 'maskW' ? dw : dh;
-    } else if ((id === 'maskW' || id === 'maskH') && S.mask.shape === 'glasses') {
+    } else if ((id === 'maskW' || id === 'maskH') && state.mask.shape === 'glasses') {
       const cw = canvas.width, ch = canvas.height;
       const _gs = _glassesInitSize(cw, ch);
       el.value = id === 'maskW' ? _gs.w : _gs.h;
@@ -3366,27 +3366,27 @@ bindSlider('vol1',    'vol1Val',    v => `${Math.round(v)}`,    v => { vid[1].vo
 bindSlider('offset0', 'offset0Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, null);
 bindSlider('offset1', 'offset1Val', v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`, null);
 bindSlider('maskW',   'maskWVal',   v => `${Math.round(v)}`,    v => {
-  const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
+  const ar = state.mask.h > 0 ? state.mask.w / state.mask.h : 1;
   // スライダー操作時は下限10（テキスト入力は0まで許容）
   if (parseFloat(elMaskW.value) < 10) { elMaskW.value = 10; updateSliderFill(elMaskW); v = 10; document.getElementById('maskWVal').value = 10; }
-  _syncZoomToMaskScale(S.mask.w, v);
-  S.mask.w = v;
-  if (S.arLock && S.mask.h > 0) {
+  _syncZoomToMaskScale(state.mask.w, v);
+  state.mask.w = v;
+  if (state.arLock && state.mask.h > 0) {
     const newH = Math.max(0, Math.round(v / ar));
-    S.mask.h = newH;
+    state.mask.h = newH;
     elMaskH.value = newH;
     document.getElementById('maskHVal').value = newH;
     updateSliderFill(elMaskH);
   }
 });
 bindSlider('maskH',   'maskHVal',   v => `${Math.round(v)}`,    v => {
-  const ar = S.mask.h > 0 ? S.mask.w / S.mask.h : 1;
+  const ar = state.mask.h > 0 ? state.mask.w / state.mask.h : 1;
   // スライダー操作時は下限10（テキスト入力は0まで許容）
   if (parseFloat(elMaskH.value) < 10) { elMaskH.value = 10; updateSliderFill(elMaskH); v = 10; document.getElementById('maskHVal').value = 10; }
-  S.mask.h = v;
-  if (S.arLock && S.mask.w > 0) {
+  state.mask.h = v;
+  if (state.arLock && state.mask.w > 0) {
     const newW = Math.max(0, Math.round(v * ar));
-    S.mask.w = newW;
+    state.mask.w = newW;
     elMaskW.value = newW;
     document.getElementById('maskWVal').value = newW;
     updateSliderFill(elMaskW);
@@ -3394,13 +3394,13 @@ bindSlider('maskH',   'maskHVal',   v => `${Math.round(v)}`,    v => {
 });
 bindSlider('maskOffX', 'maskOffXVal', v => `${Math.round(v)}`, v => {
   const cw = canvas.width;
-  const cx = Math.round((cw - S.mask.w) / 2);
-  S.mask.x = Math.max(0, Math.min(cx + Math.round(v), cw - S.mask.w));
+  const cx = Math.round((cw - state.mask.w) / 2);
+  state.mask.x = Math.max(0, Math.min(cx + Math.round(v), cw - state.mask.w));
 });
 bindSlider('maskOffY', 'maskOffYVal', v => `${Math.round(v)}`, v => {
   const ch = canvas.height;
-  const cy = Math.round((ch - S.mask.h) / 2);
-  S.mask.y = Math.max(0, Math.min(cy + Math.round(v), ch - S.mask.h));
+  const cy = Math.round((ch - state.mask.h) / 2);
+  state.mask.y = Math.max(0, Math.min(cy + Math.round(v), ch - state.mask.h));
 });
 bindSlider('borderW', 'borderWVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('maskZoom', 'maskZoomVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(2), null);
@@ -4088,18 +4088,18 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     // _was-active クリーンアップ（click が成立した場合は復元不要）
     document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('_was-active', '_had-active'));
     if (btn.disabled) return;
-    const prevShape = S.mask.shape;
+    const prevShape = state.mask.shape;
     const newShape  = btn.dataset.shape;
     document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    S.mask.shape = newShape;
+    state.mask.shape = newShape;
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
     elGlassesUiRow.style.display = newShape === 'glasses' ? '' : 'none';
     const _isFrameShape2 = newShape === 'phone' || newShape === 'glasses';
     document.getElementById('frameBlurRow').style.display = _isFrameShape2 ? '' : 'none';
     document.getElementById('frameTintRow').style.display = _isFrameShape2 ? '' : 'none';
     if (newShape === 'glasses') {
-      const _gsi = S.mask.glassesStyle || 0;
+      const _gsi = state.mask.glassesStyle || 0;
       elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === _gsi));
     }
     _updateFgFixedBtn();
@@ -4107,32 +4107,32 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     // --- phone ↔ 非phone の状態スワップ（形状固有処理より先に行う）---
     if (prevShape !== 'phone' && newShape === 'phone') {
       // 非phone → phone: 現在の非phone状態を保存
-      _nonPhoneMaskState = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
+      _nonPhoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y };
     } else if (prevShape === 'phone' && newShape !== 'phone') {
       // phone → 非phone: phone状態を保存し、非phone状態を復元
-      _phoneMaskState = { w: S.mask.w, h: S.mask.h, x: S.mask.x, y: S.mask.y };
+      _phoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y };
       if (_nonPhoneMaskState) {
-        S.mask.w = _nonPhoneMaskState.w; S.mask.h = _nonPhoneMaskState.h;
-        S.mask.x = _nonPhoneMaskState.x; S.mask.y = _nonPhoneMaskState.y;
+        state.mask.w = _nonPhoneMaskState.w; state.mask.h = _nonPhoneMaskState.h;
+        state.mask.x = _nonPhoneMaskState.x; state.mask.y = _nonPhoneMaskState.y;
       } else {
-        S.mask.w = 400; S.mask.h = 400;
-        S.mask.x = Math.round((canvas.width  - 400) / 2);
-        S.mask.y = Math.round((canvas.height - 400) / 2);
+        state.mask.w = 400; state.mask.h = 400;
+        state.mask.x = Math.round((canvas.width  - 400) / 2);
+        state.mask.y = Math.round((canvas.height - 400) / 2);
       }
     }
 
     // --- 形状固有処理 ---
     if (newShape === 'heart') {
       // ハート → 大きい方に揃えてアス比ロックを自動ON
-      const side = Math.max(S.mask.w, S.mask.h);
-      S.mask.w = side; S.mask.h = side;
+      const side = Math.max(state.mask.w, state.mask.h);
+      state.mask.w = side; state.mask.h = side;
       ['maskW','maskH'].forEach(id => {
         const el = document.getElementById(id);
         el.value = Math.round(side);
         document.getElementById(id + 'Val').value = Math.round(side);
         updateSliderFill(el);
       });
-      if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
+      if (!state.arLock) { _arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'phone') {
       // phone状態を復元（なければデフォルト 360x780）
       const cw = canvas.width, ch = canvas.height;
@@ -4148,30 +4148,30 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
         newX = Math.round((cw - newW) / 2);
         newY = Math.round((ch - newH) / 2);
       }
-      S.mask.w = newW; S.mask.h = newH;
-      S.mask.x = newX; S.mask.y = newY;
-      if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
+      state.mask.w = newW; state.mask.h = newH;
+      state.mask.x = newX; state.mask.y = newY;
+      if (!state.arLock) { _arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'glasses') {
       // glasses → スタイルの vw/vh 比でサイズ決定、AR ロック
       const cw = canvas.width, ch = canvas.height;
       const _gs = _glassesInitSize(cw, ch);
-      S.mask.w = _gs.w; S.mask.h = _gs.h;
-      S.mask.x = Math.round((cw - _gs.w) / 2);
-      S.mask.y = Math.round((ch - _gs.h) / 2);
-      if (!S.arLock) { _arLockBeforeAutoLock = false; S.arLock = true; _updateArLockBtn(); }
+      state.mask.w = _gs.w; state.mask.h = _gs.h;
+      state.mask.x = Math.round((cw - _gs.w) / 2);
+      state.mask.y = Math.round((ch - _gs.h) / 2);
+      if (!state.arLock) { _arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else {
       // glasses からの切り替え: 横長のままになるので高さで正方形に戻す
       if (prevShape === 'glasses') {
-        const side = S.mask.h;
-        S.mask.w = side;
-        S.mask.x = Math.round((canvas.width - side) / 2);
+        const side = state.mask.h;
+        state.mask.w = side;
+        state.mask.x = Math.round((canvas.width - side) / 2);
       }
       if (_arLockBeforeAutoLock !== null) {
-        S.arLock = _arLockBeforeAutoLock;
+        state.arLock = _arLockBeforeAutoLock;
         _arLockBeforeAutoLock = null;
         _updateArLockBtn();
-      } else if (S.arLock) {
-        S.arLock = false;
+      } else if (state.arLock) {
+        state.arLock = false;
         _updateArLockBtn();
       }
     }
@@ -4196,11 +4196,11 @@ elPhoneUiBtnRot90.addEventListener('click', () => {
   elPhoneUiBtnRot90.classList.toggle('active', _phoneLandscape);
   // マスクの幅・高さを swap して再センタリング
   const cw = renderCvs.width, ch = renderCvs.height;
-  const tmp = S.mask.w;
-  S.mask.w = S.mask.h;
-  S.mask.h = tmp;
-  S.mask.x = Math.round((cw - S.mask.w) / 2);
-  S.mask.y = Math.round((ch - S.mask.h) / 2);
+  const tmp = state.mask.w;
+  state.mask.w = state.mask.h;
+  state.mask.h = tmp;
+  state.mask.x = Math.round((cw - state.mask.w) / 2);
+  state.mask.y = Math.round((ch - state.mask.h) / 2);
   _syncMaskSliders();
 });
 
@@ -4208,64 +4208,64 @@ elPhoneUiBtnRot90.addEventListener('click', () => {
 elGlassesStyleBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     const idx = parseInt(btn.dataset.gstyle);
-    S.mask.glassesStyle = idx;
+    state.mask.glassesStyle = idx;
     elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === idx));
     // スタイル変更時に vw/vh 比でリサイズしてロック
     const cw = canvas.width, ch = canvas.height;
     const _gs = _glassesInitSize(cw, ch);
-    S.mask.w = _gs.w; S.mask.h = _gs.h;
-    S.mask.x = Math.round((cw - _gs.w) / 2);
-    S.mask.y = Math.round((ch - _gs.h) / 2);
-    if (!S.arLock) { S.arLock = true; _updateArLockBtn(); }
+    state.mask.w = _gs.w; state.mask.h = _gs.h;
+    state.mask.x = Math.round((cw - _gs.w) / 2);
+    state.mask.y = Math.round((ch - _gs.h) / 2);
+    if (!state.arLock) { state.arLock = true; _updateArLockBtn(); }
     _syncMaskSliders();
   });
 });
 
 function _updateArLockBtn() {
   const btn = document.getElementById('arLockBtn');
-  btn.classList.toggle('active', S.arLock);
-  btn.innerHTML = `<i data-lucide="${S.arLock ? 'lock' : 'lock-open'}"></i>`;
-  btn.title = t(S.arLock ? 'ar-lock' : 'ar-unlock');
+  btn.classList.toggle('active', state.arLock);
+  btn.innerHTML = `<i data-lucide="${state.arLock ? 'lock' : 'lock-open'}"></i>`;
+  btn.title = t(state.arLock ? 'ar-lock' : 'ar-unlock');
   lucide.createIcons();
 }
 document.getElementById('arLockBtn').addEventListener('click', () => {
-  S.arLock = !S.arLock;
+  state.arLock = !state.arLock;
   _updateArLockBtn();
 });
 
 function _updateZoomLockBtn() {
   const btn = document.getElementById('zoomLockBtn');
-  btn.classList.toggle('active', S.zoomLock);
-  btn.innerHTML = `<i data-lucide="${S.zoomLock ? 'lock' : 'lock-open'}"></i>`;
-  btn.title = t(S.zoomLock ? 'zoom-lock' : 'zoom-unlock');
+  btn.classList.toggle('active', state.zoomLock);
+  btn.innerHTML = `<i data-lucide="${state.zoomLock ? 'lock' : 'lock-open'}"></i>`;
+  btn.title = t(state.zoomLock ? 'zoom-lock' : 'zoom-unlock');
   lucide.createIcons();
 }
 document.getElementById('zoomLockBtn').addEventListener('click', () => {
-  S.zoomLock = !S.zoomLock;
+  state.zoomLock = !state.zoomLock;
   _updateZoomLockBtn();
 });
 
 function _updateFgFixedBtn() {
-  const isPhone = S.mask.shape === 'phone';
+  const isPhone = state.mask.shape === 'phone';
   // phone 以外のときは fgFixed を解除
-  if (!isPhone) S.fgFixed = false;
+  if (!isPhone) state.fgFixed = false;
   // X/Y スライダーはアンカーモード（fgFixed ON）時のみ表示
-  document.getElementById('fgPinXRow').style.display = S.fgFixed ? '' : 'none';
-  document.getElementById('fgPinYRow').style.display = S.fgFixed ? '' : 'none';
-  document.getElementById('fgPinLerpRow').style.display = S.fgFixed ? '' : 'none';
-  document.getElementById('fgPinOpacityRow').style.display = S.fgFixed ? '' : 'none';
+  document.getElementById('fgPinXRow').style.display = state.fgFixed ? '' : 'none';
+  document.getElementById('fgPinYRow').style.display = state.fgFixed ? '' : 'none';
+  document.getElementById('fgPinLerpRow').style.display = state.fgFixed ? '' : 'none';
+  document.getElementById('fgPinOpacityRow').style.display = state.fgFixed ? '' : 'none';
   // ズームスライダーはアンカーモードでも操作可能（zoomLock で連動制御）
   elMaskZoom.disabled = false;
   document.getElementById('maskZoomVal').disabled = false;
   // 錨アイコンはアンカーモード (fgFixed) の ON/OFF を反映
   const btn = document.getElementById('fgFixedBtn');
-  btn.classList.toggle('active', S.fgFixed);
+  btn.classList.toggle('active', state.fgFixed);
   btn.title = t('fg-anchor-show');
 }
 
 // ズームロック ON 時、マスク幅の変化率に比例して maskZoom を追従させる
 function _syncZoomToMaskScale(oldW, newW) {
-  if (!S.zoomLock || oldW <= 0 || Math.abs(oldW - newW) < 0.5) return;
+  if (!state.zoomLock || oldW <= 0 || Math.abs(oldW - newW) < 0.5) return;
   const ratio = newW / oldW;
   const curZoom = parseFloat(elMaskZoom.value);
   const newZoom = Math.min(5, Math.max(0.1, parseFloat((curZoom * ratio).toFixed(2))));
@@ -4274,16 +4274,16 @@ function _syncZoomToMaskScale(oldW, newW) {
   updateSliderFill(elMaskZoom);
 }
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
-  S.fgFixed = !S.fgFixed;
-  if (S.fgFixed) {
-    _zoomLockBeforeFgFixed = S.zoomLock;
-    if (!S.zoomLock) {
-      S.zoomLock = true;
+  state.fgFixed = !state.fgFixed;
+  if (state.fgFixed) {
+    _zoomLockBeforeFgFixed = state.zoomLock;
+    if (!state.zoomLock) {
+      state.zoomLock = true;
       _updateZoomLockBtn();
     }
   } else {
     if (_zoomLockBeforeFgFixed !== null) {
-      S.zoomLock = _zoomLockBeforeFgFixed;
+      state.zoomLock = _zoomLockBeforeFgFixed;
       _zoomLockBeforeFgFixed = null;
       _updateZoomLockBtn();
     }
@@ -4304,7 +4304,7 @@ document.getElementById('maskVisBtn').addEventListener('click', () => {
 document.getElementById('maskResetBtn').addEventListener('click', () => {
   const cw = canvas.width, ch = canvas.height;
   let dw, dh;
-  if (S.mask.shape === 'phone') {
+  if (state.mask.shape === 'phone') {
     const targetW = 360, targetH = 780;
     if (_phoneLandscape) {
       // 横向き: 幅・高さを swap
@@ -4317,20 +4317,20 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
       dh = Math.round(dw * targetH / targetW);
       if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
     }
-  } else if (S.mask.shape === 'glasses') {
+  } else if (state.mask.shape === 'glasses') {
     const _gs = _glassesInitSize(cw, ch);
     dw = _gs.w; dh = _gs.h;
   } else {
     dw = 400; dh = 400;
   }
-  S.mask.w = dw;
-  S.mask.h = dh;
+  state.mask.w = dw;
+  state.mask.h = dh;
   // shape はそのまま
-  S.arLock = (S.mask.shape === 'phone' || S.mask.shape === 'heart' || S.mask.shape === 'glasses'); // phone/heart/glasses は AR ロックを維持
+  state.arLock = (state.mask.shape === 'phone' || state.mask.shape === 'heart' || state.mask.shape === 'glasses'); // phone/heart/glasses は AR ロックを維持
   _updateArLockBtn();
   // phone の保存状態も更新
-  if (S.mask.shape === 'phone') {
-    _phoneMaskState = { w: dw, h: dh, x: S.mask.x, y: S.mask.y };
+  if (state.mask.shape === 'phone') {
+    _phoneMaskState = { w: dw, h: dh, x: state.mask.x, y: state.mask.y };
   }
   // スライダーを defaultValue（HTML の value 属性）にリセット
   const resetSlider = id => {
@@ -4444,15 +4444,15 @@ function canvasCoords(e) {
 }
 
 function hitTestHandle(px, py) {
-  const tol = S.mask.shape === 'heart' ? HANDLE_SZ + 8 : HANDLE_SZ + 3;
-  for (const h of getHandles(S.mask)) {
+  const tol = state.mask.shape === 'heart' ? HANDLE_SZ + 8 : HANDLE_SZ + 3;
+  for (const h of getHandles(state.mask)) {
     if (Math.abs(px - h.x) <= tol && Math.abs(py - h.y) <= tol) return h;
   }
   return null;
 }
 
 function hitTestMask(px, py) {
-  const { x, y, w, h, shape } = S.mask;
+  const { x, y, w, h, shape } = state.mask;
   if (shape === 'rect')   return px >= x && px <= x + w && py >= y && py <= y + h;
   if (shape === 'circle') {
     const dx = (px - (x + w / 2)) / (w / 2);
@@ -4474,7 +4474,7 @@ function hitTestMask(px, py) {
 }
 
 function hitTestAnchor(px, py) {
-  if (!S.fgFixed || S.mask.shape !== 'phone') return false;
+  if (!state.fgFixed || state.mask.shape !== 'phone') return false;
   const scale = _dispH > 0 ? canvas.height / _dispH : 1;
   // アンカーマーカーの位置はキャンバス中央 + fgPinX/Y
   const ax  = canvas.width  / 2 + parseFloat(elFgPinX.value);
@@ -4484,8 +4484,8 @@ function hitTestAnchor(px, py) {
 }
 
 function _applyAnchorDrag(p) {
-  const nx = Math.max(-1920, Math.min(1920, Math.round(S.drag.pinX0 + (p.x - S.drag.sp.x))));
-  const ny = Math.max(-1080, Math.min(1080, Math.round(S.drag.pinY0 + (p.y - S.drag.sp.y))));
+  const nx = Math.max(-1920, Math.min(1920, Math.round(state.drag.pinX0 + (p.x - state.drag.sp.x))));
+  const ny = Math.max(-1080, Math.min(1080, Math.round(state.drag.pinY0 + (p.y - state.drag.sp.y))));
   elFgPinX.value = nx; elFgPinY.value = ny;
   document.getElementById('fgPinXVal').value = nx;
   document.getElementById('fgPinYVal').value = ny;
@@ -4494,7 +4494,7 @@ function _applyAnchorDrag(p) {
 
 // phone形状の固定ARからwを偶数にスナップしてhを導出、それ以外は通常のMath.round
 function _snapMaskSize(w, h) {
-  if (S.mask.shape === 'phone') {
+  if (state.mask.shape === 'phone') {
     const ar = _phoneLandscape ? 780 / 360 : 360 / 780;
     const sw = Math.round(w / 2) * 2; // 偶数スナップ
     const sh = Math.round(sw / ar / 2) * 2;
@@ -4504,11 +4504,11 @@ function _snapMaskSize(w, h) {
 }
 
 function applyResize(hid, dx, dy, shiftKey) {
-  const sm = S.drag.sm;
+  const sm = state.drag.sm;
   let { x, y, w, h } = sm;
   const MIN = 10;
   const isCorner = hid === 'tl' || hid === 'tr' || hid === 'bl' || hid === 'br';
-  const lockAr = S.arLock || (shiftKey && isCorner);
+  const lockAr = state.arLock || (shiftKey && isCorner);
   if (lockAr) {
     const ar = sm.w / sm.h;
     if (isCorner) {
@@ -4554,12 +4554,12 @@ function applyResize(hid, dx, dy, shiftKey) {
   }
   _syncZoomToMaskScale(sm.w, Math.round(w));
   const snapped = _snapMaskSize(w, h);
-  S.mask.x = Math.round(x); S.mask.y = Math.round(y); S.mask.w = snapped.w; S.mask.h = snapped.h;
+  state.mask.x = Math.round(x); state.mask.y = Math.round(y); state.mask.w = snapped.w; state.mask.h = snapped.h;
   // スライダーを同期
-  elMaskW.value = S.mask.w;
-  document.getElementById('maskWVal').value = S.mask.w;
-  elMaskH.value = S.mask.h;
-  document.getElementById('maskHVal').value = S.mask.h;
+  elMaskW.value = state.mask.w;
+  document.getElementById('maskWVal').value = state.mask.w;
+  elMaskH.value = state.mask.h;
+  document.getElementById('maskHVal').value = state.mask.h;
   updateSliderFill(elMaskW);
   updateSliderFill(elMaskH);
 }
@@ -4567,30 +4567,30 @@ function applyResize(hid, dx, dy, shiftKey) {
 function startDrag(e, p) {
   // アンカードラッグ（fgFixed ON 時、マスクより優先）
   if (hitTestAnchor(p.x, p.y)) {
-    S.drag.active = true;
-    S.drag.mode   = 'fg-anchor';
-    S.drag.sp     = { x: p.x, y: p.y };
-    S.drag.pinX0  = parseFloat(elFgPinX.value);
-    S.drag.pinY0  = parseFloat(elFgPinY.value);
+    state.drag.active = true;
+    state.drag.mode   = 'fg-anchor';
+    state.drag.sp     = { x: p.x, y: p.y };
+    state.drag.pinX0  = parseFloat(elFgPinX.value);
+    state.drag.pinY0  = parseFloat(elFgPinY.value);
     canvas.style.cursor = 'grabbing';
     e.preventDefault();
     return;
   }
   const hh = hitTestHandle(p.x, p.y);
   if (hh) {
-    S.drag.active = true;
-    S.drag.mode   = hh.id;
-    S.drag.sm     = { ...S.mask };
-    S.drag.sp     = { x: p.x, y: p.y };
+    state.drag.active = true;
+    state.drag.mode   = hh.id;
+    state.drag.sm     = { ...state.mask };
+    state.drag.sp     = { x: p.x, y: p.y };
     canvas.style.cursor = hh.cur;
     e.preventDefault();
     return;
   }
   if (hitTestMask(p.x, p.y)) {
-    S.drag.active = true;
-    S.drag.mode   = 'move';
-    S.drag.ox     = p.x - S.mask.x;
-    S.drag.oy     = p.y - S.mask.y;
+    state.drag.active = true;
+    state.drag.mode   = 'move';
+    state.drag.ox     = p.x - state.mask.x;
+    state.drag.oy     = p.y - state.mask.y;
     canvas.style.cursor = 'grabbing';
     e.preventDefault();
   }
@@ -4605,7 +4605,7 @@ canvas.addEventListener('mousedown', e => {
 });
 canvas.addEventListener('click', () => {
   if (_canvasClickMoved) return;
-  if (S.playing) syncPause(); else syncPlay();
+  if (state.playing) syncPause(); else syncPlay();
 });
 
 // ---- マスク追従モード (右クリック) ----
@@ -4614,8 +4614,8 @@ canvas.addEventListener('click', () => {
 function _setFollowMode(mode) {
   _followMode = mode;
   canvasWrap.classList.toggle('mask-follow', mode !== 'none');
-  if (mode === 'anchor' && !S.zoomLock) {
-    S.zoomLock = true;
+  if (mode === 'anchor' && !state.zoomLock) {
+    state.zoomLock = true;
     _updateZoomLockBtn();
   }
 }
@@ -4625,7 +4625,7 @@ canvas.addEventListener('contextmenu', e => {
   const p = canvasCoords(e);
   _followTargetX = p.x;
   _followTargetY = p.y;
-  if (S.fgFixed && hitTestAnchor(p.x, p.y)) {
+  if (state.fgFixed && hitTestAnchor(p.x, p.y)) {
     // アンカーの上で右クリック → アンカー追従トグル
     const next = _followMode === 'anchor' ? 'none' : 'anchor';
     _setFollowMode(next);
@@ -4637,7 +4637,7 @@ canvas.addEventListener('contextmenu', e => {
 });
 
 canvas.addEventListener('wheel', e => {
-  if (_followMode === 'none' && !S.maskHovered && !S.anchorHovered) return;
+  if (_followMode === 'none' && !state.maskHovered && !state.anchorHovered) return;
   e.preventDefault();
 
   const doZoom = () => {
@@ -4656,24 +4656,24 @@ canvas.addEventListener('wheel', e => {
   };
   const doResize = () => {
     const step = e.deltaY < 0 ? 10 : -10;
-    const cx = S.mask.x + S.mask.w / 2;
-    const cy = S.mask.y + S.mask.h / 2;
-    const oldW = S.mask.w;
-    const rawW = Math.max(20, S.mask.w + step);
-    const rawH = S.mask.h > 0 ? Math.max(20, Math.round(rawW * S.mask.h / S.mask.w)) : rawW;
+    const cx = state.mask.x + state.mask.w / 2;
+    const cy = state.mask.y + state.mask.h / 2;
+    const oldW = state.mask.w;
+    const rawW = Math.max(20, state.mask.w + step);
+    const rawH = state.mask.h > 0 ? Math.max(20, Math.round(rawW * state.mask.h / state.mask.w)) : rawW;
     const snapped = _snapMaskSize(rawW, rawH);
     _syncZoomToMaskScale(oldW, snapped.w);
-    S.mask.w = snapped.w;
-    S.mask.h = snapped.h;
+    state.mask.w = snapped.w;
+    state.mask.h = snapped.h;
     // マスク中心を固定してリサイズ（中心から広げる）
-    S.mask.x = Math.round(cx - snapped.w / 2);
-    S.mask.y = Math.round(cy - snapped.h / 2);
+    state.mask.x = Math.round(cx - snapped.w / 2);
+    state.mask.y = Math.round(cy - snapped.h / 2);
     _followTargetX = cx;
     _followTargetY = cy;
     _syncMaskSliders();
   };
 
-  if (_followMode === 'anchor' || S.anchorHovered) {
+  if (_followMode === 'anchor' || state.anchorHovered) {
     // 視点モード / アンカーホバー: ホイール=ズーム / Ctrl+ホイール=枠サイズ
     if (e.ctrlKey) doResize(); else doZoom();
   } else {
@@ -4682,7 +4682,7 @@ canvas.addEventListener('wheel', e => {
   }
 }, { passive: false });
 
-canvas.addEventListener('mouseleave', () => { S.maskHovered = false; S.anchorHovered = false; });
+canvas.addEventListener('mouseleave', () => { state.maskHovered = false; state.anchorHovered = false; });
 
 let _modalOpen = false;
 
@@ -4693,11 +4693,11 @@ document.addEventListener('mousemove', e => {
     _followTargetX = p.x;
     _followTargetY = p.y;
     if (_followMode === 'mask') {
-      S.mask.x = Math.round(p.x - S.mask.w / 2);
-      S.mask.y = Math.round(p.y - S.mask.h / 2);
+      state.mask.x = Math.round(p.x - state.mask.w / 2);
+      state.mask.y = Math.round(p.y - state.mask.h / 2);
       _syncOffsetSliders();
     }
-    if (_followMode === 'anchor' && S.fgFixed) {
+    if (_followMode === 'anchor' && state.fgFixed) {
       const nx = Math.max(-1920, Math.min(1920, Math.round(p.x - canvas.width  / 2)));
       const ny = Math.max(-1080, Math.min(1080, Math.round(p.y - canvas.height / 2)));
       elFgPinX.value = nx; elFgPinY.value = ny;
@@ -4705,33 +4705,33 @@ document.addEventListener('mousemove', e => {
       document.getElementById('fgPinYVal').value = ny;
       updateSliderFill(elFgPinX); updateSliderFill(elFgPinY);
     }
-    S.maskHovered = false;
+    state.maskHovered = false;
     return;
   }
-  if (!S.drag.active) {
+  if (!state.drag.active) {
     const hh       = hitTestHandle(p.x, p.y);
     const inMask   = hitTestMask(p.x, p.y);
     const inAnchor = hitTestAnchor(p.x, p.y);
-    S.maskHovered = !!(hh || inMask);
-    S.anchorHovered = !!inAnchor;
+    state.maskHovered = !!(hh || inMask);
+    state.anchorHovered = !!inAnchor;
     canvas.style.cursor = inAnchor ? 'grab' : (hh ? hh.cur : (inMask ? 'grab' : 'default'));
     return;
   }
   _canvasClickMoved = true;
-  if (S.drag.mode === 'fg-anchor') {
+  if (state.drag.mode === 'fg-anchor') {
     _applyAnchorDrag(p);
-  } else if (S.drag.mode === 'move') {
-    S.mask.x = Math.round(p.x - S.drag.ox);
-    S.mask.y = Math.round(p.y - S.drag.oy);
+  } else if (state.drag.mode === 'move') {
+    state.mask.x = Math.round(p.x - state.drag.ox);
+    state.mask.y = Math.round(p.y - state.drag.oy);
     _syncOffsetSliders();
   } else {
-    applyResize(S.drag.mode, p.x - S.drag.sp.x, p.y - S.drag.sp.y, e.shiftKey);
+    applyResize(state.drag.mode, p.x - state.drag.sp.x, p.y - state.drag.sp.y, e.shiftKey);
   }
 });
 
 document.addEventListener('mouseup', () => {
-  if (S.drag.active) {
-    S.drag.active = false; S.drag.mode = null; canvas.style.cursor = 'default';
+  if (state.drag.active) {
+    state.drag.active = false; state.drag.mode = null; canvas.style.cursor = 'default';
     _syncOffsetSliders();
   }
 });
@@ -4739,29 +4739,29 @@ document.addEventListener('mouseup', () => {
 canvas.addEventListener('touchstart', e => {
   const p = canvasCoords(e);
   if (hitTestHandle(p.x, p.y) || hitTestMask(p.x, p.y)) {
-    S.maskTouched = true;
+    state.maskTouched = true;
   } else {
-    S.maskTouched = false;
+    state.maskTouched = false;
   }
   startDrag(e, p);
 }, { passive: false });
 
 document.addEventListener('touchmove', e => {
-  if (!S.drag.active) return;
+  if (!state.drag.active) return;
   const p = canvasCoords(e);
-  if (S.drag.mode === 'fg-anchor') {
+  if (state.drag.mode === 'fg-anchor') {
     _applyAnchorDrag(p);
-  } else if (S.drag.mode === 'move') {
-    S.mask.x = Math.round(p.x - S.drag.ox);
-    S.mask.y = Math.round(p.y - S.drag.oy);
+  } else if (state.drag.mode === 'move') {
+    state.mask.x = Math.round(p.x - state.drag.ox);
+    state.mask.y = Math.round(p.y - state.drag.oy);
     _syncOffsetSliders();
   } else {
-    applyResize(S.drag.mode, p.x - S.drag.sp.x, p.y - S.drag.sp.y);
+    applyResize(state.drag.mode, p.x - state.drag.sp.x, p.y - state.drag.sp.y);
   }
   e.preventDefault();
 }, { passive: false });
 
-document.addEventListener('touchend', () => { S.drag.active = false; S.drag.mode = null; _syncOffsetSliders(); });
+document.addEventListener('touchend', () => { state.drag.active = false; state.drag.mode = null; _syncOffsetSliders(); });
 
 // ============================================================
 //  プログレスバー
@@ -4828,7 +4828,7 @@ function updateProgress() {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].pause(); });
-  } else if (S.playing) {
+  } else if (state.playing) {
     [0, 1].forEach(i => { if (loaded[i] && mediaType[i] === 'video') vid[i].play().catch(() => {}); });
   }
 });
@@ -5079,14 +5079,14 @@ function collectSettings() {
     offset0:       elOffset0.value,
     vol1:          elVol1.value,
     offset1:       elOffset1.value,
-    maskX:         S.mask.x,
-    maskY:         S.mask.y,
-    maskW:         S.mask.w,
-    maskH:         S.mask.h,
+    maskX:         state.mask.x,
+    maskY:         state.mask.y,
+    maskW:         state.mask.w,
+    maskH:         state.mask.h,
     bufW:          canvas.width,
     bufH:          canvas.height,
-    maskShape:     S.mask.shape,
-    arLock:        S.arLock,
+    maskShape:     state.mask.shape,
+    arLock:        state.arLock,
     borderW:       elBorderW.value,
     borderOpacity: elBorderOpacity.value,
     borderColor:   elBorderColor.value,
@@ -5097,8 +5097,8 @@ function collectSettings() {
     maskBlur:    elMaskBlur.value,
     maskPixel: elMaskPixel.value,
     maskZoom:      elMaskZoom.value,
-    fgFixed:       S.fgFixed,
-    zoomLock:      S.zoomLock,
+    fgFixed:       state.fgFixed,
+    zoomLock:      state.zoomLock,
     fgPinX:        elFgPinX.value,
     fgPinY:        elFgPinY.value,
     fgPinLerp:     elFgPinLerp.value,
@@ -5126,7 +5126,7 @@ function collectSettings() {
     rainShadow:       elRainShadow.value,
     frameBlur:        elFrameBlur.value,
     frameTint:        elFrameTint.value,
-    glassesStyle:     S.mask.glassesStyle,
+    glassesStyle:     state.mask.glassesStyle,
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
@@ -5220,7 +5220,7 @@ function applySettings(d) {
   }
   if (d.maskShape) {
     const loadShape = d.maskShape;
-    S.mask.shape = loadShape;
+    state.mask.shape = loadShape;
     const isGlasses = loadShape === 'glasses';
     document.querySelectorAll('.shape-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.shape === loadShape);
@@ -5231,8 +5231,8 @@ function applySettings(d) {
     document.getElementById('frameBlurRow').style.display = _isFrameShape3 ? '' : 'none';
     document.getElementById('frameTintRow').style.display = _isFrameShape3 ? '' : 'none';
     if (isGlasses) {
-      if (d.glassesStyle != null) S.mask.glassesStyle = d.glassesStyle;
-      const gsi = S.mask.glassesStyle || 0;
+      if (d.glassesStyle != null) state.mask.glassesStyle = d.glassesStyle;
+      const gsi = state.mask.glassesStyle || 0;
       elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === gsi));
     }
     _updateFgFixedBtn();
@@ -5268,15 +5268,15 @@ function applySettings(d) {
     }
   }
   if (d.arLock != null) {
-    S.arLock = !!d.arLock;
+    state.arLock = !!d.arLock;
     _updateArLockBtn();
   }
   if (d.zoomLock != null) {
-    S.zoomLock = !!d.zoomLock;
+    state.zoomLock = !!d.zoomLock;
     _updateZoomLockBtn();
   }
   if (d.fgFixed != null) {
-    S.fgFixed = !!d.fgFixed;
+    state.fgFixed = !!d.fgFixed;
     _updateFgFixedBtn();
   }
   // theme はプリセットに含めない（ユーザー個人の設定として独立管理）
@@ -6488,7 +6488,7 @@ document.getElementById('resyncBtn').addEventListener('click', async () => {
   await _applyCompositeT(_compositeT);
   // 一時停止中は requestVideoFrameCallback が起動しないことがあるため、
   // シーク完了後に createImageBitmap で _vidBitmap を強制リフレッシュしてキャンバスに即反映
-  if (!S.playing && 'createImageBitmap' in window) {
+  if (!state.playing && 'createImageBitmap' in window) {
     await Promise.all([0, 1].map(async i => {
       if (!loaded[i] || mediaType[i] !== 'video') return;
       try {
