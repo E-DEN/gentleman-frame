@@ -21,10 +21,10 @@ import { resetHintState } from './render.js';
 
 // proxy.js (yt-dlp) を使って Iwara ページURL → CDN URL を解決
 // ローカル実行時はローカルプロキシ、本番（Pages）ではWorkerを自動選択
-const _cfg = window.GF_CONFIG || {};
+const _cfg = window.GF_CONFIG;
 export const _MY_PROXY = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-  ? (_cfg.proxyLocal || 'http://localhost:8788')
-  : (_cfg.proxyProd  || 'https://gf-proxy.mydn.workers.dev');
+  ? _cfg.proxyLocal
+  : _cfg.proxyProd;
 
 export async function resolveIwaraURL(pageUrl) {
   const base = _MY_PROXY;
