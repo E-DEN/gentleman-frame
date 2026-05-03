@@ -7,7 +7,7 @@ import {
   vid, img, mediaType, loaded, visHidden, maskHidden, effectsHidden,
   _vidBitmap, _vidBitmapPending, _startBitmapCapture, _stopBitmapCapture,
   _currentHandle, _loadedFileName, _loadedPageUrl, _loadedSrcUrl,
-  _compositeT, _compositeLastRaf, _compositeSeekPending, _playDelayTimers,
+  _compositeT, _compositeSeekPending, _playDelayTimers,
   setCompositeT, setCompositeLastRaf, setCompositeSeekPending,
   _scheduleResync, _resyncTimer,
   _syncMaskSliders, _syncOffsetSliders,

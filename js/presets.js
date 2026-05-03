@@ -1,7 +1,7 @@
 ﻿// presets.js — プリセット管理・コーデック・エクスポート/インポート
 
-import { state, _animColors, _ANIM_DEFAULTS, PRESET_KEY, _presetsReady, setPresetsReady,
-  _calcOverflows, _setZoneLoaded } from './state.js';
+import { state, _animColors, PRESET_KEY, setPresetsReady,
+  _calcOverflows } from './state.js';
 import {
   canvas,
   vid, img, mediaType, loaded, visHidden,
@@ -28,14 +28,14 @@ import {
   _pendingMask, setPendingMask,
   _bufferSynced, setCanvasAspectRatio,
   _maskBorderFadeStart, setMaskBorderFadeStart,
-  _fgFadeStart, setFgFadeStart,
-  _modalOpen, setModalOpen,
+  setFgFadeStart,
+  setModalOpen,
   _shiftHeld, _setDelBtnIcon,
   _updateFgFixedBtn, _updateArLockBtn, _updateZoomLockBtn,
 } from './canvas.js';
 import {
   _applyBorderAnim, _syncAnimColors,
-  _collectFilterParams, _renderCustomFQP, _setRenderPresets,
+  _setRenderPresets,
   applyLang,
   syncStop, _applyCompositeT,
 } from './controls.js';

@@ -9,7 +9,7 @@ import {
   effectsWrap, svgGblurEl,
   vid, img, mediaType, loaded, visHidden, maskHidden, effectsHidden,
   getMediaSrc, getHandles, HANDLE_SZ,
-  _dispW, _dispH, _cachedAccent, _cachedBg, _readCssVars,
+  _dispH, _cachedAccent, _cachedBg,
   _lastBufScale, _lastFgAlpha,
   setLastBufScale, setLastFgAlpha,
   _compositeT, _compositeLastRaf, _compositeSeekPending,
