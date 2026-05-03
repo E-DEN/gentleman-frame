@@ -6,6 +6,7 @@ import { canvas, loaded, mediaType, vid, _vidBitmap, _compositeT } from './canva
 import { _applyCompositeT } from './playback.js';
 // 以下のモジュールはインポート時にトップレベル初期化コードを実行する
 import './render.js';
+import './controls.js';
 import './media.js';
 import './presets.js';
 import './sortable.js';
@@ -158,3 +159,11 @@ document.getElementById('canvasWrap').addEventListener('dblclick', () => {
 })();
 
 lucide.createIcons();
+
+// ============================================================
+//  ブラウザのデフォルトファイルオープン防止
+//  ドロップゾーン外にファイルをドロップしたときブラウザがファイルを
+//  開いてしまわないよう、document レベルで dragover/drop を抑制する。
+// ============================================================
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop',     e => e.preventDefault());
