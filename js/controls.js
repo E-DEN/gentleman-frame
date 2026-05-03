@@ -1132,6 +1132,8 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
   }
   state.mask.w = dw;
   state.mask.h = dh;
+  state.mask.x = Math.round((canvas.width  - dw) / 2);
+  state.mask.y = Math.round((canvas.height - dh) / 2);
   state.arLock = (state.mask.shape === 'phone' || state.mask.shape === 'heart' || state.mask.shape === 'glasses');
   _updateArLockBtn();
   if (state.mask.shape === 'phone') {
@@ -1143,9 +1145,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
     el.dispatchEvent(new Event('input'));
   };
   _syncMaskSliders();
-  ['maskBlur', 'borderW', 'borderOpacity', 'borderSpeed', 'borderGlow', 'frameBlur', 'frameTint'].forEach(resetSlider);
-  document.getElementById('borderColor').value =
-    document.getElementById('borderColor').defaultValue || '#ffffff';
+  ['maskOffX', 'maskOffY', 'maskBlur', 'maskPixel', 'maskZoom', 'borderW', 'borderOpacity', 'borderAnimSpeed', 'borderAnimBright', 'frameBlur', 'frameTint'].forEach(resetSlider);
   lucide.createIcons();
 });
 
