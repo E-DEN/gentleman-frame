@@ -60,25 +60,19 @@
       gl.deleteProgram(prog);
       return null;
     }
-    var posLoc      = gl.getAttribLocation(prog, 'a_position');
-    var texCoordLoc = gl.getAttribLocation(prog, 'a_texCoord');
-    if (posLoc < 0 || texCoordLoc < 0) {
-      console.error('GFRainEngine: attribute location not found', { posLoc, texCoordLoc });
+    var posLoc = gl.getAttribLocation(prog, 'a_position');
+    if (posLoc < 0) {
+      console.error('GFRainEngine: attribute location not found', { posLoc });
       gl.deleteProgram(prog);
       return null;
     }
 
-    var tcBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, tcBuf);
+    var posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       -1, -1,  1, -1,  -1,  1,
       -1,  1,  1, -1,   1,  1
     ]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(texCoordLoc);
-    gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-
-    var posBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
     gl.enableVertexAttribArray(posLoc);
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
@@ -171,7 +165,6 @@
     'uniform sampler2D u_textureShine;',
     'uniform sampler2D u_textureFg;',
     'uniform sampler2D u_textureBg;',
-    'varying vec2 v_texCoord;',
     'uniform vec2 u_resolution;',
     'uniform vec2 u_parallax;',
     'uniform float u_parallaxFg;',
