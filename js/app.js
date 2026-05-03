@@ -301,21 +301,13 @@ function _syncOffsetSliders() {
 }
 
 // pending マスク設定をバッファ座標に変換して適用
-// srcW/srcH あり → 比率スケール変換、なし（旧プリセット）→ 現バッファ中央に配置
 function _applyMaskFromPm(pm, cw, ch) {
-  if (!pm) return false;
-  if (pm.srcW && pm.srcH && pm.x != null) {
-    const sx = cw / pm.srcW, sy = ch / pm.srcH;
-    S.mask.w = Math.max(1, Math.min(Math.round(pm.w * sx), cw));
-    S.mask.h = Math.max(1, Math.min(Math.round(pm.h * sy), ch));
-    S.mask.x = Math.max(0, Math.min(Math.round(pm.x * sx), cw - S.mask.w));
-    S.mask.y = Math.max(0, Math.min(Math.round(pm.y * sy), ch - S.mask.h));
-  } else {
-    S.mask.w = Math.max(1, Math.min(pm.w, cw));
-    S.mask.h = Math.max(1, Math.min(pm.h, ch));
-    S.mask.x = Math.round((cw - S.mask.w) / 2);
-    S.mask.y = Math.round((ch - S.mask.h) / 2);
-  }
+  if (!pm || !pm.srcW || !pm.srcH || pm.x == null) return false;
+  const sx = cw / pm.srcW, sy = ch / pm.srcH;
+  S.mask.w = Math.max(1, Math.min(Math.round(pm.w * sx), cw));
+  S.mask.h = Math.max(1, Math.min(Math.round(pm.h * sy), ch));
+  S.mask.x = Math.max(0, Math.min(Math.round(pm.x * sx), cw - S.mask.w));
+  S.mask.y = Math.max(0, Math.min(Math.round(pm.y * sy), ch - S.mask.h));
   return true;
 }
 
@@ -642,6 +634,30 @@ function _brightHex(hex, bright) {
     const t = (bright - 70) / 30;
     return `rgb(${Math.round(r+(255-r)*t)},${Math.round(g+(255-g)*t)},${Math.round(b+(255-b)*t)})`;
   }
+}
+
+// 枠色合い(frameTint +)用グラデーション塗りつぶしを生成（border strokeと同じ回転グラデーション）
+function _buildTintFill(ctx, cvs, animKey, phase) {
+  if (animKey === 'none' || !animKey) return elBorderColor.value;
+  const bright = parseInt(elBorderAnimBright.value, 10);
+  const cx = cvs.width / 2, cy = cvs.height / 2;
+  const r  = Math.hypot(cvs.width, cvs.height) / 2;
+  const a  = phase * Math.PI * 2;
+  const g  = ctx.createLinearGradient(
+    cx + Math.cos(a) * r, cy + Math.sin(a) * r,
+    cx - Math.cos(a) * r, cy - Math.sin(a) * r
+  );
+  if (animKey === 'rainbow') {
+    for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60},100%,${bright}%)`);
+  } else if (_animColors[animKey]) {
+    const [c0, c1] = _animColors[animKey];
+    g.addColorStop(0,   _brightHex(c0, bright));
+    g.addColorStop(0.5, _brightHex(c1, bright));
+    g.addColorStop(1,   _brightHex(c0, bright));
+  } else {
+    return elBorderColor.value;
+  }
+  return g;
 }
 
 function _buildBorderGrad(ctx, m, phase, anim, bright) {
@@ -1423,8 +1439,11 @@ function _drawGlassesFrame(ctx, m, bufScale) {
         postCtx.drawImage(renderCvs, 0, 0);
       }
       if (_ft !== 0) {
+        const _animKey = elBorderAnim.value;
+        const _speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
+        const _phase = (performance.now() * 0.001 * _speed) % 1;
         postCtx.globalAlpha = Math.abs(_ft) / 100;
-        postCtx.fillStyle = _ft > 0 ? elBorderColor.value : '#000000';
+        postCtx.fillStyle = _ft > 0 ? _buildTintFill(postCtx, postCvs, _animKey, _phase) : '#000000';
         postCtx.fillRect(0, 0, postCvs.width, postCvs.height);
         postCtx.globalAlpha = 1;
       }
@@ -1735,8 +1754,11 @@ function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
         postCtx.drawImage(renderCvs, 0, 0);
       }
       if (_ft !== 0) {
+        const _animKey = elBorderAnim.value;
+        const _speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
+        const _phase = (performance.now() * 0.001 * _speed) % 1;
         postCtx.globalAlpha = Math.abs(_ft) / 100;
-        postCtx.fillStyle = _ft > 0 ? elBorderColor.value : '#000000';
+        postCtx.fillStyle = _ft > 0 ? _buildTintFill(postCtx, postCvs, _animKey, _phase) : '#000000';
         postCtx.fillRect(0, 0, postCvs.width, postCvs.height);
         postCtx.globalAlpha = 1;
       }
@@ -5132,7 +5154,7 @@ function applySettings(d) {
     vol1: d.vol1, offset1: d.offset1,
     maskW: d.maskW, maskH: d.maskH,
     borderW: d.borderW, borderOpacity: d.borderOpacity, maskBlur: d.maskBlur,
-    maskPixel: d.maskPixel ?? d.filterPixel ?? 0,
+    maskPixel: d.maskPixel ?? 0,
     filterBlur: d.filterBlur ?? 0,
     filterBrightness: d.filterBrightness, filterContrast: d.filterContrast,
     filterHighlight: d.filterHighlight ?? 0, filterShadow: d.filterShadow ?? 0,
@@ -5174,8 +5196,7 @@ function applySettings(d) {
     _applyBorderAnim(d.borderAnim);
   }
   if (d.maskShape) {
-    // 旧プリセット互換: glasses2 → glasses に正規化
-    const loadShape = (d.maskShape === 'glasses2') ? 'glasses' : d.maskShape;
+    const loadShape = d.maskShape;
     S.mask.shape = loadShape;
     const isGlasses = loadShape === 'glasses';
     document.querySelectorAll('.shape-btn').forEach(b => {
@@ -5205,11 +5226,6 @@ function applySettings(d) {
     _phoneShowRec = !!d.phoneShowRec;
     elPhoneUiBtnRec.classList.toggle('active', _phoneShowRec);
   }
-  // 旧プリセット互換: phoneShowTC は phoneShowRec として扱う
-  if (d.phoneShowTC != null && d.phoneShowRec == null) {
-    _phoneShowRec = !!d.phoneShowTC;
-    elPhoneUiBtnRec.classList.toggle('active', _phoneShowRec);
-  }
   if (d.phoneShowDot != null) {
     _phoneShowDot = !!d.phoneShowDot;
     elPhoneUiBtnDot.classList.toggle('active', _phoneShowDot);
@@ -5221,17 +5237,11 @@ function applySettings(d) {
       h: +d.maskH,
       x: d.maskX != null ? +d.maskX : null,
       y: d.maskY != null ? +d.maskY : null,
-      srcW: d.bufW ? +d.bufW : null,  // 保存時のバッファ幅 (旧プリセットは null)
+      srcW: d.bufW ? +d.bufW : null,
       srcH: d.bufH ? +d.bufH : null,
     };
-    // bufW/bufH があれば正しい AR で即座に適用、なければ現バッファで直接適用
-    if (_bufferSynced) {
-      if (d.bufW && d.bufH) {
-        setCanvasAspectRatio(+d.bufW, +d.bufH); // _pendingMask も内部で消費される
-      } else {
-        _applyMaskFromPm(_pendingMask, canvas.width, canvas.height);
-        _syncMaskSliders();
-      }
+    if (_bufferSynced && d.bufW && d.bufH) {
+      setCanvasAspectRatio(+d.bufW, +d.bufH); // _pendingMask も内部で消費される
     }
   }
   if (d.arLock != null) {
