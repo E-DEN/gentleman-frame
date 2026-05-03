@@ -21,7 +21,7 @@ const { URL }  = require('url');
 const path   = require('path');
 const fs     = require('fs');
 
-const PORT = 8788;
+const PORT = parseInt(process.env.PORT, 10) || 8788;
 
 // ---------- Iwara direct API resolver ----------
 
