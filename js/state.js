@@ -74,8 +74,11 @@ export const state = {
     w: 400,
     h: 400,
     shape: 'rect',
-    glassesStyle: 0
+    glassesStyle: 0,
+    specStyle: 'bars',
+    specGap: 15,
   },
+  borderInvert: false,
   arLock: false,
   zoomLock: false,           // マスクリサイズ時にズームを自動追従させる
   fgFixed: false,            // false = 紳士枠モード, true = アンカーモード

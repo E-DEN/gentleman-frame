@@ -19,6 +19,7 @@ import {
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
   elMaskZoom, elMaskW, elMaskH,
   elPhoneUiRow, elGlassesUiRow, elGlassesStyleBtns,
+  elSpectrumUiRow,
   elPhoneUiBtnRoT, elPhoneUiBtnRec, elPhoneUiBtnDot, elPhoneUiBtnRot90,
   updateSliderFill, _syncMaskSliders,
   _activePresetIdx, setActivePresetIdx,
@@ -71,6 +72,7 @@ export function collectSettings() {
     borderOpacity: elBorderOpacity.value,
     borderColor:   elBorderColor.value,
     borderAnim:    elBorderAnim.value,
+    borderInvert:  state.borderInvert,
     borderAnimSpeed:  elBorderAnimSpeed.value,
     borderAnimBright: elBorderAnimBright.value,
     borderAnimColors: JSON.stringify(_animColors),
@@ -107,6 +109,10 @@ export function collectSettings() {
     frameBlur:        elFrameBlur.value,
     frameTint:        elFrameTint.value,
     glassesStyle:     state.mask.glassesStyle,
+    specStyle:        state.mask.specStyle || 'bars',
+    specBars:         document.getElementById('specBars')?.value ?? '64',
+    specAmp:          document.getElementById('specAmp')?.value  ?? '100',
+    specGap:          document.getElementById('specGap')?.value  ?? '15',
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
@@ -145,6 +151,9 @@ export function applySettings(d) {
     ['fgPinY','fgPinYVal'],
     ['fgPinLerp','fgPinLerpVal'],
     ['fgPinOpacity','fgPinOpacityVal'],
+    ['specBars','specBarsVal'],
+    ['specAmp','specAmpVal'],
+    ['specGap','specGapVal'],
   ];
   const vals = {
     vol0:             d.vol0             ?? '25',
@@ -185,6 +194,9 @@ export function applySettings(d) {
     fgPinY:           d.fgPinY           ?? '0',
     fgPinLerp:        d.fgPinLerp        ?? '50',
     fgPinOpacity:     d.fgPinOpacity     ?? '100',
+    specBars:         d.specBars         ?? '32',
+    specAmp:          d.specAmp          ?? '100',
+    specGap:          d.specGap          ?? '0',
   };
   sliders.forEach(([id]) => {
     if (vals[id] == null) return;
@@ -209,6 +221,11 @@ export function applySettings(d) {
     }
     Object.keys(_animColors).forEach(_syncAnimColors);
     _applyBorderAnim(d.borderAnim);
+    if (d.borderInvert) {
+      state.borderInvert = true;
+      document.querySelector('.bcp-chip--invert')?.classList.add('active');
+      _syncBorderSwatch?.();
+    }
   }
   if (d.maskShape) {
     const loadShape = d.maskShape;
@@ -227,6 +244,20 @@ export function applySettings(d) {
       const gsi = state.mask.glassesStyle || 0;
       elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === gsi));
     }
+    if (loadShape === 'spectrum') {
+      if (d.specStyle) {
+        // 旧プリセット互換: radial-spike/radial-wave → radial
+        const s = d.specStyle.startsWith('radial') ? 'radial' : d.specStyle;
+        state.mask.specStyle = s;
+      }
+      const ss = state.mask.specStyle || 'bars';
+      document.querySelectorAll('.spec-style-btn[data-specstyle]').forEach(b =>
+        b.classList.toggle('active', b.dataset.specstyle === ss));
+    }
+    elSpectrumUiRow.style.display = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specBarsRow').style.display = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specAmpRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specGapRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
     _updateFgFixedBtn();
   }
   if (d.phoneLandscape != null) {

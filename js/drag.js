@@ -52,6 +52,7 @@ export function hitTestMask(px, py) {
   }
   if (shape === 'phone') return px >= x && px <= x + w && py >= y && py <= y + h;
   if (shape === 'glasses') return px >= x && px <= x + w && py >= y && py <= y + h;
+  if (shape === 'spectrum') return px >= x && px <= x + w && py >= y && py <= y + h;
   return false;
 }
 

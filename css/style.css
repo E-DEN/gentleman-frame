@@ -903,6 +903,10 @@
     }
     .bcp-chip:hover { transform: scale(1.2); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
     .bcp-chip.active { border-color: #fff; box-shadow: 0 0 0 1px var(--accent), 0 2px 6px rgba(0,0,0,0.5); }
+    .bcp-chip--invert {
+      background: linear-gradient(135deg, #fff 50%, #000 50%) !important;
+      border-radius: 6px;
+    }
     .bcp-custom-btn {
       width: 20px;
       height: 20px;
@@ -1125,6 +1129,26 @@
     }
     .shape-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     /* Phone UI overlay toggles */
+    .spec-style-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 22px;
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 3px 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      font-family: inherit;
+    }
+    .spec-style-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .spec-style-btn:active:not(:disabled) { transform: scale(0.93); transition: transform 0.07s, border-color 0.12s, color 0.12s; }
+    .spec-style-btn.active { border-color: var(--accent); color: var(--accent); }
+
     .phone-ui-group {
       display: flex;
       gap: 4px;
@@ -2079,6 +2103,7 @@
     }
     .btn       svg.lucide { width: 14px; height: 14px; }    .card-title svg.lucide { width: 13px; height: 13px; }
     .drop-icon  svg.lucide { width: 22px; height: 22px; }
-    .shape-btn  svg.lucide { width: 14px; height: 14px; }
+    .shape-btn       svg.lucide { width: 14px; height: 14px; }
+    .spec-style-btn   svg.lucide { width: 14px; height: 14px; }
     .hint       svg.lucide { width: 12px; height: 12px; }
     .drop-delete svg.lucide { width: 10px; height: 10px; }

@@ -14,7 +14,7 @@ import {
   elBorderW, elBorderColor, elBorderOpacity,
   elBorderAnim, elBorderAnimSpeed, elBorderAnimBright,
   elFrameBlur, elFrameTint,
-  elPhoneUiRow, elGlassesUiRow, elGlassesStyleBtns,
+  elPhoneUiRow, elGlassesUiRow, elSpectrumUiRow, elSpecBars, elSpecAmp, elGlassesStyleBtns,
   elPhoneUiBtnRoT, elPhoneUiBtnRec, elPhoneUiBtnDot, elPhoneUiBtnRot90,
   elVol0, elVol1, elOffset0, elOffset1,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
@@ -40,6 +40,7 @@ import {
 } from './render.js';
 import { updateMediaControls, _updateDropLink } from './media.js';
 import { syncPlay, syncPause, syncStop, _applyCompositeT } from './playback.js';
+import { connectAudioElements } from './spectrum.js';
 import './drag.js';
 import './lang.js';
 
@@ -336,6 +337,8 @@ let _closeBorderColorPop = () => {};
 export let _syncAnimColors = (_anim) => {};
 let _resetBcpTarget      = ()      => {};
 export function _applyBorderAnim(anim) {
+  state.borderInvert = false;
+  document.querySelector('.bcp-chip--invert')?.classList.remove('active');
   elBorderAnim.value = anim;
   document.querySelectorAll('.banim-btn[data-anim]').forEach(b => b.classList.toggle('active', b.dataset.anim === anim));
   const on = anim !== 'none';
@@ -408,7 +411,7 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
   const SOLID_PRESETS = [
     '#ffffff','#222222','#ff5555','#ff9933',
     '#ffdd33','#33dd77','#33aaff','#33eeff',
-    '#aa55ff','#ff55bb','#ff8833','#00ffcc'
+    '#aa55ff','#ff55bb','#ff8833'
   ];
   const GRAD_MAP = { rainbow: 'conic-gradient(from 0deg, #ff7eb3, #ffb347, #f9f871, #6ee7b7, #93c5fd, #d8b4fe, #ff7eb3)' };
   Object.entries(_animColors).forEach(([k, [c0, c1]]) => { GRAD_MAP[k] = `linear-gradient(135deg,${c0},${c1})`; });
@@ -511,19 +514,31 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     const btn = document.createElement('button');
     btn.className = 'bcp-chip'; btn.style.background = hex; btn.dataset.color = hex;
     btn.addEventListener('click', () => {
-      if (_bcpTarget === 'main') _applyBorderAnim('none');
+      if (_bcpTarget === 'main') { _applyBorderAnim('none'); state.borderInvert = false; }
       _loadHex(hex); _applyColorState();
       if (_bcpTarget === 'main') _closeBorderColorPop();
     });
     solidRow.appendChild(btn);
   });
+  // --- ネガポジ反転ボタン ---
+  const invertBtn = document.createElement('button');
+  invertBtn.className = 'bcp-chip bcp-chip--invert';
+  invertBtn.title = 'ネガポジ反転';
+  invertBtn.addEventListener('click', () => {
+    _applyBorderAnim('none');
+    state.borderInvert = !state.borderInvert;
+    invertBtn.classList.toggle('active', state.borderInvert);
+    _syncBorderSwatch();
+    _closeBorderColorPop();
+  });
+  solidRow.appendChild(invertBtn);
 
   let _svDrag = false, _hueDrag = false, _wasDragging = false;
   function _pickSv(e) {
     const r = svCanvas.getBoundingClientRect();
     _s = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     _v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height));
-    if (_bcpTarget === 'main') _applyBorderAnim('none');
+    if (_bcpTarget === 'main') { _applyBorderAnim('none'); state.borderInvert = false; }
     _drawSv(); _applyColorState();
   }
   function _pickHue(e) {
@@ -543,19 +558,23 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     let v = hexInput.value.trim();
     if (!v.startsWith('#')) v = '#' + v;
     if (/^#[0-9a-f]{6}$/i.test(v)) {
-      if (_bcpTarget === 'main') _applyBorderAnim('none');
+      if (_bcpTarget === 'main') { _applyBorderAnim('none'); state.borderInvert = false; }
       _loadHex(v); _applyColorState();
     }
   });
 
   picker.addEventListener('input', () => {
-    if (_bcpTarget === 'main') _applyBorderAnim('none');
+    if (_bcpTarget === 'main') { _applyBorderAnim('none'); state.borderInvert = false; }
     _loadHex(picker.value); _applyColorState();
   });
 
   _syncBorderSwatch = function () {
     const anim = elBorderAnim.value;
-    swatch.style.background = anim !== 'none' ? (GRAD_MAP[anim] || picker.value) : picker.value;
+    if (state.borderInvert) {
+      swatch.style.background = 'linear-gradient(135deg,#fff 50%,#000 50%)';
+    } else {
+      swatch.style.background = anim !== 'none' ? (GRAD_MAP[anim] || picker.value) : picker.value;
+    }
   };
   _syncBorderSwatch();
 
@@ -966,6 +985,10 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     state.mask.shape = newShape;
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
     elGlassesUiRow.style.display = newShape === 'glasses' ? '' : 'none';
+    elSpectrumUiRow.style.display = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specBarsRow').style.display = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specAmpRow').style.display  = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specGapRow').style.display  = newShape === 'spectrum' ? '' : 'none';
     const _isFrameShape2 = newShape === 'phone' || newShape === 'glasses';
     document.getElementById('frameBlurRow').style.display = _isFrameShape2 ? '' : 'none';
     document.getElementById('frameTintRow').style.display = _isFrameShape2 ? '' : 'none';
@@ -1029,6 +1052,7 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
         state.mask.w = side;
         state.mask.x = Math.round((canvas.width - side) / 2);
       }
+      if (newShape === 'spectrum') connectAudioElements(vid[0], vid[1]);
       if (state.arLockBeforeAutoLock !== null) {
         state.arLock = state.arLockBeforeAutoLock;
         state.arLockBeforeAutoLock = null;
@@ -1081,6 +1105,20 @@ elGlassesStyleBtns.forEach(btn => {
     _syncMaskSliders();
   });
 });
+
+// ---- スペクトラム スタイルボタン ----
+document.querySelectorAll('.spec-style-btn[data-specstyle]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.mask.specStyle = btn.dataset.specstyle;
+    document.querySelectorAll('.spec-style-btn[data-specstyle]').forEach(b =>
+      b.classList.toggle('active', b.dataset.specstyle === state.mask.specStyle));
+  });
+});
+// 旧 specStyle 値(radial-spike/radial-wave)を radial に正規化
+if (state.mask.specStyle && state.mask.specStyle.startsWith('radial')) state.mask.specStyle = 'radial';
+bindSlider('specBars', 'specBarsVal', v => `${Math.round(v)}`, null);
+bindSlider('specAmp',  'specAmpVal',  v => `${Math.round(v)}`, null);
+bindSlider('specGap',  'specGapVal',  v => `${Math.round(v)}`, null);
 
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
   state.fgFixed = !state.fgFixed;

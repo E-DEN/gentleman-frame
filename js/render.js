@@ -25,11 +25,13 @@ import {
   elFrameBlur, elFrameTint,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
   elMaskZoom, elMaskBlur, elMaskPixel,
+  elSpecBars, elSpecAmp, elSpecGap,
   _scheduleResync,
   _syncOffsetSliders,
   _getOffsets,
   updateProgress, syncMaskDropOverlay,
 } from './canvas.js';
+import { getSpectrumBars } from './spectrum.js';
 
 // ============================================================
 //  Canvas CSS フィルター（明るさ / コントラスト / 彩度）
@@ -542,6 +544,49 @@ export function _renderFrame() {
 }
 
 // マスク枠・ハンドル・アンカー・スマホフレームをぼかしより後に描画する
+// スペクトラム bars/mirror のスカイライン輪郭パス（gap=0時の枠用）
+function _spectrumSkyline(ctx, m) {
+  const specStyle = m.specStyle || 'bars';
+  if (specStyle !== 'bars' && specStyle !== 'mirror') return false;
+  const BAR_COUNT = elSpecBars ? Math.max(4, parseInt(elSpecBars.value) || 64) : 64;
+  const amp       = elSpecAmp  ? Math.max(0.1, parseFloat(elSpecAmp.value) / 100) : 1.0;
+  const bars      = getSpectrumBars(BAR_COUNT);
+  const barW      = m.w / BAR_COUNT;
+  ctx.beginPath();
+  if (specStyle === 'bars') {
+    const bottom = m.y + m.h;
+    const h = Array.from({ length: BAR_COUNT }, (_, i) => Math.max(2, Math.min(1, (bars ? bars[i] * amp : 0)) * m.h));
+    ctx.moveTo(m.x, bottom);
+    ctx.lineTo(m.x, bottom - h[0]);
+    for (let i = 0; i < BAR_COUNT; i++) {
+      ctx.lineTo(m.x + (i + 1) * barW, bottom - h[i]);
+      if (i < BAR_COUNT - 1) ctx.lineTo(m.x + (i + 1) * barW, bottom - h[i + 1]);
+    }
+    ctx.lineTo(m.x + m.w, bottom);
+    ctx.closePath();
+  } else { // mirror
+    const midY = m.y + m.h / 2;
+    const hh = Array.from({ length: BAR_COUNT }, (_, i) => Math.max(1, Math.min(1, (bars ? bars[i] * amp : 0)) * m.h / 2));
+    // 上側: 左→右
+    ctx.moveTo(m.x, midY);
+    ctx.lineTo(m.x, midY - hh[0]);
+    for (let i = 0; i < BAR_COUNT; i++) {
+      ctx.lineTo(m.x + (i + 1) * barW, midY - hh[i]);
+      if (i < BAR_COUNT - 1) ctx.lineTo(m.x + (i + 1) * barW, midY - hh[i + 1]);
+    }
+    ctx.lineTo(m.x + m.w, midY);
+    // 下側: 右→左
+    ctx.lineTo(m.x + m.w, midY + hh[BAR_COUNT - 1]);
+    for (let i = BAR_COUNT - 1; i >= 0; i--) {
+      ctx.lineTo(m.x + i * barW, midY + hh[i]);
+      if (i > 0) ctx.lineTo(m.x + i * barW, midY + hh[i - 1]);
+    }
+    ctx.lineTo(m.x, midY);
+    ctx.closePath();
+  }
+  return true;
+}
+
 // → effectsWrap 外側の overlayCanvas に描くため CSS filter 非適用
 export function _drawOverlays() {
   const dCtx = overlayCtx;
@@ -575,11 +620,18 @@ export function _drawOverlays() {
         const bright = parseInt(elBorderAnimBright.value, 10);
         const phase  = (performance.now() * 0.001 * speed) % 1;
         dCtx.strokeStyle = _buildBorderGrad(dCtx, m, phase, anim, bright);
-      } else {
+      } else if (!state.borderInvert) {
         dCtx.strokeStyle = elBorderColor.value;
       }
-      const _gp6 = buildMaskPath(dCtx, m);
-      _gp6 ? dCtx.stroke(_gp6) : dCtx.stroke();
+      if (!state.borderInvert || anim !== 'none') {
+        const _usesSkyline = m.shape === 'spectrum' && parseInt(elSpecGap?.value ?? 15) === 0;
+        if (_usesSkyline && _spectrumSkyline(dCtx, m)) {
+          dCtx.stroke();
+        } else {
+          const _gp6 = buildMaskPath(dCtx, m);
+          _gp6 ? dCtx.stroke(_gp6) : dCtx.stroke();
+        }
+      }
       dCtx.restore();
     }
   }
@@ -602,6 +654,32 @@ export function _drawOverlays() {
   // --- 前景アンカー（phone + fgFixed ON 時）---
   // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
   anchorCtx.clearRect(0, 0, W, H);
+
+  // --- borderInvert 枠（anchorCanvas の difference 合成を利用）---
+  if (state.borderInvert && bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
+    // ※ borderFadeA / anim 判定は上で計算済みなので再利用できないため再計算
+    let bfa;
+    if (_fgFadeStart === 0) { bfa = 0; }
+    else if (_fgFadeStart > 0) { bfa = _lastFgAlpha; }
+    else if (_maskBorderFadeStart === 0) { bfa = 0; }
+    else if (_maskBorderFadeStart > 0) { bfa = Math.min(1, (performance.now() - _maskBorderFadeStart) / 500); }
+    else { bfa = 1; }
+    if (bfa > 0) {
+      anchorCtx.save();
+      anchorCtx.lineWidth   = bw * 1.5 * bufScale;
+      anchorCtx.globalAlpha = (parseInt(elBorderOpacity.value, 10) / 100) * bfa;
+      anchorCtx.strokeStyle = '#ffffff';
+      const _usesSkylineInv = m.shape === 'spectrum' && parseInt(elSpecGap?.value ?? 15) === 0;
+      if (_usesSkylineInv && _spectrumSkyline(anchorCtx, m)) {
+        anchorCtx.stroke();
+      } else {
+        const _gp7 = buildMaskPath(anchorCtx, m);
+        _gp7 ? anchorCtx.stroke(_gp7) : anchorCtx.stroke();
+      }
+      anchorCtx.restore();
+    }
+  }
+
   if (state.fgFixed && state.mask.shape === 'phone' && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0])) {
     const ax  = W / 2 + parseFloat(elFgPinX.value);
     const ay  = H / 2 + parseFloat(elFgPinY.value);
@@ -637,12 +715,19 @@ export function _drawOverlays() {
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'phone') {
     const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
     const phase = (performance.now() * 0.001 * speed) % 1;
-    _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase);
+    if (state.borderInvert) {
+      // UI要素は dCtx に通常描画、本体アウトラインのみ anchorCtx に白で描画
+      _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase, null, true, false, true);   // UI only (skip outline + dot)
+      _drawPhoneFrame(anchorCtx, m, bufScale, 1.0, phase, '#ffffff', false, true); // outline + dot
+    } else {
+      _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase);
+    }
   }
 
   // --- メガネ枠オーバーレイ ---
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'glasses') {
-    _drawGlassesFrame(dCtx, m, bufScale);
+    const gfCtx = state.borderInvert ? anchorCtx : dCtx;
+    _drawGlassesFrame(gfCtx, m, bufScale, state.borderInvert ? '#ffffff' : null);
   }
 }
 
@@ -809,6 +894,76 @@ export function buildMaskPath(c, m) {
     else { c.rect(m.x, m.y, m.w, m.h); }
   } else if (m.shape === 'circle') {
     c.ellipse(m.x + m.w / 2, m.y + m.h / 2, m.w / 2, m.h / 2, 0, 0, Math.PI * 2);
+  } else if (m.shape === 'spectrum') {
+    const specStyle = m.specStyle || 'bars';
+    const BAR_COUNT = elSpecBars ? Math.max(4, parseInt(elSpecBars.value) || 64) : 64;
+    const amp       = elSpecAmp  ? Math.max(0.1, parseFloat(elSpecAmp.value) / 100) : 1.0;
+    const bars      = getSpectrumBars(BAR_COUNT);
+
+    if (specStyle === 'bars' || specStyle === 'mirror') {
+      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 15;
+      const gap  = gapPct === 0 ? 0 : Math.max(1, Math.round(m.w / BAR_COUNT * gapPct / 100));
+      const barW = Math.max(1, (m.w - gap * (BAR_COUNT - 1)) / BAR_COUNT);
+      if (specStyle === 'bars') {
+        const bottom = m.y + m.h;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const v    = bars ? Math.min(1, bars[i] * amp) : 0;
+          const barH = Math.max(2, v * m.h);
+          c.rect(m.x + i * (barW + gap), bottom - barH, barW, barH);
+        }
+      } else { // mirror
+        const midY = m.y + m.h / 2;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const v      = bars ? Math.min(1, bars[i] * amp) : 0;
+          const halfH  = Math.max(1, v * m.h / 2);
+          c.rect(m.x + i * (barW + gap), midY - halfH, barW, halfH * 2);
+        }
+      }
+    } else { // radial
+      // gap>0: spike（セグメント分割）、gap=0: wave（スムース）
+      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 15;
+      const cx = m.x + m.w / 2;
+      const cy = m.y + m.h / 2;
+      const rMin = Math.min(m.w, m.h) * 0.18;
+      const rMax = Math.min(m.w, m.h) * 0.50;
+
+      if (gapPct > 0) {
+        // spike: 内円(常時表示) + リングセグメントバー
+        c.arc(cx, cy, rMin, 0, Math.PI * 2);
+        c.closePath();
+        const fullAngle = (Math.PI * 2) / BAR_COUNT;
+        const barAngle  = fullAngle * Math.max(0.1, 1 - gapPct / 100);
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const v      = bars ? Math.min(1, bars[i] * amp) : 0;
+          const outerR = rMin + Math.max(0.04, v) * (rMax - rMin);
+          const angle  = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
+          const a0 = angle - barAngle / 2;
+          const a1 = angle + barAngle / 2;
+          c.moveTo(cx + Math.cos(a0) * rMin, cy + Math.sin(a0) * rMin);
+          c.arc(cx, cy, outerR, a0, a1);
+          c.lineTo(cx + Math.cos(a1) * rMin, cy + Math.sin(a1) * rMin);
+          c.arc(cx, cy, rMin, a1, a0, true);
+          c.closePath();
+        }
+      } else {
+        // wave: スムースBlob
+        const pts = [];
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const v     = bars ? Math.min(1, bars[i] * amp) : 0;
+          const r     = rMin + v * (rMax - rMin);
+          const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
+          pts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
+        }
+        const N = pts.length;
+        c.moveTo((pts[0].x + pts[N - 1].x) / 2, (pts[0].y + pts[N - 1].y) / 2);
+        for (let i = 0; i < N; i++) {
+          const p1 = pts[i];
+          const p2 = pts[(i + 1) % N];
+          c.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+        }
+        c.closePath();
+      }
+    }
   } else if (m.shape === 'heart') {
     // ハート型パス (幅・高さに合わせてスケール)
     const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
@@ -836,7 +991,7 @@ let _shutterMorphLast = 0; // 前回の nowMs
 let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
 let _glassSamplerCtx  = null;
 
-export function _drawGlassesFrame(ctx, m, bufScale) {
+export function _drawGlassesFrame(ctx, m, bufScale, overrideColor = null) {
   const bw = parseFloat(elBorderW.value);
   const idx = (state.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
   const g = _GLASSES_STYLES[idx];
@@ -856,14 +1011,14 @@ export function _drawGlassesFrame(ctx, m, bufScale) {
   const sw      = Math.max(1.5, 2.5 * s); // 外輪固定（スマホ本体と同一）
   const sw_lens = bw * 1.5 * s;           // 内枠: スライダー1 = 1.5バッファpx（外枠最小値と同等）
 
-  const anim    = elBorderAnim.value;
+  const anim    = overrideColor ? 'none' : elBorderAnim.value;
   const speed   = parseFloat(elBorderAnimSpeed.value) * 0.1;
   const phase   = (performance.now() * 0.001 * speed) % 1;
   const bright  = parseInt(elBorderAnimBright.value, 10);
   const opacity = parseInt(elBorderOpacity.value, 10) / 100;
   const strokeStyle = anim !== 'none'
     ? _buildBorderGrad(ctx, m, phase, anim, bright)
-    : elBorderColor.value;
+    : (overrideColor || elBorderColor.value);
 
   // ① ストローク先描画
   ctx.save();
@@ -882,7 +1037,8 @@ export function _drawGlassesFrame(ctx, m, bufScale) {
   ctx.restore();
 
   // ② ブラー/ティントをストロークの背面に合成（destination-over）
-  {
+  // overrideColor（borderInvert）時は差分合成が CSS 側で処理されるためスキップ
+  if (!overrideColor) {
     const _fb = parseFloat(elFrameBlur.value);
     const _ft = parseInt(elFrameTint.value, 10);
     if (_fb > 0 || _ft !== 0) {
@@ -915,12 +1071,12 @@ export function _drawGlassesFrame(ctx, m, bufScale) {
   }
 }
 
-export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
+export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor = null, skipOutline = false, outlineOnly = false, skipDot = false) {
   if (typeof ctx.roundRect !== 'function') return;
   const s = bufScale;
 
   // 選択色をRGBに展開
-  const _bc     = elBorderColor.value;
+  const _bc     = overrideColor || elBorderColor.value;
   const _br     = parseInt(_bc.slice(1, 3), 16);
   const _bg     = parseInt(_bc.slice(3, 5), 16);
   const _bb     = parseInt(_bc.slice(5, 7), 16);
@@ -955,7 +1111,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   const btnR = Math.round(2 * s);
 
   // アニメON/OFF を確定してパーツ色を決定
-  const _anim   = elBorderAnim.value;
+  const _anim   = overrideColor ? 'none' : elBorderAnim.value;
   const _bright = parseInt(elBorderAnimBright.value, 10);
   const _animOn = _anim !== 'none';
   const _grad   = _animOn ? _buildBorderGrad(ctx, { x: bx, y: by, w: bw, h: bh }, phase, _anim, _bright) : null;
@@ -971,7 +1127,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
   ctx.globalAlpha = opacity;
 
   // ---- 本体アウトライン（選択色 / アニメ対応）----
-  {
+  if (!skipOutline) {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
     ctx.shadowBlur  = 4 * s;
@@ -983,8 +1139,25 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase) {
     ctx.restore();
   }
 
+  if (outlineOnly) {
+    // アウトライン + ドットのみ（anchorCtx 向け）
+    if (state.phoneShowDot) {
+      const dotR = Math.max(2, Math.round(2.5 * s));
+      ctx.save();
+      if (_animOn) ctx.globalAlpha = opacity * _dotA;
+      ctx.beginPath();
+      const dotX2 = _land ? scrX + mLong1 * 0.44 : scrX + scrW / 2;
+      const dotY2 = _land ? scrY + scrH / 2        : scrY + mLong1 * 0.44;
+      ctx.arc(dotX2, dotY2, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = colDot;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore(); return;
+  }
+
   // ---- パンチホールカメラ ----
-  if (state.phoneShowDot) {
+  if (state.phoneShowDot && !skipDot) {
     const dotR = Math.max(2, Math.round(2.5 * s));
     ctx.save();
     if (_animOn) ctx.globalAlpha = opacity * _dotA;
