@@ -1,4 +1,4 @@
-﻿// state.js — アプリケーション状態 + 定数
+// state.js — アプリケーション状態 + 定数
 
 export const PRESET_KEY = 'gentleFrame_presets';
 export let _presetsReady = false;
@@ -97,4 +97,3 @@ export const state = {
   zoomLockBeforeFgFixed: null,
   arLockBeforeAutoLock:  null,
 };
-
