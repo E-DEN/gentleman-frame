@@ -1259,6 +1259,10 @@ canvas.addEventListener('mousedown', e => {
 
 // ============================================================
 //  ページ可視性
+//  タブの表示・非表示を検知する Page Visibility API。
+//  別タブへの切り替えや最小化で document.hidden が true になる。
+//  非表示時は動画を一時停止してリソースを節約し、
+//  再表示時（かつ再生中だった場合）に自動で再開する。
 // ============================================================
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
@@ -1267,4 +1271,3 @@ document.addEventListener('visibilitychange', () => {
     [0, 1].forEach(i => { if (loaded[i] && mediaType[i] === 'video') vid[i].play().catch(() => {}); });
   }
 });
-
