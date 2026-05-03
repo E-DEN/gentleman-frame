@@ -8,7 +8,7 @@ import { _applyCompositeT } from './controls.js';
 import './render.js';
 import './media.js';
 import './presets.js';
-import './dnd.js';
+import './sortable.js';
 
 // ============================================================
 //  シアターモード & 全画面

@@ -1,4 +1,4 @@
-﻿// dnd.js — プリセットスムーズ並び替え（ゴースト要素方式）
+﻿// sortable.js — プリセットスムーズ並び替え（ゴースト要素方式）
 
 import { _activePresetIdx, _f2Target, setIsDraggingPreset, setActivePresetIdx, setF2Target } from './canvas.js';
 import { loadPresets, savePresets, renderPresets } from './presets.js';
