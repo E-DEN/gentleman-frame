@@ -473,8 +473,14 @@ const elPhoneUiBtnRoT = document.getElementById('phoneUiRoT');
 const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
 const elPhoneUiBtnDot = document.getElementById('phoneUiDot');
 const elPhoneUiBtnRot90 = document.getElementById('phoneUiRot90');
-const elFgPinX = document.getElementById('fgPinX');
-const elFgPinY = document.getElementById('fgPinY');
+const elVol0    = document.getElementById('vol0');
+const elVol1    = document.getElementById('vol1');
+const elOffset0 = document.getElementById('offset0');
+const elOffset1 = document.getElementById('offset1');
+const elFgPinX       = document.getElementById('fgPinX');
+const elFgPinY       = document.getElementById('fgPinY');
+const elFgPinLerp    = document.getElementById('fgPinLerp');
+const elFgPinOpacity = document.getElementById('fgPinOpacity');
 const elFilterBlur = document.getElementById('filterBlur');
 const elFilterBrightness = document.getElementById('filterBrightness');
 const elFilterContrast = document.getElementById('filterContrast');
@@ -593,8 +599,11 @@ function updateBarsOverlay() {
 // ============================================================
 //  雨オーバーレイ（WebGL – Codrops RainEffect ベース）
 // ============================================================
-const rainOverlay  = document.getElementById('rainOverlay');
-const elFilterRain = document.getElementById('filterRain');
+const rainOverlay      = document.getElementById('rainOverlay');
+const elFilterRain     = document.getElementById('filterRain');
+const elRainSpeed      = document.getElementById('rainSpeed');
+const elRainRefraction = document.getElementById('rainRefraction');
+const elRainShadow     = document.getElementById('rainShadow');
 
 // 雨サブ行の表示切替
 function _rainSubVisible(v) {
@@ -607,13 +616,10 @@ function _rainSubVisible(v) {
 window._startRainOverlay = function () {
   const amt = parseInt(elFilterRain.value, 10);
   if (amt > 0) {
-    const elSpeed  = document.getElementById('rainSpeed');
-    const elRef    = document.getElementById('rainRefraction');
-    const elShadow = document.getElementById('rainShadow');
     GFRainEngine.start(rainOverlay, canvas, amt, {
-      speed:      elSpeed  ? parseFloat(elSpeed.value)          : 1,
-      refraction: elRef    ? parseFloat(elRef.value)            : 200,
-      shadow:     elShadow ? parseInt(elShadow.value, 10) === 1 : false
+      speed:      parseFloat(elRainSpeed.value),
+      refraction: parseFloat(elRainRefraction.value),
+      shadow:     parseInt(elRainShadow.value, 10) === 1
     });
   }
 };
@@ -700,7 +706,6 @@ function _renderFrame() {
   }
 
   // アンカー描画位置を lerp で補間（ドラッグ中も滑らかに追従）
-  const elFgPinLerp = document.getElementById('fgPinLerp');
   // 表示0-100 → 内部 0.01-1.0 の対数スケール: 0.01 * 100^(x/100)
   const _rawLerp = elFgPinLerp ? parseFloat(elFgPinLerp.value) : 50;
   const _pinLerpK = 0.01 * Math.pow(100, _rawLerp / 100);
@@ -1150,8 +1155,7 @@ function _drawOverlays() {
     const ca  = Math.max(5,  Math.round(7  * bufScale));
     const lw  = Math.max(1,  1.2 * bufScale);
     const clw = Math.max(1,  1.0 * bufScale);
-    const _fgPinOpacityEl = document.getElementById('fgPinOpacity');
-    const _anchorAlpha = _fgPinOpacityEl ? parseFloat(_fgPinOpacityEl.value) / 100 : 1;
+    const _anchorAlpha = elFgPinOpacity ? parseFloat(elFgPinOpacity.value) / 100 : 1;
     anchorCtx.save();
     anchorCtx.globalAlpha = _anchorAlpha;
     // globalCompositeOperation はデフォルト source-over のまま
@@ -3011,8 +3015,8 @@ function setPlaying(playing) {
 
 function _getOffsets() {
   return [
-    parseFloat(document.getElementById('offset0').value) || 0,
-    parseFloat(document.getElementById('offset1').value) || 0,
+    parseFloat(elOffset0.value) || 0,
+    parseFloat(elOffset1.value) || 0,
   ];
 }
 
@@ -3297,8 +3301,8 @@ bindSlider('vol1',    'vol1Val',    v => `${Math.round(v)}`,    v => { vid[1].vo
   };
   const _applyMaster = () => {
     const g = _masterMuted ? 0 : _masterVol / 100;
-    vid[0].volume = g * (parseFloat(document.getElementById('vol0').value) / 100) ** 2;
-    vid[1].volume = g * (parseFloat(document.getElementById('vol1').value) / 100) ** 2;
+    vid[0].volume = g * (parseFloat(elVol0.value) / 100) ** 2;
+    vid[1].volume = g * (parseFloat(elVol1.value) / 100) ** 2;
     const iconName = _masterMuted || _masterVol === 0 ? 'volume-x' : _masterVol < 50 ? 'volume-1' : 'volume-2';
     masterMuteBtn.innerHTML = `<i data-lucide="${iconName}"></i>`;
     lucide.createIcons({ nodes: [masterMuteBtn] });
@@ -4364,8 +4368,8 @@ function swapVideos() {
   [visHidden[0],       visHidden[1]]       = [visHidden[1],       visHidden[0]];
 
   // ボリュームを再割当て（スライダーと入れ替え前後の整合）
-  if (mediaType[0] === 'video') vid[0].volume = (parseFloat(document.getElementById('vol0').value) / 100) ** 2;
-  if (mediaType[1] === 'video') vid[1].volume = (parseFloat(document.getElementById('vol1').value) / 100) ** 2;
+  if (mediaType[0] === 'video') vid[0].volume = (parseFloat(elVol0.value) / 100) ** 2;
+  if (mediaType[1] === 'video') vid[1].volume = (parseFloat(elVol1.value) / 100) ** 2;
 
   // 動画専用コントロールの表示/非表示
   updateMediaControls(0);
@@ -5071,10 +5075,10 @@ applyLang(_lang);
 
 function collectSettings() {
   return {
-    vol0:          document.getElementById('vol0').value,
-    offset0:       document.getElementById('offset0').value,
-    vol1:          document.getElementById('vol1').value,
-    offset1:       document.getElementById('offset1').value,
+    vol0:          elVol0.value,
+    offset0:       elOffset0.value,
+    vol1:          elVol1.value,
+    offset1:       elOffset1.value,
     maskX:         S.mask.x,
     maskY:         S.mask.y,
     maskW:         S.mask.w,
@@ -5097,8 +5101,8 @@ function collectSettings() {
     zoomLock:      S.zoomLock,
     fgPinX:        elFgPinX.value,
     fgPinY:        elFgPinY.value,
-    fgPinLerp:     document.getElementById('fgPinLerp')?.value ?? '50',
-    fgPinOpacity:  document.getElementById('fgPinOpacity')?.value ?? '100',
+    fgPinLerp:     elFgPinLerp.value,
+    fgPinOpacity:  elFgPinOpacity.value,
     filterBrightness: elFilterBrightness.value,
     filterContrast:   elFilterContrast.value,
     filterHighlight:  elFilterHighlight.value,
@@ -5117,9 +5121,9 @@ function collectSettings() {
     filterFps:        elFilterFps.value,
     filterBlur:       elFilterBlur.value,
     filterRain:       elFilterRain.value,
-    rainSpeed:        document.getElementById('rainSpeed')?.value ?? '1',
-    rainRefraction:   document.getElementById('rainRefraction')?.value ?? '30',
-    rainShadow:       document.getElementById('rainShadow')?.value ?? '0',
+    rainSpeed:        elRainSpeed.value,
+    rainRefraction:   elRainRefraction.value,
+    rainShadow:       elRainShadow.value,
     frameBlur:        elFrameBlur.value,
     frameTint:        elFrameTint.value,
     glassesStyle:     S.mask.glassesStyle,
