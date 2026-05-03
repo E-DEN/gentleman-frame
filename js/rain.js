@@ -295,7 +295,7 @@
 
       this.gl = new GL(
         this.canvas,
-        { alpha: true, premultipliedAlpha: false },
+        { alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true },
         VERT_SHADER, FRAG_SHADER
       );
       var gl = this.gl;

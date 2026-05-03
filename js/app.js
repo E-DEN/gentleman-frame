@@ -2,10 +2,12 @@
 //  app.js — エントリーポイント (ES Module)
 // ============================================================
 import { state } from './state.js';
-import { canvas, loaded, mediaType, vid, _vidBitmap, _compositeT } from './canvas.js';
+import { canvas, loaded, mediaType, vid, _vidBitmap, _compositeT,
+         overlayCanvas, effectsHidden,
+         elFilterBrightness, elFilterContrast, elFilterSaturation, elFilterHue, elFilterBars } from './canvas.js';
 import { _applyCompositeT } from './playback.js';
 // 以下のモジュールはインポート時にトップレベル初期化コードを実行する
-import './render.js';
+import { rainOverlay } from './render.js';
 import './controls.js';
 import './media.js';
 import './presets.js';
@@ -42,7 +44,43 @@ document.getElementById('screenshotBtn').addEventListener('click', () => {
   const pad = n => String(n).padStart(2, '0');
   const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
   const filename = `gentleman-frame_${ts}.png`;
-  canvas.toBlob(blob => {
+
+  // 全レイヤーを合成: mainCanvas（canvas エフェクト済）+ 雨 + スマホ/メガネ枠
+  const shot  = document.createElement('canvas');
+  shot.width  = canvas.width;
+  shot.height = canvas.height;
+  const sCtx  = shot.getContext('2d');
+
+  // effectsWrap の CSS フィルター（brightness/contrast/saturation/hue）を 2D context で再現
+  if (!effectsHidden) {
+    const b  = parseFloat(elFilterBrightness.value);
+    const co = parseFloat(elFilterContrast.value);
+    const s  = parseFloat(elFilterSaturation.value);
+    const h  = parseFloat(elFilterHue.value);
+    if (b !== 100 || co !== 100 || s !== 100 || h !== 0) {
+      sCtx.filter = `brightness(${b}%) contrast(${co}%) saturate(${s}%) hue-rotate(${h}deg)`;
+    }
+  }
+  sCtx.drawImage(canvas, 0, 0);       // mainCanvas（映像＋blur/vignette 等の canvas エフェクト）
+  sCtx.drawImage(rainOverlay, 0, 0);  // 雨ガラスオーバーレイ（WebGL）
+  sCtx.filter = 'none';
+
+  // シネマバー（barsOverlay の CSS background をキャンバスで再現）
+  if (!effectsHidden) {
+    const barsAmt = parseFloat(elFilterBars.value);
+    if (barsAmt > 0) {
+      const pct  = (barsAmt / 10) * 18;
+      const barH = Math.round(shot.height * pct / 100);
+      sCtx.fillStyle = '#000';
+      sCtx.fillRect(0, 0, shot.width, barH);
+      sCtx.fillRect(0, shot.height - barH, shot.width, barH);
+    }
+  }
+
+  // overlayCanvas（スマホ枠・メガネ枠・マスクボーダー）CSS filter 対象外
+  sCtx.drawImage(overlayCanvas, 0, 0);
+
+  shot.toBlob(blob => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
