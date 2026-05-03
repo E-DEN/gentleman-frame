@@ -13,7 +13,7 @@
 'use strict';
 (function (global) {
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
+  // ─── ヘルパー ────────────────────────────────────────────────────────────────
 
   function createCanvas(w, h) {
     var c = document.createElement('canvas');
@@ -36,7 +36,7 @@
     for (var i = 0; i < n; i++) f.call(undefined, i);
   }
 
-  // ─── WebGL utilities (from webgl.js) ────────────────────────────────────────
+  // ─── WebGL ユーティリティ（webgl.js より） ────────────────────────────────────
 
   function glGetContext(canvas, options) {
     var names = ['webgl', 'experimental-webgl'];
@@ -122,7 +122,7 @@
     ]), gl.STATIC_DRAW);
   }
 
-  // ─── GL wrapper class (from gl-obj.js) ──────────────────────────────────────
+  // ─── GL ラッパークラス（gl-obj.js より） ──────────────────────────────────────
 
   function GL(canvas, options, vert, frag) {
     this.canvas  = canvas;
@@ -147,7 +147,7 @@
     }
   };
 
-  // ─── Shaders (inlined) ──────────────────────────────────────────────────────
+  // ─── シェーダー（インライン化） ──────────────────────────────────────────────
 
   var VERT_SHADER = [
     'precision mediump float;',
@@ -157,8 +157,8 @@
     '}'
   ].join('\n');
 
-  // Modified water.frag: final line outputs only fg (drop refraction + alpha),
-  // no bg fill — areas with no drops are transparent so mainCanvas shows through.
+  // water.frag 改変: 最終行は FG（雫屈折 + アルファ）のみ出力。
+  // BG 塗りなし — 雫のない領域は透明にして mainCanvas が透けて見えるようにする。
   var FRAG_SHADER = [
     'precision mediump float;',
     'uniform sampler2D u_waterMap;',
@@ -263,7 +263,7 @@
     '}'
   ].join('\n');
 
-  // ─── RainRenderer (from rain-renderer.js) ───────────────────────────────────
+  // ─── RainRenderer（rain-renderer.js より） ───────────────────────────────────
 
   var defaultRendererOptions = {
     renderShadow:    false,
@@ -312,11 +312,11 @@
       gl.createUniform('1f', 'parallaxBg',     this.options.parallaxBg);
       gl.createUniform('1f', 'parallaxFg',     this.options.parallaxFg);
 
-      // Texture slot 0: water map (updated from canvasLiquid every frame)
+      // テクスチャスロット 0: ウォーターマップ（毎フレーム canvasLiquid から更新）
       gl.createTexture(null, 0);
       gl.createUniform('1i', 'waterMap', 0);
 
-      // Texture slot 1: shine (unused – 2×2 blank)
+      // テクスチャスロット 1: シャイン（未使用 — 2×2 の空白）
       var blankCanvas = createCanvas(2, 2);
       this._textures = [
         { name: 'textureShine', img: blankCanvas },
@@ -338,11 +338,11 @@
       gl.useProgram(gl.program);
       gl.createUniform('2f', 'parallax', 0, 0);
 
-      // Update water map from Raindrops canvas
+      // Raindrops キャンバスからウォーターマップを更新
       gl.activeTexture(0);
       gl.updateTexture(this.canvasLiquid);
 
-      // Update FG/BG from live mainCanvas (skip slot 0: shine is static)
+      // ライブな mainCanvas から FG/BG を更新（スロット 0 のシャインは静的なのでスキップ）
       var self = this;
       this._textures.forEach(function (t, i) {
         if (i === 0) return; // shine is static blank
@@ -355,14 +355,14 @@
 
     stop: function () {
       this._stopped = true;
-      // Clear the WebGL canvas to transparent
+      // WebGL キャンバスを透明にクリア
       var rawGl = this.gl.gl;
       rawGl.clearColor(0, 0, 0, 0);
       rawGl.clear(rawGl.COLOR_BUFFER_BIT);
     }
   };
 
-  // ─── Raindrops (from raindrops.js) ──────────────────────────────────────────
+  // ─── Raindrops（raindrops.js より） ──────────────────────────────────────────
 
   var DROP_PROTO = {
     x: 0, y: 0, r: 0,
@@ -687,10 +687,10 @@
     }
   };
 
-  // ─── Intensity mapping ───────────────────────────────────────────────────────
+  // ─── 強度マッピング ───────────────────────────────────────────────────────────
 
   function intensityToOptions(v) {
-    // v: 1-10 (mapped from filterRain slider)
+    // v: 1〜10（filterRain スライダーからマッピング）
     var t = v / 10;
     return {
       maxDrops:    Math.round(100 + t * 800),       // 180 – 900
@@ -700,7 +700,7 @@
     };
   }
 
-  // ─── Image loading ───────────────────────────────────────────────────────────
+  // ─── 画像読み込み ───────────────────────────────────────────────────────────
 
   function loadImages(list, cb) {
     var result  = {};
@@ -716,7 +716,7 @@
     });
   }
 
-  // ─── Public API ─────────────────────────────────────────────────────────────
+  // ─── 公開 API ─────────────────────────────────────────────────────────────
 
   var _state = null;
   var _generation = 0; // incremented on each stop() to cancel in-flight loadImages callbacks
@@ -730,7 +730,7 @@
      * @param {object}           [extra]         – { speed, refraction, shadow }
      */
     start: function (overlayCanvas, mainCanvas, intensity, extra) {
-      // Stop any running instance first
+      // 実行中のインスタンスを先に停止する
       this.stop();
 
       extra = extra || {};
@@ -748,7 +748,7 @@
           return;
         }
 
-        // Sync overlay canvas size to mainCanvas
+        // オーバーレイキャンバスのサイズを mainCanvas に同期
         overlayCanvas.width  = mainCanvas.width;
         overlayCanvas.height = mainCanvas.height;
 

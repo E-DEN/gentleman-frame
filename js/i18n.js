@@ -1,7 +1,7 @@
-﻿// ============================================================
-//  i18n — Gentleman Frame translation engine
 // ============================================================
-//  Built-in: ja (日本語), en (English)
+//  i18n — Gentleman Frame 翻訳エンジン
+// ============================================================
+//  組み込み: ja（日本語）, en（英語）
 //
 //  ── 言語を追加するには ──────────────────────────────────────
 //  1. js/locales/_template.js をコピーして js/locales/XX.js を作成
@@ -42,14 +42,14 @@ function getRegisteredLangs() {
   return Object.keys(_I18N_DICTS).map(code => ({ code, label: _I18N_LABELS[code] || code }));
 }
 
-// var (not let) so app.js can update it via plain assignment across script files
+// var（let でない）: スクリプトファイルをまたいで app.js が単純代入で更新できるようにするため
 var _lang = localStorage.getItem('gf-lang') || 'ja';
 
 function t(key) {
   return (_I18N_DICTS[_lang] || _I18N_DICTS['ja'] || {})[key] || key;
 }
 
-// ── Built-in: Japanese ─────────────────────────────────────
+// \u2500\u2500 \u7d44\u307f\u8fbc\u307f: \u65e5\u672c\u8a9e \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 registerLang('ja', '日本語', {
   'mode-dark':'ダークモード','mode-light':'ライトモード',
   'vid-title':'動画',
@@ -166,7 +166,7 @@ registerLang('ja', '日本語', {
   'lang-template-dl':'テンプレートをDL',
 });
 
-// ── Built-in: English ──────────────────────────────────────
+// \u2500\u2500 \u7d44\u307f\u8fbc\u307f: \u82f1\u8a9e \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 registerLang('en', 'English', {
   'mode-dark':'Dark Mode','mode-light':'Light Mode',
   'vid-title':'Videos',
@@ -283,7 +283,7 @@ registerLang('en', 'English', {
   'lang-template-dl':'Download Template',
 });
 
-// ── Built-in: Chinese Simplified ──────────────────────────
+// \u2500\u2500 \u7d44\u307f\u8fbc\u307f: \u4e2d\u56fd\u8a9e\uff08\u7c21\u4f53\u5b57\uff09 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 registerLang('zh', '中文', {
   'mode-dark':'深色模式','mode-light':'浅色模式',
   'vid-title':'视频',
@@ -396,7 +396,7 @@ registerLang('zh', '中文', {
   'lang-cancel':'取消',  'lang-template-dl':'下载模板',});
 
 // ============================================================
-//  External language loading (JSON D&D / paste)
+//  外部言語読み込み（JSON D&D / 貼り付け）
 // ============================================================
 
 /**
@@ -424,7 +424,7 @@ function loadLangJSON(jsonText) {
   return { code, label };
 }
 
-// Restore externally loaded languages from previous session
+// 前回セッションで読み込んだ外部言語を復元
 (function () {
   try {
     const saved = JSON.parse(localStorage.getItem('gf-ext-langs') || '[]');
@@ -433,8 +433,8 @@ function loadLangJSON(jsonText) {
 })();
 
 /**
- * Generate a blank template JSON (all values empty) based on the current
- * built-in 'ja' key set, then trigger a file download.
+ * 現在の組み込み 'ja' キー一覧をもとに空テンプレート JSON を生成し、
+ * ファイルダウンロードをトリガーする。
  */
 function downloadLangTemplate() {
   const keys = Object.keys(_I18N_DICTS['ja'] || {});

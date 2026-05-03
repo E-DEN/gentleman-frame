@@ -3,7 +3,7 @@
 // ============================================================
 import { state } from './state.js';
 import { canvas, loaded, mediaType, vid, _vidBitmap, _compositeT } from './canvas.js';
-import { _applyCompositeT } from './controls.js';
+import { _applyCompositeT } from './playback.js';
 // 以下のモジュールはインポート時にトップレベル初期化コードを実行する
 import './render.js';
 import './media.js';

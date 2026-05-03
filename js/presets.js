@@ -35,10 +35,9 @@ import {
 } from './canvas.js';
 import {
   _applyBorderAnim, _syncAnimColors,
-  _setRenderPresets,
-  applyLang,
-  syncStop, _applyCompositeT,
 } from './controls.js';
+import { _setRenderPresets, applyLang } from './lang.js';
+import { syncStop, _applyCompositeT } from './playback.js';
 import { loadVideoFromHandle, loadVideoFromURL } from './media.js';
 import {
   updateCanvasFilter, updateBarsOverlay,
