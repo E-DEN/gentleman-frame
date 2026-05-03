@@ -3826,6 +3826,7 @@ const _FQP = {
   horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
   modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
   trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
+  prism:   { filterBrightness: 90,  filterContrast: 180, filterHighlight:  +4, filterShadow: +40, filterSaturation: 122, filterHue: 0, filterTemp: -12, filterTint:  -2, filterSharpness: 0,   filterCA: 3,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterFlare: 3,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
 };
 // ---- カスタムフィルタープリセット ----
 const _FQP_FILTER_KEYS = [
