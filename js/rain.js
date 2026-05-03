@@ -60,8 +60,13 @@
       gl.deleteProgram(prog);
       return null;
     }
-    var posLoc     = gl.getAttribLocation(prog, 'a_position');
+    var posLoc      = gl.getAttribLocation(prog, 'a_position');
     var texCoordLoc = gl.getAttribLocation(prog, 'a_texCoord');
+    if (posLoc < 0 || texCoordLoc < 0) {
+      console.error('GFRainEngine: attribute location not found', { posLoc, texCoordLoc });
+      gl.deleteProgram(prog);
+      return null;
+    }
 
     var tcBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, tcBuf);

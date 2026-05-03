@@ -11,6 +11,7 @@ import {
   getMediaSrc, getHandles, HANDLE_SZ,
   _dispW, _dispH, _cachedAccent, _cachedBg, _readCssVars,
   _lastBufScale, _lastFgAlpha,
+  setLastBufScale, setLastFgAlpha,
   _compositeT, _compositeLastRaf, _compositeSeekPending,
   setCompositeT, setCompositeLastRaf,
   _maskBorderFadeStart, _fgFadeStart,
@@ -176,7 +177,7 @@ export function _renderFrame() {
   // バッファ → 表示CSS px の拡大率。動画解像度が高いほど > 1 になる。
   // lineWidth などの「見た目固定」値はこの係数で補正する。
   const bufScale = _dispH > 0 ? H / _dispH : 1;
-  _lastBufScale = bufScale;
+  setLastBufScale(bufScale);
 
   ctx.clearRect(0, 0, W, H);
 
@@ -196,7 +197,7 @@ export function _renderFrame() {
   const fgAlpha = _fgFadeStart < 0 ? 1
     : _fgFadeStart === 0 ? 0
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
-  _lastFgAlpha = fgAlpha;
+  setLastFgAlpha(fgAlpha);
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
     const maskZoom = state.fgZoomDisp;
