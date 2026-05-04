@@ -173,6 +173,27 @@ export function bindSlider(id, valId, fmt, onChange) {
   resetBtn.dataset.i18nTitle = 'slider-reset';
   resetBtn.title = t('slider-reset');
   resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
+  // スライダーID → filterMaskOnly キー + MOBtn ID のマッピング
+  const _SLIDER_MO_MAP = {
+    filterHighlight:   { key: 'highlight',   btnId: 'filterHighlightMOBtn'   },
+    filterShadow:      { key: 'shadow',      btnId: 'filterShadowMOBtn'      },
+    filterTemp:        { key: 'temp',        btnId: 'filterTempMOBtn'        },
+    filterTint:        { key: 'tint',        btnId: 'filterTintMOBtn'        },
+    filterSharpness:   { key: 'sharpness',   btnId: 'filterSharpnessMOBtn'   },
+    filterCA:          { key: 'ca',          btnId: 'filterCAMOBtn'          },
+    filterVignette:    { key: 'vignette',    btnId: 'filterVignetteMOBtn'    },
+    filterMatte:       { key: 'matte',       btnId: 'filterMatteMOBtn'       },
+    filterGrain:       { key: 'grain',       btnId: 'filterGrainMOBtn'       },
+    filterBloom:       { key: 'bloom',       btnId: 'filterBloomMOBtn'       },
+    filterBlur:        { key: 'blur',        btnId: 'filterBlurMOBtn'        },
+    filterFlare:       { key: 'flare',       btnId: 'filterFlareMOBtn'       },
+    filterRain:        { key: 'rain',        btnId: 'filterRainMOBtn'        },
+    filterPencil:      { key: 'pencil',      btnId: 'filterPencilMOBtn'      },
+    filterEmboss:      { key: 'emboss',      btnId: 'filterEmbossMOBtn'      },
+    filterChalkboard:  { key: 'chalkboard',  btnId: 'filterChalkboardMOBtn'  },
+    filterNightVision: { key: 'nightvision', btnId: 'filterNightVisionMOBtn' },
+    filterAirbrush:    { key: 'airbrush',    btnId: 'filterAirbrushMOBtn'    },
+  };
   resetBtn.addEventListener('click', () => {
     const id = el.id;
     if ((id === 'maskW' || id === 'maskH') && state.mask.shape === 'phone') {
@@ -197,6 +218,12 @@ export function bindSlider(id, valId, fmt, onChange) {
       el.value = el.defaultValue;
     }
     el.dispatchEvent(new Event('input'));
+    // 対応する「マスク内のみ」ボタンも解除する
+    const _mo = _SLIDER_MO_MAP[id];
+    if (_mo) {
+      state.filterMaskOnly[_mo.key] = false;
+      document.getElementById(_mo.btnId)?.classList.remove('active');
+    }
   });
   vl.insertAdjacentElement('afterend', resetBtn);
   lucide.createIcons({ nodes: [resetBtn] });

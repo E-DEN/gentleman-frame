@@ -186,7 +186,7 @@ export function _renderFrame() {
 
   // --- 背景 動画/画像（レイヤー 1）---
   if (loaded[0] && !visHidden[0]) {
-    try { ctx.drawImage(getMediaSrc(0), 0, 0, W, H); }
+    try { ctx.drawImage(_getVidSrc(0), 0, 0, W, H); }
     catch (e) { ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H); }
   } else {
     ctx.fillStyle = _cachedBg;
@@ -221,9 +221,9 @@ export function _renderFrame() {
         dx = cx * (1 - maskZoom);
         dy = cy * (1 - maskZoom);
       }
-      offCtx.drawImage(getMediaSrc(1), dx, dy, W * maskZoom, H * maskZoom);
+      offCtx.drawImage(_getVidSrc(1), dx, dy, W * maskZoom, H * maskZoom);
     } else {
-      offCtx.drawImage(getMediaSrc(1), 0, 0, W, H);
+      offCtx.drawImage(_getVidSrc(1), 0, 0, W, H);
     }
     // --- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ---
     if (pixelAmt >= 1) {
@@ -273,7 +273,7 @@ export function _renderFrame() {
       const ay  = H / 2 + state.fgPinDispY;
       const dx  = mcx - ax * maskZoom;
       const dy  = mcy - ay * maskZoom;
-      offCtx.drawImage(getMediaSrc(0), dx, dy, W * maskZoom, H * maskZoom);
+      offCtx.drawImage(_getVidSrc(0), dx, dy, W * maskZoom, H * maskZoom);
       if (pixelAmt >= 1) {
         const pSize = Math.round(pixelAmt * 4);
         const pw = Math.ceil(W / pSize);
@@ -310,7 +310,7 @@ export function _renderFrame() {
       const pw = Math.ceil(W / pSize);
       const ph = Math.ceil(H / pSize);
       postCtx.clearRect(0, 0, W, H);
-      postCtx.drawImage(getMediaSrc(0), 0, 0, pw, ph);
+      postCtx.drawImage(_getVidSrc(0), 0, 0, pw, ph);
       ctx.save();
       const _gp4 = buildMaskPath(ctx, m);
       _gp4 ? ctx.clip(_gp4) : ctx.clip();
@@ -325,7 +325,7 @@ export function _renderFrame() {
       const _gp5 = buildMaskPath(ctx, m);
       _gp5 ? ctx.clip(_gp5) : ctx.clip();
       ctx.filter = `blur(${bp}px)`;
-      ctx.drawImage(getMediaSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
+      ctx.drawImage(_getVidSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
       ctx.filter = 'none';
       ctx.restore();
     }
@@ -954,6 +954,17 @@ let _fpsLastTime = 0;
 // FPS スナップ値 (インデックス 0=OFF, 1↑=実fps)
 const _FPS_SNAPS = [0, 18, 23.976, 24, 29.97, 30, 48, 59.94, 60, 120];
 
+// FPS 制限時の映像フレームキャッシュ
+// 実フレームでキャプチャし、lerp 補間フレームでは同フレームを再利用する。
+// これにより「映像はFPSレート、lerp/描画は毎rAF」が実現できる。
+const _fpsVidCvs = [document.createElement('canvas'), document.createElement('canvas')];
+const _fpsVidCtx = _fpsVidCvs.map(c => c.getContext('2d'));
+const _vidFreezeReady = [false, false];
+let _vidFreezeMode = false;
+function _getVidSrc(i) {
+  return (_vidFreezeMode && _vidFreezeReady[i]) ? _fpsVidCvs[i] : getMediaSrc(i);
+}
+
 export function render(now) {
   // filterFps: 0=制限なし、それ以外=fps上限で間引き
   const fpsLimit = parseFloat(elFilterFps.value) || 0;
@@ -970,32 +981,55 @@ export function render(now) {
     displayCtx.filter = 'none';
     displayCtx.globalAlpha = 1;
   };
+  let _isRealFrame = true;
   if (fpsLimit > 0) {
     const interval = 1000 / fpsLimit;
     if (now - _fpsLastTime < interval - 0.5) {
-      // FPS スキップ: 映像はスキップするが枠は毎フレーム更新
-      // アンカー追従 lerp はFPS制限に関わらず毎フレーム実行する
-      const _rl = elFgPinLerp ? parseFloat(elFgPinLerp.value) : 50;
-      const _lk = 0.01 * Math.pow(100, _rl / 100);
-      state.fgPinDispX += (parseFloat(elFgPinX.value) - state.fgPinDispX) * _lk;
-      state.fgPinDispY += (parseFloat(elFgPinY.value) - state.fgPinDispY) * _lk;
-      state.fgZoomDisp += (parseFloat(elMaskZoom.value) - state.fgZoomDisp) * _lk;
+      // lerp 収束中・追従モード中はキャッシュ映像でフルレンダリング
+      // 映像フレームは _fpsVidCvs（最後の実フレームで取得済み）を再利用するため
+      // 映像のFPS間引きは維持しつつ、lerp/描画は毎rAFで更新できる。
+      const _lerpActive =
+        Math.abs(parseFloat(elFgPinX.value)   - state.fgPinDispX) > 0.05 ||
+        Math.abs(parseFloat(elFgPinY.value)   - state.fgPinDispY) > 0.05 ||
+        Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002 ||
+        state.followMode !== 'none';
+      if (!_lerpActive) {
+        _blitMblur(0.35);
+        _drawOverlays();
+        requestAnimationFrame(render);
+        return;
+      }
+      // lerp 中: キャッシュ映像を使いフルレンダリング（_fpsLastTime は更新しない）
+      _vidFreezeMode = true;
+      _isRealFrame = false;
+    } else {
+      // 通常の実フレーム: モーションブラーを blit してから描画
       _blitMblur(0.35);
-      _drawOverlays();
-      requestAnimationFrame(render);
-      return;
+      _fpsLastTime = now;
+      _vidFreezeMode = false;
     }
-    // モーションブラー: スキップ中に溜まった前フレームを薄く重ねて blit
-    _blitMblur(0.35);
-    _fpsLastTime = now;
   }
   _renderFrame();
-  GFRainEngine.tick(); // 雨をメインループに同期（filterFps に追従）
+  _vidFreezeMode = false;
+  if (_isRealFrame) {
+    GFRainEngine.tick(); // 雨は filterFps レートのみ更新
+    // 映像フレームをキャッシュに保存（lerp 補間フレームで再利用）
+    const _cW = canvas.width, _cH = canvas.height;
+    if (_fpsVidCvs[0].width !== _cW || _fpsVidCvs[0].height !== _cH) {
+      _fpsVidCvs.forEach(c => { c.width = _cW; c.height = _cH; });
+    }
+    for (let _vi = 0; _vi < 2; _vi++) {
+      if (loaded[_vi] && !visHidden[_vi] && mediaType[_vi] !== 'image') {
+        _fpsVidCtx[_vi].clearRect(0, 0, _cW, _cH);
+        try { _fpsVidCtx[_vi].drawImage(getMediaSrc(_vi), 0, 0, _cW, _cH); _vidFreezeReady[_vi] = true; } catch (_) {}
+      }
+    }
+  }
   updateProgress();
   syncMaskDropOverlay();
   _updateCanvasHints();
-  // 今フレームを保存（次フレームのブラー用）
-  if (fpsLimit > 0) {
+  // 今フレームを保存（次フレームのブラー用）— 実フレームのみ更新
+  if (fpsLimit > 0 && _isRealFrame) {
     _mblurCtx.clearRect(0, 0, _mblurCvs.width, _mblurCvs.height);
     _mblurCtx.drawImage(renderCvs, 0, 0);
   }

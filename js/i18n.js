@@ -330,7 +330,7 @@ registerLang('zh', '中文', {
   'filter-pixel':'像素化','filter-flare':'色彩光晕','filter-rain':'雨','filter-blur':'模糊',
   'mask-blur':'遮罩模糊','mask-pixel':'遮罩像素',
   'rain-speed':'雨 - 速度','rain-refraction':'雨 - 折射','rain-shadow':'雨 - 阴影',
-'filter-bars':'信筱遥幅','filter-fps':'帧率',  'filter-highlight':'高光','filter-shadow':'阴影','filter-tint':'色调','filter-sharpness':'锐化','filter-bloom':'晩染','filter-pencil':'铅笔素描','filter-emboss':'浮雕','filter-chalkboard':'粉笔','filter-nightvision':'夜视','filter-airbrush':'喷笔','filter-artistic-label':'艺术效果','filter-maskonly':'仅遮罩内',
+  'filter-bars':'信筱遥幅','filter-fps':'帧率',  'filter-highlight':'高光','filter-shadow':'阴影','filter-tint':'色调','filter-sharpness':'锐化','filter-bloom':'晩染','filter-pencil':'铅笔素描','filter-emboss':'浮雕','filter-chalkboard':'粉笔','filter-nightvision':'夜视','filter-airbrush':'喷笔','filter-artistic-label':'艺术效果','filter-maskonly':'仅遮罩内',
   'fqp-cinema':'电影','fqp-retro':'复古','fqp-insta':'网红',
   'fqp-pastel':'粉彩','fqp-neon':'霓虹','fqp-sunset':'夕阳',
   'fqp-cool':'冷色','fqp-dreamy':'梦幻','fqp-glitch':'故障',
