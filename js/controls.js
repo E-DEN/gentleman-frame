@@ -22,7 +22,7 @@ import {
   elFilterHue, elFilterVignette, elFilterCA, elFilterTemp, elFilterTint,
   elFilterHighlight, elFilterShadow, elFilterSharpness, elFilterMatte,
   elFilterGrain, elMaskPixel, elMaskBlur, elFilterFlare, elFilterBars,
-  elFilterWatercolor,
+  elFilterBloom,
   elFilterPencil, elFilterEmboss, elFilterChalkboard, elFilterNightVision, elFilterAirbrush,
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
   elProgressFill, elProgressThumb, elTimeLabel, elPlayBtn,
@@ -695,7 +695,7 @@ bindSlider('filterCA',         'filterCAVal',         v => v % 1 === 0 ? `${Math
 bindSlider('filterVignette',   'filterVignetteVal',   v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterMatte',      'filterMatteVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('filterWatercolor',  'filterWatercolorVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterBloom',  'filterBloomVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterPencil',      'filterPencilVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterEmboss',      'filterEmbossVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterChalkboard',  'filterChalkboardVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
@@ -739,36 +739,44 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterWatercolor', 'filterPencil', 'filterEmboss', 'filterChalkboard', 'filterNightVision', 'filterAirbrush', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterBloom', 'filterPencil', 'filterEmboss', 'filterChalkboard', 'filterNightVision', 'filterAirbrush', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
   });
   [
-    { key: 'watercolor',  btnId: 'filterWatercolorFOBtn'  },
-    { key: 'pencil',      btnId: 'filterPencilFOBtn'      },
-    { key: 'emboss',      btnId: 'filterEmbossFOBtn'      },
-    { key: 'chalkboard',  btnId: 'filterChalkboardFOBtn'  },
-    { key: 'nightvision', btnId: 'filterNightVisionFOBtn' },
-    { key: 'airbrush',    btnId: 'filterAirbrushFOBtn'    },
+    { key: 'sharpness',  btnId: 'filterSharpnessMOBtn'  },
+    { key: 'ca',         btnId: 'filterCAMOBtn'          },
+    { key: 'matte',      btnId: 'filterMatteMOBtn'       },
+    { key: 'bloom',      btnId: 'filterBloomMOBtn'       },
+    { key: 'flare',      btnId: 'filterFlareMOBtn'       },
+    { key: 'pencil',     btnId: 'filterPencilMOBtn'      },
+    { key: 'emboss',     btnId: 'filterEmbossMOBtn'      },
+    { key: 'chalkboard', btnId: 'filterChalkboardMOBtn'  },
+    { key: 'nightvision',btnId: 'filterNightVisionMOBtn' },
+    { key: 'airbrush',   btnId: 'filterAirbrushMOBtn'    },
   ].forEach(({ key, btnId }) => {
-    state.filterFrameOnly[key] = false;
+    state.filterMaskOnly[key] = false;
     document.getElementById(btnId)?.classList.remove('active');
   });
 });
 
 // ---- クイックフィルタープリセット ----
 [
-  { key: 'watercolor',  btnId: 'filterWatercolorFOBtn'  },
-  { key: 'pencil',      btnId: 'filterPencilFOBtn'      },
-  { key: 'emboss',      btnId: 'filterEmbossFOBtn'      },
-  { key: 'chalkboard',  btnId: 'filterChalkboardFOBtn'  },
-  { key: 'nightvision', btnId: 'filterNightVisionFOBtn' },
-  { key: 'airbrush',    btnId: 'filterAirbrushFOBtn'    },
+  { key: 'sharpness',  btnId: 'filterSharpnessMOBtn'  },
+  { key: 'ca',         btnId: 'filterCAMOBtn'          },
+  { key: 'matte',      btnId: 'filterMatteMOBtn'       },
+  { key: 'bloom',      btnId: 'filterBloomMOBtn'       },
+  { key: 'flare',      btnId: 'filterFlareMOBtn'       },
+  { key: 'pencil',     btnId: 'filterPencilMOBtn'      },
+  { key: 'emboss',     btnId: 'filterEmbossMOBtn'      },
+  { key: 'chalkboard', btnId: 'filterChalkboardMOBtn'  },
+  { key: 'nightvision',btnId: 'filterNightVisionMOBtn' },
+  { key: 'airbrush',   btnId: 'filterAirbrushMOBtn'    },
 ].forEach(({ key, btnId }) => {
   document.getElementById(btnId).addEventListener('click', () => {
-    state.filterFrameOnly[key] = !state.filterFrameOnly[key];
-    document.getElementById(btnId).classList.toggle('active', state.filterFrameOnly[key]);
+    state.filterMaskOnly[key] = !state.filterMaskOnly[key];
+    document.getElementById(btnId).classList.toggle('active', state.filterMaskOnly[key]);
   });
 });
 

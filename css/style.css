@@ -1838,8 +1838,8 @@
       background: var(--drop-hover);
     }
 
-    /* Frame-Only icon button (per artistic filter) */
-    .fo-btn {
+    /* Mask-Only icon button (per artistic filter) */
+    .mo-btn {
       flex-shrink: 0;
       margin-left: auto;
       width: 16px;
@@ -1856,9 +1856,9 @@
       opacity: 0.35;
       transition: opacity 0.12s, color 0.12s, border-color 0.12s;
     }
-    .fo-btn:hover { opacity: 0.85; }
-    .fo-btn.active { opacity: 1; color: var(--accent); border-color: var(--accent); }
-    .fo-btn svg.lucide { width: 10px; height: 10px; }
+    .mo-btn:hover { opacity: 0.85; }
+    .mo-btn.active { opacity: 1; color: var(--accent); border-color: var(--accent); }
+    .mo-btn svg.lucide { width: 10px; height: 10px; }
 
     /* Canvas drag-over highlight */
     .canvas-drop-over::after {

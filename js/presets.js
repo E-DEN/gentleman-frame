@@ -17,6 +17,7 @@ import {
   elFilterHighlight, elFilterShadow, elFilterSharpness, elFilterMatte,
   elFilterGrain, elMaskPixel, elMaskBlur, elFilterFlare, elFilterBars,
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
+  elFilterBloom,
   elMaskZoom, elMaskW, elMaskH,
   elPhoneUiRow, elGlassesUiRow, elGlassesStyleBtns,
   elSpectrumUiRow,
@@ -98,6 +99,7 @@ export function collectSettings() {
     filterVignette:   elFilterVignette.value,
     filterMatte:      elFilterMatte.value,
     filterGrain:      elFilterGrain.value,
+    filterBloom:      elFilterBloom.value,
     filterFlare:      elFilterFlare.value,
     filterBars:       elFilterBars.value,
     filterFps:        elFilterFps.value,
@@ -124,6 +126,7 @@ export function collectSettings() {
     phoneShowRoT:   state.phoneShowRoT,
     phoneShowRec:   state.phoneShowRec,
     phoneShowDot:   state.phoneShowDot,
+    filterMaskOnly: { ...state.filterMaskOnly },
   };
 }
 
@@ -140,6 +143,7 @@ export function applySettings(d) {
     ['filterTemp','filterTempVal'],['filterTint','filterTintVal'],['filterSharpness','filterSharpnessVal'],
     ['filterCA','filterCAVal'],['filterVignette','filterVignetteVal'],
     ['filterMatte','filterMatteVal'],['filterGrain','filterGrainVal'],
+    ['filterBloom','filterBloomVal'],
     ['filterFlare','filterFlareVal'],
     ['filterBars','filterBarsVal'],
     ['filterFps','filterFpsVal'],
@@ -184,6 +188,7 @@ export function applySettings(d) {
     filterVignette:   d.filterVignette   ?? '0',
     filterMatte:      d.filterMatte      ?? '0',
     filterGrain:      d.filterGrain      ?? '0',
+    filterBloom:      d.filterBloom      ?? '0',
     filterFlare:      d.filterFlare      ?? '0',
     filterBars:       d.filterBars       ?? '0',
     filterFps:        d.filterFps        ?? '0',
@@ -313,6 +318,25 @@ export function applySettings(d) {
   }
   if (d.borderW != null && parseFloat(d.borderW) > 0) {
     setMaskBorderFadeStart(loaded[1] ? performance.now() : 0);
+  }
+  if (d.filterMaskOnly && typeof d.filterMaskOnly === 'object') {
+    const _moButtons = {
+      sharpness:   'filterSharpnessMOBtn',
+      ca:          'filterCAMOBtn',
+      matte:       'filterMatteMOBtn',
+      bloom:       'filterBloomMOBtn',
+      flare:       'filterFlareMOBtn',
+      pencil:      'filterPencilMOBtn',
+      emboss:      'filterEmbossMOBtn',
+      chalkboard:  'filterChalkboardMOBtn',
+      nightvision: 'filterNightVisionMOBtn',
+      airbrush:    'filterAirbrushMOBtn',
+    };
+    Object.entries(_moButtons).forEach(([key, btnId]) => {
+      const val = !!d.filterMaskOnly[key];
+      state.filterMaskOnly[key] = val;
+      document.getElementById(btnId)?.classList.toggle('active', val);
+    });
   }
   updateCanvasFilter();
   updateBarsOverlay();
