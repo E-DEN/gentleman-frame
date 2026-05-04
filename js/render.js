@@ -503,21 +503,6 @@ export function _renderFrame() {
     ctx.globalAlpha = t * 0.30;
     ctx.drawImage(chCvs, 0, 0);
     ctx.restore();
-    // 3. 紙目テクスチャ: ランダムノイズを soft-light で重ねる
-    const nSz = 256;
-    const nData = grainCtx.createImageData(nSz, nSz);
-    const nd = nData.data;
-    const nStr = t * 50;
-    for (let i = 0; i < nd.length; i += 4) {
-      const v = Math.max(0, Math.min(255, 128 + (Math.random() - 0.5) * nStr));
-      nd[i] = nd[i+1] = nd[i+2] = v; nd[i+3] = 255;
-    }
-    grainCtx.putImageData(nData, 0, 0);
-    ctx.save();
-    ctx.globalCompositeOperation = 'soft-light';
-    ctx.globalAlpha = t * 0.25;
-    ctx.drawImage(grainCvs, 0, 0, W, H);
-    ctx.restore();
   }
 
   // --- Sharpness (オーバーレイ unsharp mask) ---
