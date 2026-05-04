@@ -986,9 +986,11 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
     elGlassesUiRow.style.display = newShape === 'glasses' ? '' : 'none';
     elSpectrumUiRow.style.display = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specBarsRow').style.display = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specAmpRow').style.display  = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specGapRow').style.display  = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specBarsRow').style.display   = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specAmpRow').style.display    = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specGapRow').style.display    = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specSymRow').style.display    = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specRotateRow').style.display = newShape === 'spectrum' ? '' : 'none';
     const _isFrameShape2 = newShape === 'phone' || newShape === 'glasses';
     document.getElementById('frameBlurRow').style.display = _isFrameShape2 ? '' : 'none';
     document.getElementById('frameTintRow').style.display = _isFrameShape2 ? '' : 'none';
@@ -1114,19 +1116,33 @@ elGlassesStyleBtns.forEach(btn => {
   });
 });
 
-// ---- スペクトラム スタイルボタン ----
-document.querySelectorAll('.spec-style-btn[data-specstyle]').forEach(btn => {
+// ---- スペクトラム 形状ボタン ----
+document.querySelectorAll('.spec-shape-btn[data-specshape]').forEach(btn => {
   btn.addEventListener('click', () => {
-    state.mask.specStyle = btn.dataset.specstyle;
-    document.querySelectorAll('.spec-style-btn[data-specstyle]').forEach(b =>
-      b.classList.toggle('active', b.dataset.specstyle === state.mask.specStyle));
+    state.mask.specShape = btn.dataset.specshape;
+    document.querySelectorAll('.spec-shape-btn[data-specshape]').forEach(b =>
+      b.classList.toggle('active', b.dataset.specshape === state.mask.specShape));
   });
 });
-// 旧 specStyle 値(radial-spike/radial-wave)を radial に正規化
-if (state.mask.specStyle && state.mask.specStyle.startsWith('radial')) state.mask.specStyle = 'radial';
-bindSlider('specBars', 'specBarsVal', v => `${Math.round(v)}`, null);
-bindSlider('specAmp',  'specAmpVal',  v => `${Math.round(v)}`, null);
-bindSlider('specGap',  'specGapVal',  v => `${Math.round(v)}`, null);
+// ---- スペクトラム 対称ボタン ----
+document.querySelectorAll('.spec-sym-btn[data-specsym]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.mask.specSym = btn.dataset.specsym;
+    document.querySelectorAll('.spec-sym-btn[data-specsym]').forEach(b =>
+      b.classList.toggle('active', b.dataset.specsym === state.mask.specSym));
+  });
+});
+// 旧 specStyle から移行
+if (state.mask.specStyle && !state.mask.specShape) {
+  const _s = state.mask.specStyle.startsWith('radial') ? 'radial' : state.mask.specStyle;
+  const _map = { bars: ['bars','none'], mirror: ['bars','ud'], radial: ['radial','none'], symwave: ['radial','lr'] };
+  const [sh, sy] = _map[_s] || ['bars','none'];
+  state.mask.specShape = sh; state.mask.specSym = sy;
+}
+bindSlider('specBars',   'specBarsVal',   v => `${Math.round(v)}`, null);
+bindSlider('specAmp',    'specAmpVal',    v => `${Math.round(v)}`, null);
+bindSlider('specGap',    'specGapVal',    v => `${Math.round(v)}`, null);
+bindSlider('specRotate', 'specRotateVal', v => `${Math.round(v)}°`, v => { state.mask.specRotate = Math.round(v); });
 
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
   state.fgFixed = !state.fgFixed;

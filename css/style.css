@@ -1128,7 +1128,9 @@
       color: var(--accent);
     }
     .shape-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    /* Phone UI overlay toggles */
+    /* Spectrum shape / sym toggles */
+    .spec-shape-btn,
+    .spec-sym-btn,
     .spec-style-btn {
       display: inline-flex;
       align-items: center;
@@ -1145,8 +1147,14 @@
       transition: border-color 0.15s, color 0.15s;
       font-family: inherit;
     }
+    .spec-shape-btn:hover,
+    .spec-sym-btn:hover,
     .spec-style-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .spec-shape-btn:active:not(:disabled),
+    .spec-sym-btn:active:not(:disabled),
     .spec-style-btn:active:not(:disabled) { transform: scale(0.93); transition: transform 0.07s, border-color 0.12s, color 0.12s; }
+    .spec-shape-btn.active,
+    .spec-sym-btn.active,
     .spec-style-btn.active { border-color: var(--accent); color: var(--accent); }
 
     .phone-ui-group {
@@ -2104,6 +2112,8 @@
     .btn       svg.lucide { width: 14px; height: 14px; }    .card-title svg.lucide { width: 13px; height: 13px; }
     .drop-icon  svg.lucide { width: 22px; height: 22px; }
     .shape-btn       svg.lucide { width: 14px; height: 14px; }
-    .spec-style-btn   svg.lucide { width: 14px; height: 14px; }
+    .spec-shape-btn svg.lucide,
+    .spec-sym-btn   svg.lucide,
+    .spec-style-btn svg.lucide { width: 14px; height: 14px; }
     .hint       svg.lucide { width: 12px; height: 12px; }
     .drop-delete svg.lucide { width: 10px; height: 10px; }

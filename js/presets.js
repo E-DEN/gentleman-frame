@@ -109,8 +109,10 @@ export function collectSettings() {
     frameBlur:        elFrameBlur.value,
     frameTint:        elFrameTint.value,
     glassesStyle:     state.mask.glassesStyle,
-    specStyle:        state.mask.specStyle || 'bars',
-    specBars:         document.getElementById('specBars')?.value ?? '64',
+    specShape:        state.mask.specShape || 'bars',
+    specSym:          state.mask.specSym   || 'none',
+    specRotate:       state.mask.specRotate || 0,
+    specBars:         document.getElementById('specBars')?.value ?? '32',
     specAmp:          document.getElementById('specAmp')?.value  ?? '100',
     specGap:          document.getElementById('specGap')?.value  ?? '15',
     vid0Name:      _loadedFileName[0],
@@ -245,19 +247,30 @@ export function applySettings(d) {
       elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === gsi));
     }
     if (loadShape === 'spectrum') {
-      if (d.specStyle) {
-        // 旧プリセット互換: radial-spike/radial-wave → radial
-        const s = d.specStyle.startsWith('radial') ? 'radial' : d.specStyle;
-        state.mask.specStyle = s;
+      // 新フィールド
+      if (d.specShape  != null) state.mask.specShape  = d.specShape;
+      if (d.specSym    != null) state.mask.specSym    = d.specSym;
+      if (d.specRotate != null) state.mask.specRotate = parseInt(d.specRotate) || 0;
+      // 旧 specStyle から移行
+      if (d.specStyle && d.specShape == null) {
+        const _s = d.specStyle.startsWith('radial') ? 'radial' : d.specStyle;
+        const _map = { bars: ['bars','none'], mirror: ['bars','ud'], radial: ['radial','none'], symwave: ['radial','lr'] };
+        const [sh, sy] = _map[_s] || ['bars','none'];
+        state.mask.specShape = sh; state.mask.specSym = sy;
       }
-      const ss = state.mask.specStyle || 'bars';
-      document.querySelectorAll('.spec-style-btn[data-specstyle]').forEach(b =>
-        b.classList.toggle('active', b.dataset.specstyle === ss));
+      document.querySelectorAll('.spec-shape-btn[data-specshape]').forEach(b =>
+        b.classList.toggle('active', b.dataset.specshape === (state.mask.specShape || 'bars')));
+      document.querySelectorAll('.spec-sym-btn[data-specsym]').forEach(b =>
+        b.classList.toggle('active', b.dataset.specsym === (state.mask.specSym || 'none')));
+      const _srEl = document.getElementById('specRotate');
+      if (_srEl) { _srEl.value = state.mask.specRotate || 0; document.getElementById('specRotateVal').value = `${state.mask.specRotate || 0}°`; }
     }
     elSpectrumUiRow.style.display = loadShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specBarsRow').style.display = loadShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specAmpRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specGapRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specBarsRow').style.display    = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specAmpRow').style.display     = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specGapRow').style.display     = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specSymRow').style.display     = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specRotateRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
     _updateFgFixedBtn();
   }
   if (d.phoneLandscape != null) {

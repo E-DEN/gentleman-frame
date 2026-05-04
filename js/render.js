@@ -546,16 +546,50 @@ export function _renderFrame() {
 // マスク枠・ハンドル・アンカー・スマホフレームをぼかしより後に描画する
 // スペクトラム bars/mirror のスカイライン輪郭パス（gap=0時の枠用）
 function _spectrumSkyline(ctx, m) {
-  const specStyle = m.specStyle || 'bars';
-  if (specStyle !== 'bars' && specStyle !== 'mirror') return false;
+  // 旧 specStyle からの互換マッピング
+  const specShape  = m.specShape  || (m.specStyle === 'radial' || m.specStyle === 'symwave' ? 'radial' : 'bars');
+  const specSym    = m.specSym    != null ? m.specSym : (m.specStyle === 'mirror' ? 'ud' : m.specStyle === 'symwave' ? 'lr' : 'none');
+  const specRotate = ((m.specRotate || 0) * Math.PI / 180);
+  if (specShape !== 'bars') return false; // radial は buildMaskPath で処理
   const BAR_COUNT = elSpecBars ? Math.max(4, parseInt(elSpecBars.value) || 64) : 64;
   const amp       = elSpecAmp  ? Math.max(0.1, parseFloat(elSpecAmp.value) / 100) : 1.0;
   const bars      = getSpectrumBars(BAR_COUNT);
   const barW      = m.w / BAR_COUNT;
+  const cx = m.x + m.w / 2;
+  const cy = m.y + m.h / 2;
+  const HALF = Math.ceil(BAR_COUNT / 2);
+  if (specRotate !== 0) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(specRotate);
+    ctx.translate(-cx, -cy);
+  }
   ctx.beginPath();
-  if (specStyle === 'bars') {
+  if (specSym === 'ud') {
+    // 上下対称（ミラー）
+    const midY = m.y + m.h / 2;
+    const hh = Array.from({ length: BAR_COUNT }, (_, i) => Math.max(1, Math.min(1, (bars ? bars[i] * amp : 0)) * m.h / 2));
+    ctx.moveTo(m.x, midY);
+    ctx.lineTo(m.x, midY - hh[0]);
+    for (let i = 0; i < BAR_COUNT; i++) {
+      ctx.lineTo(m.x + (i + 1) * barW, midY - hh[i]);
+      if (i < BAR_COUNT - 1) ctx.lineTo(m.x + (i + 1) * barW, midY - hh[i + 1]);
+    }
+    ctx.lineTo(m.x + m.w, midY);
+    ctx.lineTo(m.x + m.w, midY + hh[BAR_COUNT - 1]);
+    for (let i = BAR_COUNT - 1; i >= 0; i--) {
+      ctx.lineTo(m.x + i * barW, midY + hh[i]);
+      if (i > 0) ctx.lineTo(m.x + i * barW, midY + hh[i - 1]);
+    }
+    ctx.lineTo(m.x, midY);
+    ctx.closePath();
+  } else {
+    // none / lr: 下辺からの階段輪郭
     const bottom = m.y + m.h;
-    const h = Array.from({ length: BAR_COUNT }, (_, i) => Math.max(2, Math.min(1, (bars ? bars[i] * amp : 0)) * m.h));
+    const h = Array.from({ length: BAR_COUNT }, (_, i) => {
+      const barIdx = specSym === 'lr' ? (i < HALF ? (HALF - 1 - i) : (i - HALF)) : i;
+      return Math.max(2, Math.min(1, (bars ? bars[barIdx] * amp : 0)) * m.h);
+    });
     ctx.moveTo(m.x, bottom);
     ctx.lineTo(m.x, bottom - h[0]);
     for (let i = 0; i < BAR_COUNT; i++) {
@@ -564,26 +598,8 @@ function _spectrumSkyline(ctx, m) {
     }
     ctx.lineTo(m.x + m.w, bottom);
     ctx.closePath();
-  } else { // mirror
-    const midY = m.y + m.h / 2;
-    const hh = Array.from({ length: BAR_COUNT }, (_, i) => Math.max(1, Math.min(1, (bars ? bars[i] * amp : 0)) * m.h / 2));
-    // 上側: 左→右
-    ctx.moveTo(m.x, midY);
-    ctx.lineTo(m.x, midY - hh[0]);
-    for (let i = 0; i < BAR_COUNT; i++) {
-      ctx.lineTo(m.x + (i + 1) * barW, midY - hh[i]);
-      if (i < BAR_COUNT - 1) ctx.lineTo(m.x + (i + 1) * barW, midY - hh[i + 1]);
-    }
-    ctx.lineTo(m.x + m.w, midY);
-    // 下側: 右→左
-    ctx.lineTo(m.x + m.w, midY + hh[BAR_COUNT - 1]);
-    for (let i = BAR_COUNT - 1; i >= 0; i--) {
-      ctx.lineTo(m.x + i * barW, midY + hh[i]);
-      if (i > 0) ctx.lineTo(m.x + i * barW, midY + hh[i - 1]);
-    }
-    ctx.lineTo(m.x, midY);
-    ctx.closePath();
   }
+  if (specRotate !== 0) ctx.restore();
   return true;
 }
 
@@ -895,43 +911,110 @@ export function buildMaskPath(c, m, forStroke = false) {
   } else if (m.shape === 'circle') {
     c.ellipse(m.x + m.w / 2, m.y + m.h / 2, m.w / 2, m.h / 2, 0, 0, Math.PI * 2);
   } else if (m.shape === 'spectrum') {
-    const specStyle = m.specStyle || 'bars';
+    // 旧 specStyle からの互換マッピング
+    const specShape  = m.specShape  || (m.specStyle === 'radial' || m.specStyle === 'symwave' ? 'radial' : 'bars');
+    const specSym    = m.specSym    != null ? m.specSym : (m.specStyle === 'mirror' ? 'ud' : m.specStyle === 'symwave' ? 'lr' : 'none');
+    const specRotate = ((m.specRotate || 0) * Math.PI / 180);
     const BAR_COUNT = elSpecBars ? Math.max(4, parseInt(elSpecBars.value) || 64) : 64;
     const amp       = elSpecAmp  ? Math.max(0.1, parseFloat(elSpecAmp.value) / 100) : 1.0;
     const bars      = getSpectrumBars(BAR_COUNT);
-
-    if (specStyle === 'bars' || specStyle === 'mirror') {
-      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 15;
+    const cx = m.x + m.w / 2;
+    const cy = m.y + m.h / 2;
+    if (specRotate !== 0) {
+      c.save();
+      c.translate(cx, cy);
+      c.rotate(specRotate);
+      c.translate(-cx, -cy);
+    }
+    c.beginPath();
+    if (specShape === 'bars') {
+      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 0;
       const gap  = gapPct === 0 ? 0 : Math.max(1, Math.round(m.w / BAR_COUNT * gapPct / 100));
       const barW = Math.max(1, (m.w - gap * (BAR_COUNT - 1)) / BAR_COUNT);
-      if (specStyle === 'bars') {
+      const HALF = Math.ceil(BAR_COUNT / 2);
+      if (specSym === 'ud') {
+        // 上下対称（ミラー）
+        const midY = m.y + m.h / 2;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const v     = bars ? Math.min(1, bars[i] * amp) : 0;
+          const halfH = Math.max(1, v * m.h / 2);
+          c.rect(m.x + i * (barW + gap), midY - halfH, barW, halfH * 2);
+        }
+      } else if (specSym === 'lr') {
+        // 左右対称: 中心=高域, 端=低域
+        const bottom = m.y + m.h;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const barIdx = i < HALF ? (HALF - 1 - i) : (i - HALF);
+          const v    = bars ? Math.min(1, bars[barIdx] * amp) : 0;
+          const barH = Math.max(2, v * m.h);
+          c.rect(m.x + i * (barW + gap), bottom - barH, barW, barH);
+        }
+      } else {
+        // none: 通常バー
         const bottom = m.y + m.h;
         for (let i = 0; i < BAR_COUNT; i++) {
           const v    = bars ? Math.min(1, bars[i] * amp) : 0;
           const barH = Math.max(2, v * m.h);
           c.rect(m.x + i * (barW + gap), bottom - barH, barW, barH);
         }
-      } else { // mirror
-        const midY = m.y + m.h / 2;
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const v      = bars ? Math.min(1, bars[i] * amp) : 0;
-          const halfH  = Math.max(1, v * m.h / 2);
-          c.rect(m.x + i * (barW + gap), midY - halfH, barW, halfH * 2);
-        }
       }
     } else { // radial
-      // gap>0: spike（セグメント分割）、gap=0: wave（スムース）
-      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 15;
-      const cx = m.x + m.w / 2;
-      const cy = m.y + m.h / 2;
+      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 0;
       const rMin = Math.min(m.w, m.h) * 0.18;
       const rMax = Math.min(m.w, m.h) * 0.50;
-
-      if (gapPct > 0) {
+      if (specSym === 'lr') {
+        // 左右対称スムース円形波（垂直軸で対称）
+        const allPts = [];
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const v = bars ? Math.min(1, bars[i] * amp) : 0;
+          const r = rMin + v * (rMax - rMin);
+          const angle = Math.PI / 2 - (i / (BAR_COUNT - 1)) * Math.PI;
+          allPts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
+        }
+        for (let i = BAR_COUNT - 2; i >= 1; i--) {
+          const v = bars ? Math.min(1, bars[i] * amp) : 0;
+          const r = rMin + v * (rMax - rMin);
+          const angle = Math.PI / 2 - (i / (BAR_COUNT - 1)) * Math.PI;
+          allPts.push({ x: cx + Math.cos(Math.PI - angle) * r, y: cy + Math.sin(Math.PI - angle) * r });
+        }
+        const N = allPts.length;
+        c.moveTo((allPts[0].x + allPts[N - 1].x) / 2, (allPts[0].y + allPts[N - 1].y) / 2);
+        for (let i = 0; i < N; i++) {
+          const p1 = allPts[i]; const p2 = allPts[(i + 1) % N];
+          c.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+        }
+        c.closePath();
+      } else if (specSym === 'ud') {
+        // 上下対称スムース円形波（水平軸で対称）
+        const HALF2 = BAR_COUNT;
+        const allPts = [];
+        // 上半円: 右(0) → 左(π)
+        for (let i = 0; i <= HALF2; i++) {
+          const v = bars ? Math.min(1, bars[Math.min(i, HALF2 - 1)] * amp) : 0;
+          const r = rMin + v * (rMax - rMin);
+          const angle = (i / HALF2) * Math.PI; // 0 → π
+          allPts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
+        }
+        // 下半円: 左(π) → 右(0)  ← 上の鏡像
+        for (let i = HALF2 - 1; i >= 0; i--) {
+          const v = bars ? Math.min(1, bars[Math.min(i, HALF2 - 1)] * amp) : 0;
+          const r = rMin + v * (rMax - rMin);
+          const angle = (i / HALF2) * Math.PI;
+          allPts.push({ x: cx + Math.cos(angle) * r, y: cy - Math.sin(angle) * r }); // y を反転
+        }
+        const N = allPts.length;
+        c.moveTo((allPts[0].x + allPts[N - 1].x) / 2, (allPts[0].y + allPts[N - 1].y) / 2);
+        for (let i = 0; i < N; i++) {
+          const p1 = allPts[i]; const p2 = allPts[(i + 1) % N];
+          c.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+        }
+        c.closePath();
+      } else if (gapPct > 0) {
+        // spike（セグメント分割）
         const fullAngle = (Math.PI * 2) / BAR_COUNT;
         const barAngle  = fullAngle * Math.max(0.1, 1 - gapPct / 100);
         if (forStroke) {
-          // ストローク: 外弧＋両辺＋ギャップ部分の内円弧を1本の連続パスで描画（スカイライン風）
+          // スカイライン風連続パス
           const segs = Array.from({ length: BAR_COUNT }, (_, i) => {
             const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
             const a0 = angle - barAngle / 2;
@@ -943,12 +1026,12 @@ export function buildMaskPath(c, m, forStroke = false) {
           for (let i = 0; i < BAR_COUNT; i++) {
             const { a0, a1, outerR } = segs[i];
             const nextA0 = i + 1 < BAR_COUNT ? segs[i + 1].a0 : segs[0].a0 + Math.PI * 2;
-            c.arc(cx, cy, outerR, a0, a1);     // 辺(自動) + 外弧
-            c.arc(cx, cy, rMin,   a1, nextA0); // 辺(自動) + ギャップ内円弧
+            c.arc(cx, cy, outerR, a0, a1);
+            c.arc(cx, cy, rMin,   a1, nextA0);
           }
           c.closePath();
         } else {
-          // fill/clip: 内円 + 全セグメント
+          // fill/clip: 内円 + セグメント群
           c.arc(cx, cy, rMin, 0, Math.PI * 2);
           c.closePath();
           for (let i = 0; i < BAR_COUNT; i++) {
@@ -976,13 +1059,13 @@ export function buildMaskPath(c, m, forStroke = false) {
         const N = pts.length;
         c.moveTo((pts[0].x + pts[N - 1].x) / 2, (pts[0].y + pts[N - 1].y) / 2);
         for (let i = 0; i < N; i++) {
-          const p1 = pts[i];
-          const p2 = pts[(i + 1) % N];
+          const p1 = pts[i]; const p2 = pts[(i + 1) % N];
           c.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
         }
         c.closePath();
       }
     }
+    if (specRotate !== 0) c.restore();
   } else if (m.shape === 'heart') {
     // ハート型パス (幅・高さに合わせてスケール)
     const cx = m.x + m.w / 2, cy = m.y + m.h / 2;

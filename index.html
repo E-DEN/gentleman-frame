@@ -274,12 +274,24 @@
         </div>
       </div>
       <div class="ctrl-row" id="spectrumUiRow" style="display:none">
-        <label data-i18n="spec-style">スタイル</label>
+        <label data-i18n="spec-shape">形状</label>
         <div class="phone-ui-group">
-          <button class="spec-style-btn active" data-specstyle="bars" data-i18n-title="spec-style-bars" title="バー"><i data-lucide="chart-column-increasing"></i></button>
-          <button class="spec-style-btn" data-specstyle="mirror" data-i18n-title="spec-style-mirror" title="ミラー"><i data-lucide="audio-lines"></i></button>
-          <button class="spec-style-btn" data-specstyle="radial" data-i18n-title="spec-style-radial" title="円形"><i data-lucide="sun"></i></button>
+          <button class="spec-shape-btn active" data-specshape="bars" data-i18n-title="spec-shape-bars" title="バー"><i data-lucide="chart-column-increasing"></i></button>
+          <button class="spec-shape-btn" data-specshape="radial" data-i18n-title="spec-shape-radial" title="円形"><i data-lucide="sun"></i></button>
         </div>
+      </div>
+      <div class="ctrl-row" id="specSymRow" style="display:none">
+        <label data-i18n="spec-sym">対称</label>
+        <div class="phone-ui-group">
+          <button class="spec-sym-btn active" data-specsym="none" data-i18n-title="spec-sym-none" title="なし"><i data-lucide="minus"></i></button>
+          <button class="spec-sym-btn" data-specsym="ud" data-i18n-title="spec-sym-ud" title="上下対称"><i data-lucide="chevrons-up-down"></i></button>
+          <button class="spec-sym-btn" data-specsym="lr" data-i18n-title="spec-sym-lr" title="左右対称"><i data-lucide="chevrons-left-right"></i></button>
+        </div>
+      </div>
+      <div class="ctrl-row" id="specRotateRow" style="display:none">
+        <label data-i18n="spec-rotate">回転</label>
+        <input type="range" id="specRotate" min="0" max="360" value="0" step="1">
+        <input type="text" class="ctrl-val" id="specRotateVal" value="0°" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row" id="specGapRow" style="display:none">
         <label data-i18n="spec-gap">隙間</label>
