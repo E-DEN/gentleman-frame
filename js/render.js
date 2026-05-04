@@ -851,7 +851,8 @@ export function render(now) {
     _mblurCtx.clearRect(0, 0, _mblurCvs.width, _mblurCvs.height);
     _mblurCtx.drawImage(renderCvs, 0, 0);
   }
-  // 全体ぼかし: CSS filterではなくcanvas描画時に適用
+  // 全体ぼかし: copyモードでblit→透明画素も完全置換され残留しない
+  displayCtx.globalCompositeOperation = 'copy';
   if (gb > 0) {
     svgGblurEl.setAttribute('stdDeviation', gb);
     displayCtx.filter = 'url(#gblur)';
@@ -860,6 +861,7 @@ export function render(now) {
   } else {
     displayCtx.drawImage(renderCvs, 0, 0);
   }
+  displayCtx.globalCompositeOperation = 'source-over';
   // 枠・ハンドルは overlayCanvas (effectsWrap外) に描画 → filter非適用
   _drawOverlays();
   requestAnimationFrame(render);
