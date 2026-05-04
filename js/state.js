@@ -81,6 +81,14 @@ export const state = {
     specGap: 15,
   },
   borderInvert: false,
+  filterFrameOnly: {
+    watercolor:  false,
+    pencil:      false,
+    emboss:      false,
+    chalkboard:  false,
+    nightvision: false,
+    airbrush:    false,
+  },
   arLock: false,
   zoomLock: false,           // マスクリサイズ時にズームを自動追従させる
   fgFixed: false,            // false = 紳士枠モード, true = アンカーモード

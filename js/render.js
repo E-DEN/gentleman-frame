@@ -19,6 +19,7 @@ import {
   elFilterBlur, elFilterHighlight, elFilterShadow, elFilterSharpness,
   elFilterCA, elFilterVignette, elFilterMatte, elFilterGrain,
   elFilterFlare, elFilterFps, elFilterBars, elFilterWatercolor,
+  elFilterPencil, elFilterEmboss, elFilterChalkboard, elFilterNightVision, elFilterAirbrush,
   elFilterTemp, elFilterTint,
   elBorderW, elBorderColor, elBorderOpacity,
   elBorderAnim, elBorderAnimSpeed, elBorderAnimBright,
@@ -332,6 +333,7 @@ export function _renderFrame() {
 
   // --- 色収差（放射状、スケールベース）---
   if (!effectsHidden) {
+  const _maskClipOk = !maskHidden && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0]);
   const caAmt = parseFloat(elFilterCA.value);
   if (caAmt > 0) {
     postCtx.clearRect(0, 0, W, H);
@@ -483,6 +485,8 @@ export function _renderFrame() {
   // --- Bloom / にじみ ---
   const waterAmt = elFilterWatercolor ? parseFloat(elFilterWatercolor.value) : 0;
   if (waterAmt > 0) {
+    const _foW = state.filterFrameOnly.watercolor && _maskClipOk;
+    if (_foW) { ctx.save(); const _fwp = buildMaskPath(ctx, m); if (_fwp) ctx.clip(_fwp); else ctx.clip(); }
     const t = waterAmt / 10;
     // 1. 滲み: ぼかし+彩度ブースト済みコピーをノーマル合成
     postCtx.clearRect(0, 0, W, H);
@@ -503,6 +507,7 @@ export function _renderFrame() {
     ctx.globalAlpha = t * 0.30;
     ctx.drawImage(chCvs, 0, 0);
     ctx.restore();
+    if (_foW) ctx.restore();
   }
 
   // --- Sharpness (オーバーレイ unsharp mask) ---
@@ -521,6 +526,125 @@ export function _renderFrame() {
     ctx.globalAlpha = Math.min(sharpAmt * 0.09, 0.85);
     ctx.drawImage(postCvs, 0, 0);
     ctx.restore();
+  }
+
+  // --- Pencil (鉛筆スケッチ) ---
+  const pencilAmt = elFilterPencil ? parseFloat(elFilterPencil.value) : 0;
+  if (pencilAmt > 0) {
+    const _foP = state.filterFrameOnly.pencil && _maskClipOk;
+    if (_foP) { ctx.save(); const _fpp = buildMaskPath(ctx, m); if (_fpp) ctx.clip(_fpp); else ctx.clip(); }
+    const t = pencilAmt / 10;
+    const offset = Math.max(1, Math.round(1 + t * 3));
+    // 差分でエッジ検出（エッジ部分が明るくなる）
+    postCtx.clearRect(0, 0, W, H);
+    postCtx.drawImage(renderCvs, 0, 0);
+    postCtx.globalCompositeOperation = 'difference';
+    postCtx.drawImage(renderCvs, offset, offset);
+    postCtx.globalCompositeOperation = 'source-over';
+    // グレースケール + コントラスト強化 + 反転 → 白地に黒い線
+    chCtx.clearRect(0, 0, W, H);
+    chCtx.filter = `grayscale(1) brightness(3) contrast(${4 + t * 8}) invert(1)`;
+    chCtx.drawImage(postCvs, 0, 0);
+    chCtx.filter = 'none';
+    // multiply: 白地(非エッジ)は元画像を保持、黒線のみ乗算で描画
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.7 + t * 0.3;
+    ctx.drawImage(chCvs, 0, 0);
+    ctx.restore();
+    if (_foP) ctx.restore();
+  }
+
+  // --- Emboss (エンボス) ---
+  const embossAmt = elFilterEmboss ? parseFloat(elFilterEmboss.value) : 0;
+  if (embossAmt > 0) {
+    const _foE = state.filterFrameOnly.emboss && _maskClipOk;
+    if (_foE) { ctx.save(); const _fep = buildMaskPath(ctx, m); if (_fep) ctx.clip(_fep); else ctx.clip(); }
+    const t = embossAmt / 10;
+    const offset = Math.round(1 + t * 2);
+    postCtx.clearRect(0, 0, W, H);
+    postCtx.drawImage(renderCvs, 0, 0);
+    postCtx.globalCompositeOperation = 'screen';
+    postCtx.drawImage(renderCvs, offset, offset);
+    postCtx.globalCompositeOperation = 'difference';
+    postCtx.drawImage(renderCvs, -offset, -offset);
+    postCtx.globalCompositeOperation = 'source-over';
+    chCtx.clearRect(0, 0, W, H);
+    chCtx.filter = 'brightness(2) invert(1) grayscale(1)';
+    chCtx.drawImage(postCvs, 0, 0);
+    chCtx.filter = 'none';
+    ctx.save();
+    ctx.globalAlpha = t;
+    ctx.drawImage(chCvs, 0, 0);
+    ctx.restore();
+    if (_foE) ctx.restore();
+  }
+
+  // --- Chalkboard (黒板) ---
+  const chalkAmt = elFilterChalkboard ? parseFloat(elFilterChalkboard.value) : 0;
+  if (chalkAmt > 0) {
+    const _foC = state.filterFrameOnly.chalkboard && _maskClipOk;
+    if (_foC) { ctx.save(); const _fcp = buildMaskPath(ctx, m); if (_fcp) ctx.clip(_fcp); else ctx.clip(); }
+    const t = chalkAmt / 10;
+    const offset = Math.round(1 + t * 2);
+    postCtx.clearRect(0, 0, W, H);
+    postCtx.drawImage(renderCvs, 0, 0);
+    postCtx.globalCompositeOperation = 'difference';
+    postCtx.drawImage(renderCvs, offset, offset);
+    postCtx.globalCompositeOperation = 'source-over';
+    chCtx.clearRect(0, 0, W, H);
+    chCtx.filter = `grayscale(1) brightness(${1.5 + t * 0.5})`;
+    chCtx.drawImage(postCvs, 0, 0);
+    chCtx.filter = 'none';
+    ctx.save();
+    ctx.globalAlpha = t;
+    ctx.drawImage(chCvs, 0, 0);
+    ctx.restore();
+    if (_foC) ctx.restore();
+  }
+
+  // --- Night Vision (暗視) ---
+  const nightVisionAmt = elFilterNightVision ? parseFloat(elFilterNightVision.value) : 0;
+  if (nightVisionAmt > 0) {
+    const _foN = state.filterFrameOnly.nightvision && _maskClipOk;
+    if (_foN) { ctx.save(); const _fnp = buildMaskPath(ctx, m); if (_fnp) ctx.clip(_fnp); else ctx.clip(); }
+    const t = nightVisionAmt / 10;
+    postCtx.clearRect(0, 0, W, H);
+    postCtx.filter = `grayscale(1) brightness(${1.2 + t * 0.4}) contrast(${1 + t * 0.5})`;
+    postCtx.drawImage(renderCvs, 0, 0);
+    postCtx.filter = 'none';
+    chCtx.clearRect(0, 0, W, H);
+    chCtx.fillStyle = 'rgb(0,255,60)';
+    chCtx.fillRect(0, 0, W, H);
+    chCtx.globalCompositeOperation = 'multiply';
+    chCtx.drawImage(postCvs, 0, 0);
+    chCtx.globalCompositeOperation = 'source-over';
+    const lh = Math.max(1, Math.ceil(H / 320));
+    chCtx.fillStyle = `rgba(0,0,0,${t * 0.18})`;
+    for (let y = 0; y < H; y += lh * 2) { chCtx.fillRect(0, y, W, lh); }
+    ctx.save();
+    ctx.globalAlpha = t;
+    ctx.drawImage(chCvs, 0, 0);
+    ctx.restore();
+    if (_foN) ctx.restore();
+  }
+
+  // --- Airbrush (エアブラシ) ---
+  const airbrushAmt = elFilterAirbrush ? parseFloat(elFilterAirbrush.value) : 0;
+  if (airbrushAmt > 0) {
+    const _foA = state.filterFrameOnly.airbrush && _maskClipOk;
+    if (_foA) { ctx.save(); const _fap = buildMaskPath(ctx, m); if (_fap) ctx.clip(_fap); else ctx.clip(); }
+    const t = airbrushAmt / 10;
+    postCtx.clearRect(0, 0, W, H);
+    postCtx.filter = `brightness(${1 + t * 0.5}) saturate(${1 + t * 20}) blur(${t * 8}px) contrast(${1 + t * 3})`;
+    postCtx.drawImage(renderCvs, 0, 0);
+    postCtx.filter = 'none';
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = t * 0.7;
+    ctx.drawImage(postCvs, 0, 0);
+    ctx.restore();
+    if (_foA) ctx.restore();
   }
 
   // --- Color Flare (カラーフレア) ---

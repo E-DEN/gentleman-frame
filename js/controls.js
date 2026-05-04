@@ -23,6 +23,7 @@ import {
   elFilterHighlight, elFilterShadow, elFilterSharpness, elFilterMatte,
   elFilterGrain, elMaskPixel, elMaskBlur, elFilterFlare, elFilterBars,
   elFilterWatercolor,
+  elFilterPencil, elFilterEmboss, elFilterChalkboard, elFilterNightVision, elFilterAirbrush,
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
   elProgressFill, elProgressThumb, elTimeLabel, elPlayBtn,
   elMaskZoom, elMaskW, elMaskH, elMaskOffX, elMaskOffY,
@@ -694,7 +695,12 @@ bindSlider('filterCA',         'filterCAVal',         v => v % 1 === 0 ? `${Math
 bindSlider('filterVignette',   'filterVignetteVal',   v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterMatte',      'filterMatteVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('filterWatercolor', 'filterWatercolorVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterWatercolor',  'filterWatercolorVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterPencil',      'filterPencilVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterEmboss',      'filterEmbossVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterChalkboard',  'filterChalkboardVal',  v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterNightVision', 'filterNightVisionVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterAirbrush',    'filterAirbrushVal',    v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterBlur',       'filterBlurVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), updateBarsOverlay);
@@ -733,14 +739,39 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterWatercolor', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterWatercolor', 'filterPencil', 'filterEmboss', 'filterChalkboard', 'filterNightVision', 'filterAirbrush', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
   });
+  [
+    { key: 'watercolor',  btnId: 'filterWatercolorFOBtn'  },
+    { key: 'pencil',      btnId: 'filterPencilFOBtn'      },
+    { key: 'emboss',      btnId: 'filterEmbossFOBtn'      },
+    { key: 'chalkboard',  btnId: 'filterChalkboardFOBtn'  },
+    { key: 'nightvision', btnId: 'filterNightVisionFOBtn' },
+    { key: 'airbrush',    btnId: 'filterAirbrushFOBtn'    },
+  ].forEach(({ key, btnId }) => {
+    state.filterFrameOnly[key] = false;
+    document.getElementById(btnId)?.classList.remove('active');
+  });
 });
 
 // ---- クイックフィルタープリセット ----
+[
+  { key: 'watercolor',  btnId: 'filterWatercolorFOBtn'  },
+  { key: 'pencil',      btnId: 'filterPencilFOBtn'      },
+  { key: 'emboss',      btnId: 'filterEmbossFOBtn'      },
+  { key: 'chalkboard',  btnId: 'filterChalkboardFOBtn'  },
+  { key: 'nightvision', btnId: 'filterNightVisionFOBtn' },
+  { key: 'airbrush',    btnId: 'filterAirbrushFOBtn'    },
+].forEach(({ key, btnId }) => {
+  document.getElementById(btnId).addEventListener('click', () => {
+    state.filterFrameOnly[key] = !state.filterFrameOnly[key];
+    document.getElementById(btnId).classList.toggle('active', state.filterFrameOnly[key]);
+  });
+});
+
 const _FQP = {
   //            bright  cont   hl     sh     sat    hue    temp   tint   sharp  ca     vig    matte  grain  flare  blur   bars   fps    mblur  pixel
   cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterFlare: 0,   filterBlur: 0, filterBars: 5,   filterFps: 24, maskBlur: 0, maskPixel: 0 },

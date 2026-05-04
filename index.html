@@ -537,7 +537,7 @@
         <input type="text" class="ctrl-val" id="filterMatteVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-watercolor">にじみ</label>
+        <label><span data-i18n="filter-watercolor">にじみ</span><button class="fo-btn" id="filterWatercolorFOBtn" title="フレーム内のみ"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterWatercolor" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterWatercolorVal" value="0" spellcheck="false" autocomplete="off">
       </div>
@@ -545,6 +545,35 @@
         <label data-i18n="filter-grain">フィルム粒子</label>
         <input type="range" id="filterGrain" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterGrainVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-mini-sep"></div>
+      <div style="padding:0 0 4px;">
+        <span style="font-size:11px;color:var(--text-muted)" data-i18n="filter-artistic-label">描画エフェクト</span>
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="filter-pencil">鉛筆</span><button class="fo-btn" id="filterPencilFOBtn" title="フレーム内のみ"><i data-lucide="scan"></i></button></label>
+        <input type="range" id="filterPencil" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterPencilVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="filter-emboss">エンボス</span><button class="fo-btn" id="filterEmbossFOBtn" title="フレーム内のみ"><i data-lucide="scan"></i></button></label>
+        <input type="range" id="filterEmboss" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterEmbossVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="filter-chalkboard">黒板</span><button class="fo-btn" id="filterChalkboardFOBtn" title="フレーム内のみ"><i data-lucide="scan"></i></button></label>
+        <input type="range" id="filterChalkboard" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterChalkboardVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="filter-nightvision">暗視</span><button class="fo-btn" id="filterNightVisionFOBtn" title="フレーム内のみ"><i data-lucide="scan"></i></button></label>
+        <input type="range" id="filterNightVision" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterNightVisionVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="filter-airbrush">エアブラシ</span><button class="fo-btn" id="filterAirbrushFOBtn" title="フレーム内のみ"><i data-lucide="scan"></i></button></label>
+        <input type="range" id="filterAirbrush" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterAirbrushVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
         <label data-i18n="filter-blur">ぼかし</label>
