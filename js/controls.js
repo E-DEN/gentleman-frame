@@ -999,7 +999,9 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     _updateFgFixedBtn();
 
     if (prevShape !== 'phone' && newShape === 'phone') {
-      _nonPhoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y };
+      // メガネからの遷移: 横長サイズがそのまま残らないよう h×h に正規化して保存
+      const saveW = prevShape === 'glasses' ? state.mask.h : state.mask.w;
+      _nonPhoneMaskState = { w: saveW, h: state.mask.h, x: state.mask.x, y: state.mask.y };
     } else if (prevShape === 'phone' && newShape !== 'phone') {
       _phoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y };
       if (_nonPhoneMaskState) {
@@ -1010,6 +1012,13 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
         state.mask.x = Math.round((canvas.width  - 400) / 2);
         state.mask.y = Math.round((canvas.height - 400) / 2);
       }
+    }
+
+    // メガネからの遷移: h×h の正方形に正規化（全遷移先に適用）
+    if (prevShape === 'glasses' && newShape !== 'glasses' && newShape !== 'phone') {
+      const side = state.mask.h;
+      state.mask.w = side;
+      state.mask.x = Math.round((canvas.width - side) / 2);
     }
 
     if (newShape === 'heart') {
@@ -1046,19 +1055,18 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       state.mask.x = Math.round((cw - _gs.w) / 2);
       state.mask.y = Math.round((ch - _gs.h) / 2);
       if (!state.arLock) { state.arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
+    } else if (newShape === 'spectrum') {
+      connectAudioElements(vid[0], vid[1]);
+      if (!state.arLock) { state.arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else {
-      if (prevShape === 'glasses') {
-        const side = state.mask.h;
-        state.mask.w = side;
-        state.mask.x = Math.round((canvas.width - side) / 2);
-      }
-      if (newShape === 'spectrum') connectAudioElements(vid[0], vid[1]);
       if (state.arLockBeforeAutoLock !== null) {
         state.arLock = state.arLockBeforeAutoLock;
         state.arLockBeforeAutoLock = null;
         _updateArLockBtn();
       } else if (state.arLock) {
         state.arLock = false;
+        _updateArLockBtn();
+      } else {
         _updateArLockBtn();
       }
     }
@@ -1172,7 +1180,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
   state.mask.h = dh;
   state.mask.x = Math.round((canvas.width  - dw) / 2);
   state.mask.y = Math.round((canvas.height - dh) / 2);
-  state.arLock = (state.mask.shape === 'phone' || state.mask.shape === 'heart' || state.mask.shape === 'glasses');
+  state.arLock = (state.mask.shape === 'phone' || state.mask.shape === 'heart' || state.mask.shape === 'glasses' || state.mask.shape === 'spectrum');
   _updateArLockBtn();
   if (state.mask.shape === 'phone') {
     _phoneMaskState = { w: dw, h: dh, x: state.mask.x, y: state.mask.y };

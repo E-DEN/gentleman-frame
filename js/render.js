@@ -628,7 +628,7 @@ export function _drawOverlays() {
         if (_usesSkyline && _spectrumSkyline(dCtx, m)) {
           dCtx.stroke();
         } else {
-          const _gp6 = buildMaskPath(dCtx, m);
+          const _gp6 = buildMaskPath(dCtx, m, true);
           _gp6 ? dCtx.stroke(_gp6) : dCtx.stroke();
         }
       }
@@ -673,7 +673,7 @@ export function _drawOverlays() {
       if (_usesSkylineInv && _spectrumSkyline(anchorCtx, m)) {
         anchorCtx.stroke();
       } else {
-        const _gp7 = buildMaskPath(anchorCtx, m);
+        const _gp7 = buildMaskPath(anchorCtx, m, true);
         _gp7 ? anchorCtx.stroke(_gp7) : anchorCtx.stroke();
       }
       anchorCtx.restore();
@@ -872,7 +872,7 @@ export function _glassesInitSize(cw, ch) {
   return { w: Math.min(800, cw), h: Math.min(320, ch) };
 }
 
-export function buildMaskPath(c, m) {
+export function buildMaskPath(c, m, forStroke = false) {
   if (m.shape === 'glasses') {
     const idx = (state.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
     const g = _GLASSES_STYLES[idx];
@@ -928,22 +928,41 @@ export function buildMaskPath(c, m) {
       const rMax = Math.min(m.w, m.h) * 0.50;
 
       if (gapPct > 0) {
-        // spike: 内円(常時表示) + リングセグメントバー
-        c.arc(cx, cy, rMin, 0, Math.PI * 2);
-        c.closePath();
         const fullAngle = (Math.PI * 2) / BAR_COUNT;
         const barAngle  = fullAngle * Math.max(0.1, 1 - gapPct / 100);
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const v      = bars ? Math.min(1, bars[i] * amp) : 0;
-          const outerR = rMin + Math.max(0.04, v) * (rMax - rMin);
-          const angle  = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
-          const a0 = angle - barAngle / 2;
-          const a1 = angle + barAngle / 2;
-          c.moveTo(cx + Math.cos(a0) * rMin, cy + Math.sin(a0) * rMin);
-          c.arc(cx, cy, outerR, a0, a1);
-          c.lineTo(cx + Math.cos(a1) * rMin, cy + Math.sin(a1) * rMin);
-          c.arc(cx, cy, rMin, a1, a0, true);
+        if (forStroke) {
+          // ストローク: 外弧＋両辺＋ギャップ部分の内円弧を1本の連続パスで描画（スカイライン風）
+          const segs = Array.from({ length: BAR_COUNT }, (_, i) => {
+            const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
+            const a0 = angle - barAngle / 2;
+            const a1 = angle + barAngle / 2;
+            const v  = bars ? Math.min(1, bars[i] * amp) : 0;
+            return { a0, a1, outerR: rMin + Math.max(0.04, v) * (rMax - rMin) };
+          });
+          c.moveTo(cx + Math.cos(segs[0].a0) * rMin, cy + Math.sin(segs[0].a0) * rMin);
+          for (let i = 0; i < BAR_COUNT; i++) {
+            const { a0, a1, outerR } = segs[i];
+            const nextA0 = i + 1 < BAR_COUNT ? segs[i + 1].a0 : segs[0].a0 + Math.PI * 2;
+            c.arc(cx, cy, outerR, a0, a1);     // 辺(自動) + 外弧
+            c.arc(cx, cy, rMin,   a1, nextA0); // 辺(自動) + ギャップ内円弧
+          }
           c.closePath();
+        } else {
+          // fill/clip: 内円 + 全セグメント
+          c.arc(cx, cy, rMin, 0, Math.PI * 2);
+          c.closePath();
+          for (let i = 0; i < BAR_COUNT; i++) {
+            const v      = bars ? Math.min(1, bars[i] * amp) : 0;
+            const outerR = rMin + Math.max(0.04, v) * (rMax - rMin);
+            const angle  = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
+            const a0 = angle - barAngle / 2;
+            const a1 = angle + barAngle / 2;
+            c.moveTo(cx + Math.cos(a0) * rMin, cy + Math.sin(a0) * rMin);
+            c.arc(cx, cy, outerR, a0, a1);
+            c.lineTo(cx + Math.cos(a1) * rMin, cy + Math.sin(a1) * rMin);
+            c.arc(cx, cy, rMin, a1, a0, true);
+            c.closePath();
+          }
         }
       } else {
         // wave: スムースBlob
