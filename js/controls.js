@@ -22,6 +22,7 @@ import {
   elFilterHue, elFilterVignette, elFilterCA, elFilterTemp, elFilterTint,
   elFilterHighlight, elFilterShadow, elFilterSharpness, elFilterMatte,
   elFilterGrain, elMaskPixel, elMaskBlur, elFilterFlare, elFilterBars,
+  elFilterWatercolor,
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
   elProgressFill, elProgressThumb, elTimeLabel, elPlayBtn,
   elMaskZoom, elMaskW, elMaskH, elMaskOffX, elMaskOffY,
@@ -693,6 +694,7 @@ bindSlider('filterCA',         'filterCAVal',         v => v % 1 === 0 ? `${Math
 bindSlider('filterVignette',   'filterVignetteVal',   v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterMatte',      'filterMatteVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterGrain',      'filterGrainVal',      v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterWatercolor', 'filterWatercolorVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterBlur',       'filterBlurVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), updateBarsOverlay);
@@ -731,7 +733,7 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterWatercolor', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
@@ -755,6 +757,7 @@ const _FQP = {
   modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterFlare: 1.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
   trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterFlare: 2,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
   prism:   { filterBrightness: 90,  filterContrast: 180, filterHighlight:  +4, filterShadow: +40, filterSaturation: 122, filterHue: 0, filterTemp: -12, filterTint:  -2, filterSharpness: 0,   filterCA: 3,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterFlare: 3,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
+  watercolor: { filterBrightness: 105, filterContrast: 90,  filterHighlight: +10, filterShadow: +10, filterSaturation: 130, filterHue: 0, filterTemp:  +8, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 3,   filterMatte: 4,   filterGrain: 1.5, filterFlare: 0,   filterBlur: 1.5, filterBars: 0, filterFps: 0,  maskBlur: 0, maskPixel: 0 },
 };
 const _FQP_FILTER_KEYS = [
   'filterBrightness','filterContrast','filterHighlight','filterShadow',

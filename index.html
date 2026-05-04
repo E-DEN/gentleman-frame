@@ -461,6 +461,7 @@
         <button class="fqp-btn" data-fqp="modern" data-i18n="fqp-modern">モダン</button>
         <button class="fqp-btn" data-fqp="trend" data-i18n="fqp-trend">トレンド</button>
         <button class="fqp-btn" data-fqp="prism" data-i18n="fqp-prism">プリズム</button>
+        <button class="fqp-btn" data-fqp="watercolor" data-i18n="fqp-watercolor">にじみ</button>
         <span id="fqpSaveWrap" style="display:inline-flex;align-items:center;gap:4px;">
           <button id="fqpSaveBtn" class="fqp-btn fqp-save-btn" data-i18n-title="fqp-save-title" title="現在のフィルターを保存">+</button>
           <span id="fqpNameForm" style="display:none;align-items:center;gap:4px;">
@@ -535,6 +536,11 @@
         <label data-i18n="filter-matte">マット</label>
         <input type="range" id="filterMatte" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterMatteVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label data-i18n="filter-watercolor">にじみ</label>
+        <input type="range" id="filterWatercolor" min="0" max="10" value="0" step="0.1">
+        <input type="text" class="ctrl-val" id="filterWatercolorVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
         <label data-i18n="filter-grain">フィルム粒子</label>

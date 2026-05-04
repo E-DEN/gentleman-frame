@@ -18,7 +18,7 @@ import {
   elFilterBrightness, elFilterContrast, elFilterSaturation, elFilterHue,
   elFilterBlur, elFilterHighlight, elFilterShadow, elFilterSharpness,
   elFilterCA, elFilterVignette, elFilterMatte, elFilterGrain,
-  elFilterFlare, elFilterFps, elFilterBars,
+  elFilterFlare, elFilterFps, elFilterBars, elFilterWatercolor,
   elFilterTemp, elFilterTint,
   elBorderW, elBorderColor, elBorderOpacity,
   elBorderAnim, elBorderAnimSpeed, elBorderAnimBright,
@@ -476,6 +476,46 @@ export function _renderFrame() {
     grainCtx.putImageData(idata, 0, 0);
     ctx.save();
     ctx.globalCompositeOperation = 'overlay';
+    ctx.drawImage(grainCvs, 0, 0, W, H);
+    ctx.restore();
+  }
+
+  // --- Bloom / にじみ ---
+  const waterAmt = elFilterWatercolor ? parseFloat(elFilterWatercolor.value) : 0;
+  if (waterAmt > 0) {
+    const t = waterAmt / 10;
+    // 1. 滲み: ぼかし+彩度ブースト済みコピーをノーマル合成
+    postCtx.clearRect(0, 0, W, H);
+    postCtx.filter = `blur(${t * 4}px) saturate(${100 + t * 70}%)`;
+    postCtx.drawImage(renderCvs, 0, 0);
+    postCtx.filter = 'none';
+    ctx.save();
+    ctx.globalAlpha = t * 0.55;
+    ctx.drawImage(postCvs, 0, 0);
+    ctx.restore();
+    // 2. エッジ濃縮: 軽いぼかしコピーを multiply で暗化
+    chCtx.clearRect(0, 0, W, H);
+    chCtx.filter = `blur(${t * 2}px)`;
+    chCtx.drawImage(renderCvs, 0, 0);
+    chCtx.filter = 'none';
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = t * 0.30;
+    ctx.drawImage(chCvs, 0, 0);
+    ctx.restore();
+    // 3. 紙目テクスチャ: ランダムノイズを soft-light で重ねる
+    const nSz = 256;
+    const nData = grainCtx.createImageData(nSz, nSz);
+    const nd = nData.data;
+    const nStr = t * 50;
+    for (let i = 0; i < nd.length; i += 4) {
+      const v = Math.max(0, Math.min(255, 128 + (Math.random() - 0.5) * nStr));
+      nd[i] = nd[i+1] = nd[i+2] = v; nd[i+3] = 255;
+    }
+    grainCtx.putImageData(nData, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = t * 0.25;
     ctx.drawImage(grainCvs, 0, 0, W, H);
     ctx.restore();
   }

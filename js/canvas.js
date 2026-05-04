@@ -417,6 +417,7 @@ export const elFilterShadow = document.getElementById('filterShadow');
 export const elFilterSharpness = document.getElementById('filterSharpness');
 export const elFilterMatte = document.getElementById('filterMatte');
 export const elFilterGrain = document.getElementById('filterGrain');
+export const elFilterWatercolor = document.getElementById('filterWatercolor');
 export const elMaskPixel = document.getElementById('maskPixel');
 export const elMaskBlur  = document.getElementById('maskBlur');
 export const elFilterFlare = document.getElementById('filterFlare');
