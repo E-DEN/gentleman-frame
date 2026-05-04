@@ -1,4 +1,4 @@
-﻿/**
+/**
  * GFRainEngine – WebGL rain-glass overlay for gentleman-frame
  *
  * Based on Codrops RainEffect by Lucas Bebber (MIT License)

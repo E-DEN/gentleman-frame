@@ -1,4 +1,4 @@
-﻿// presets.js — プリセット管理・コーデック・エクスポート/インポート
+// presets.js — プリセット管理・コーデック・エクスポート/インポート
 
 import { state, _animColors, PRESET_KEY, setPresetsReady,
   _calcOverflows } from './state.js';

@@ -1,4 +1,4 @@
-﻿// spectrum.js — Web Audio API スペクトラム解析
+// spectrum.js — Web Audio API スペクトラム解析
 
 let _audioCtx  = null;
 let _analyser  = null;
