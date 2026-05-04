@@ -25,13 +25,13 @@ import {
   elFrameBlur, elFrameTint,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
   elMaskZoom, elMaskBlur, elMaskPixel,
-  elSpecBars, elSpecAmp, elSpecGap,
+  elSpecBars, elSpecAmp, elSpecGap, elSpecSmooth,
   _scheduleResync,
   _syncOffsetSliders,
   _getOffsets,
   updateProgress, syncMaskDropOverlay,
 } from './canvas.js';
-import { getSpectrumBars } from './spectrum.js';
+import { getSpectrumBars, smoothBars } from './spectrum.js';
 
 // ============================================================
 //  Canvas CSS フィルター（明るさ / コントラスト / 彩度）
@@ -544,20 +544,35 @@ export function _renderFrame() {
 }
 
 // マスク枠・ハンドル・アンカー・スマホフレームをぼかしより後に描画する
+// ベジェ曲線を連続パスに追加するヘルパー（moveTo なし、pts[0] から連結される）
+function _smoothCurveThrough(c, pts) {
+  for (let i = 1; i < pts.length; i++) {
+    const cpX = (pts[i - 1].x + pts[i].x) / 2;
+    const cpY = (pts[i - 1].y + pts[i].y) / 2;
+    c.quadraticCurveTo(pts[i - 1].x, pts[i - 1].y, cpX, cpY);
+  }
+  if (pts.length) c.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+}
+
 // スペクトラム bars/mirror のスカイライン輪郭パス（gap=0時の枠用）
 function _spectrumSkyline(ctx, m) {
-  // 旧 specStyle からの互換マッピング
-  const specShape  = m.specShape  || (m.specStyle === 'radial' || m.specStyle === 'symwave' ? 'radial' : 'bars');
-  const specSym    = m.specSym    != null ? m.specSym : (m.specStyle === 'mirror' ? 'ud' : m.specStyle === 'symwave' ? 'lr' : 'none');
+  const specShape  = m.specShape  || 'bars';
+  const specSym    = m.specSym    || 'none';
   const specRotate = ((m.specRotate || 0) * Math.PI / 180);
   if (specShape !== 'bars') return false; // radial は buildMaskPath で処理
   const BAR_COUNT = elSpecBars ? Math.max(4, parseInt(elSpecBars.value) || 64) : 64;
   const amp       = elSpecAmp  ? Math.max(0.1, parseFloat(elSpecAmp.value) / 100) : 1.0;
   const bars      = getSpectrumBars(BAR_COUNT);
+  const smooth    = elSpecSmooth ? parseFloat(elSpecSmooth.value) / 100 : 0;
+  const sBars     = smooth > 0 && bars ? smoothBars(bars, smooth * BAR_COUNT * 1.5) : bars;
   const barW      = m.w / BAR_COUNT;
   const cx = m.x + m.w / 2;
   const cy = m.y + m.h / 2;
   const HALF = Math.ceil(BAR_COUNT / 2);
+  const _hv = (i) => {
+    const idx = specSym === 'lr' ? (i < HALF ? HALF - 1 - i : i - HALF) : i;
+    return Math.max(0, Math.min(1, (sBars ? sBars[idx] * amp : 0)));
+  };
   if (specRotate !== 0) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -565,8 +580,29 @@ function _spectrumSkyline(ctx, m) {
     ctx.translate(-cx, -cy);
   }
   ctx.beginPath();
-  if (specSym === 'ud') {
-    // 上下対称（ミラー）
+  if (smooth > 0) {
+    // スムース bezier 輪郭
+    if (specSym === 'ud') {
+      const midY = m.y + m.h / 2;
+      const topPts = [{ x: m.x, y: midY }];
+      for (let i = 0; i < BAR_COUNT; i++) topPts.push({ x: m.x + (i + 0.5) * barW, y: midY - _hv(i) * m.h / 2 });
+      topPts.push({ x: m.x + m.w, y: midY });
+      ctx.moveTo(topPts[0].x, topPts[0].y);
+      _smoothCurveThrough(ctx, topPts);
+      const botPts = topPts.slice().reverse().map(p => ({ x: p.x, y: 2 * midY - p.y }));
+      _smoothCurveThrough(ctx, botPts.slice(1));
+    } else {
+      const bottom = m.y + m.h;
+      const topPts = [{ x: m.x, y: bottom - _hv(0) * m.h }];
+      for (let i = 0; i < BAR_COUNT; i++) topPts.push({ x: m.x + (i + 0.5) * barW, y: bottom - _hv(i) * m.h });
+      topPts.push({ x: m.x + m.w, y: bottom - _hv(BAR_COUNT - 1) * m.h });
+      ctx.moveTo(m.x, bottom);
+      _smoothCurveThrough(ctx, topPts);
+      ctx.lineTo(m.x + m.w, bottom);
+    }
+    ctx.closePath();
+  } else if (specSym === 'ud') {
+    // 上下対称（ミラー）階段輪郭
     const midY = m.y + m.h / 2;
     const hh = Array.from({ length: BAR_COUNT }, (_, i) => Math.max(1, Math.min(1, (bars ? bars[i] * amp : 0)) * m.h / 2));
     ctx.moveTo(m.x, midY);
@@ -911,9 +947,8 @@ export function buildMaskPath(c, m, forStroke = false) {
   } else if (m.shape === 'circle') {
     c.ellipse(m.x + m.w / 2, m.y + m.h / 2, m.w / 2, m.h / 2, 0, 0, Math.PI * 2);
   } else if (m.shape === 'spectrum') {
-    // 旧 specStyle からの互換マッピング
-    const specShape  = m.specShape  || (m.specStyle === 'radial' || m.specStyle === 'symwave' ? 'radial' : 'bars');
-    const specSym    = m.specSym    != null ? m.specSym : (m.specStyle === 'mirror' ? 'ud' : m.specStyle === 'symwave' ? 'lr' : 'none');
+    const specShape  = m.specShape  || 'bars';
+    const specSym    = m.specSym    || 'none';
     const specRotate = ((m.specRotate || 0) * Math.PI / 180);
     const BAR_COUNT = elSpecBars ? Math.max(4, parseInt(elSpecBars.value) || 64) : 64;
     const amp       = elSpecAmp  ? Math.max(0.1, parseFloat(elSpecAmp.value) / 100) : 1.0;
@@ -928,37 +963,56 @@ export function buildMaskPath(c, m, forStroke = false) {
     }
     c.beginPath();
     if (specShape === 'bars') {
-      const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 0;
-      const gap  = gapPct === 0 ? 0 : Math.max(1, Math.round(m.w / BAR_COUNT * gapPct / 100));
-      const barW = Math.max(1, (m.w - gap * (BAR_COUNT - 1)) / BAR_COUNT);
-      const HALF = Math.ceil(BAR_COUNT / 2);
-      if (specSym === 'ud') {
+      const smooth  = elSpecSmooth ? parseFloat(elSpecSmooth.value) / 100 : 0;
+      const sBars   = smooth > 0 && bars ? smoothBars(bars, smooth * BAR_COUNT * 1.5) : bars;
+      const gapPct  = elSpecGap ? parseInt(elSpecGap.value) : 0;
+      const gap     = gapPct === 0 ? 0 : Math.max(1, Math.round(m.w / BAR_COUNT * gapPct / 100));
+      const barW    = Math.max(1, (m.w - gap * (BAR_COUNT - 1)) / BAR_COUNT);
+      const HALF    = Math.ceil(BAR_COUNT / 2);
+      const hv = (i) => {
+        const barIdx = specSym === 'lr' ? (i < HALF ? HALF - 1 - i : i - HALF) : i;
+        return Math.max(0, Math.min(1, (sBars ? sBars[barIdx] * amp : 0)));
+      };
+      if (smooth > 0 && gapPct === 0) {
+        // スムース bezier 塗り
+        if (specSym === 'ud') {
+          const midY = m.y + m.h / 2;
+          const topPts = [{ x: m.x, y: midY }];
+          for (let i = 0; i < BAR_COUNT; i++) topPts.push({ x: m.x + (i + 0.5) * barW, y: midY - hv(i) * m.h / 2 });
+          topPts.push({ x: m.x + m.w, y: midY });
+          c.moveTo(topPts[0].x, topPts[0].y);
+          _smoothCurveThrough(c, topPts);
+          const botPts = topPts.slice().reverse().map(p => ({ x: p.x, y: 2 * midY - p.y }));
+          _smoothCurveThrough(c, botPts.slice(1));
+          c.closePath();
+        } else {
+          const bottom = m.y + m.h;
+          const topPts = [{ x: m.x, y: bottom - hv(0) * m.h }];
+          for (let i = 0; i < BAR_COUNT; i++) topPts.push({ x: m.x + (i + 0.5) * barW, y: bottom - hv(i) * m.h });
+          topPts.push({ x: m.x + m.w, y: bottom - hv(BAR_COUNT - 1) * m.h });
+          c.moveTo(m.x, bottom);
+          _smoothCurveThrough(c, topPts);
+          c.lineTo(m.x + m.w, bottom);
+          c.closePath();
+        }
+      } else if (specSym === 'ud') {
         // 上下対称（ミラー）
         const midY = m.y + m.h / 2;
         for (let i = 0; i < BAR_COUNT; i++) {
-          const v     = bars ? Math.min(1, bars[i] * amp) : 0;
-          const halfH = Math.max(1, v * m.h / 2);
+          const halfH = Math.max(1, hv(i) * m.h / 2);
           c.rect(m.x + i * (barW + gap), midY - halfH, barW, halfH * 2);
         }
-      } else if (specSym === 'lr') {
-        // 左右対称: 中心=高域, 端=低域
-        const bottom = m.y + m.h;
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const barIdx = i < HALF ? (HALF - 1 - i) : (i - HALF);
-          const v    = bars ? Math.min(1, bars[barIdx] * amp) : 0;
-          const barH = Math.max(2, v * m.h);
-          c.rect(m.x + i * (barW + gap), bottom - barH, barW, barH);
-        }
       } else {
-        // none: 通常バー
+        // none / lr: バー短冊
         const bottom = m.y + m.h;
         for (let i = 0; i < BAR_COUNT; i++) {
-          const v    = bars ? Math.min(1, bars[i] * amp) : 0;
-          const barH = Math.max(2, v * m.h);
+          const barH = Math.max(2, hv(i) * m.h);
           c.rect(m.x + i * (barW + gap), bottom - barH, barW, barH);
         }
       }
     } else { // radial
+      const smooth  = elSpecSmooth ? parseFloat(elSpecSmooth.value) / 100 : 0;
+      const sBars   = smooth > 0 && bars ? smoothBars(bars, smooth * BAR_COUNT * 1.5) : bars;
       const gapPct = elSpecGap ? parseInt(elSpecGap.value) : 0;
       const rMin = Math.min(m.w, m.h) * 0.18;
       const rMax = Math.min(m.w, m.h) * 0.50;
@@ -966,13 +1020,13 @@ export function buildMaskPath(c, m, forStroke = false) {
         // 左右対称スムース円形波（垂直軸で対称）
         const allPts = [];
         for (let i = 0; i < BAR_COUNT; i++) {
-          const v = bars ? Math.min(1, bars[i] * amp) : 0;
+          const v = sBars ? Math.min(1, sBars[i] * amp) : 0;
           const r = rMin + v * (rMax - rMin);
           const angle = Math.PI / 2 - (i / (BAR_COUNT - 1)) * Math.PI;
           allPts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
         }
         for (let i = BAR_COUNT - 2; i >= 1; i--) {
-          const v = bars ? Math.min(1, bars[i] * amp) : 0;
+          const v = sBars ? Math.min(1, sBars[i] * amp) : 0;
           const r = rMin + v * (rMax - rMin);
           const angle = Math.PI / 2 - (i / (BAR_COUNT - 1)) * Math.PI;
           allPts.push({ x: cx + Math.cos(Math.PI - angle) * r, y: cy + Math.sin(Math.PI - angle) * r });
@@ -990,14 +1044,14 @@ export function buildMaskPath(c, m, forStroke = false) {
         const allPts = [];
         // 上半円: 右(0) → 左(π)
         for (let i = 0; i <= HALF2; i++) {
-          const v = bars ? Math.min(1, bars[Math.min(i, HALF2 - 1)] * amp) : 0;
+          const v = sBars ? Math.min(1, sBars[Math.min(i, HALF2 - 1)] * amp) : 0;
           const r = rMin + v * (rMax - rMin);
           const angle = (i / HALF2) * Math.PI; // 0 → π
           allPts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
         }
         // 下半円: 左(π) → 右(0)  ← 上の鏡像
         for (let i = HALF2 - 1; i >= 0; i--) {
-          const v = bars ? Math.min(1, bars[Math.min(i, HALF2 - 1)] * amp) : 0;
+          const v = sBars ? Math.min(1, sBars[Math.min(i, HALF2 - 1)] * amp) : 0;
           const r = rMin + v * (rMax - rMin);
           const angle = (i / HALF2) * Math.PI;
           allPts.push({ x: cx + Math.cos(angle) * r, y: cy - Math.sin(angle) * r }); // y を反転
@@ -1019,7 +1073,7 @@ export function buildMaskPath(c, m, forStroke = false) {
             const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
             const a0 = angle - barAngle / 2;
             const a1 = angle + barAngle / 2;
-            const v  = bars ? Math.min(1, bars[i] * amp) : 0;
+            const v  = sBars ? Math.min(1, sBars[i] * amp) : 0;
             return { a0, a1, outerR: rMin + Math.max(0.04, v) * (rMax - rMin) };
           });
           c.moveTo(cx + Math.cos(segs[0].a0) * rMin, cy + Math.sin(segs[0].a0) * rMin);
@@ -1035,7 +1089,7 @@ export function buildMaskPath(c, m, forStroke = false) {
           c.arc(cx, cy, rMin, 0, Math.PI * 2);
           c.closePath();
           for (let i = 0; i < BAR_COUNT; i++) {
-            const v      = bars ? Math.min(1, bars[i] * amp) : 0;
+            const v      = sBars ? Math.min(1, sBars[i] * amp) : 0;
             const outerR = rMin + Math.max(0.04, v) * (rMax - rMin);
             const angle  = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
             const a0 = angle - barAngle / 2;
@@ -1051,7 +1105,7 @@ export function buildMaskPath(c, m, forStroke = false) {
         // wave: スムースBlob
         const pts = [];
         for (let i = 0; i < BAR_COUNT; i++) {
-          const v     = bars ? Math.min(1, bars[i] * amp) : 0;
+          const v     = sBars ? Math.min(1, sBars[i] * amp) : 0;
           const r     = rMin + v * (rMax - rMin);
           const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
           pts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });

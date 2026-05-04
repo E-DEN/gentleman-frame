@@ -14,7 +14,7 @@ import {
   elBorderW, elBorderColor, elBorderOpacity,
   elBorderAnim, elBorderAnimSpeed, elBorderAnimBright,
   elFrameBlur, elFrameTint,
-  elPhoneUiRow, elGlassesUiRow, elSpectrumUiRow, elSpecBars, elSpecAmp, elGlassesStyleBtns,
+  elPhoneUiRow, elGlassesUiRow, elSpectrumUiRow, elSpecBars, elSpecAmp, elSpecSmooth, elGlassesStyleBtns,
   elPhoneUiBtnRoT, elPhoneUiBtnRec, elPhoneUiBtnDot, elPhoneUiBtnRot90,
   elVol0, elVol1, elOffset0, elOffset1,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
@@ -986,11 +986,12 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     elPhoneUiRow.style.display = newShape === 'phone' ? '' : 'none';
     elGlassesUiRow.style.display = newShape === 'glasses' ? '' : 'none';
     elSpectrumUiRow.style.display = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specBarsRow').style.display   = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specAmpRow').style.display    = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specGapRow').style.display    = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specSymRow').style.display    = newShape === 'spectrum' ? '' : 'none';
-    document.getElementById('specRotateRow').style.display = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specBarsRow').style.display    = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specAmpRow').style.display     = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specGapRow').style.display     = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specSmoothRow').style.display  = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specSymRow').style.display     = newShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specRotateRow').style.display  = newShape === 'spectrum' ? '' : 'none';
     const _isFrameShape2 = newShape === 'phone' || newShape === 'glasses';
     document.getElementById('frameBlurRow').style.display = _isFrameShape2 ? '' : 'none';
     document.getElementById('frameTintRow').style.display = _isFrameShape2 ? '' : 'none';
@@ -1132,16 +1133,10 @@ document.querySelectorAll('.spec-sym-btn[data-specsym]').forEach(btn => {
       b.classList.toggle('active', b.dataset.specsym === state.mask.specSym));
   });
 });
-// 旧 specStyle から移行
-if (state.mask.specStyle && !state.mask.specShape) {
-  const _s = state.mask.specStyle.startsWith('radial') ? 'radial' : state.mask.specStyle;
-  const _map = { bars: ['bars','none'], mirror: ['bars','ud'], radial: ['radial','none'], symwave: ['radial','lr'] };
-  const [sh, sy] = _map[_s] || ['bars','none'];
-  state.mask.specShape = sh; state.mask.specSym = sy;
-}
 bindSlider('specBars',   'specBarsVal',   v => `${Math.round(v)}`, null);
 bindSlider('specAmp',    'specAmpVal',    v => `${Math.round(v)}`, null);
 bindSlider('specGap',    'specGapVal',    v => `${Math.round(v)}`, null);
+bindSlider('specSmooth', 'specSmoothVal', v => `${Math.round(v)}`, null);
 bindSlider('specRotate', 'specRotateVal', v => `${Math.round(v)}°`, v => { state.mask.specRotate = Math.round(v); });
 
 document.getElementById('fgFixedBtn').addEventListener('click', () => {
@@ -1207,7 +1202,8 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
     el.dispatchEvent(new Event('input'));
   };
   _syncMaskSliders();
-  ['maskOffX', 'maskOffY', 'maskBlur', 'maskPixel', 'maskZoom', 'borderW', 'borderOpacity', 'borderAnimSpeed', 'borderAnimBright', 'frameBlur', 'frameTint'].forEach(resetSlider);
+  ['maskOffX', 'maskOffY', 'maskBlur', 'maskPixel', 'maskZoom', 'borderW', 'borderOpacity', 'borderAnimSpeed', 'borderAnimBright', 'frameBlur', 'frameTint',
+   'specBars', 'specAmp', 'specGap', 'specSmooth', 'specRotate'].forEach(resetSlider);
   lucide.createIcons();
 });
 

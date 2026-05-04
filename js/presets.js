@@ -112,9 +112,10 @@ export function collectSettings() {
     specShape:        state.mask.specShape || 'bars',
     specSym:          state.mask.specSym   || 'none',
     specRotate:       state.mask.specRotate || 0,
-    specBars:         document.getElementById('specBars')?.value ?? '32',
-    specAmp:          document.getElementById('specAmp')?.value  ?? '100',
-    specGap:          document.getElementById('specGap')?.value  ?? '15',
+    specBars:         document.getElementById('specBars')?.value   ?? '32',
+    specAmp:          document.getElementById('specAmp')?.value    ?? '100',
+    specGap:          document.getElementById('specGap')?.value    ?? '15',
+    specSmooth:       document.getElementById('specSmooth')?.value ?? '0',
     vid0Name:      _loadedFileName[0],
     vid1Name:      _loadedFileName[1],
     vid0Url:       _loadedSrcUrl[0] || _loadedPageUrl[0],
@@ -153,9 +154,10 @@ export function applySettings(d) {
     ['fgPinY','fgPinYVal'],
     ['fgPinLerp','fgPinLerpVal'],
     ['fgPinOpacity','fgPinOpacityVal'],
-    ['specBars','specBarsVal'],
-    ['specAmp','specAmpVal'],
-    ['specGap','specGapVal'],
+    ['specBars',   'specBarsVal'],
+    ['specAmp',    'specAmpVal'],
+    ['specGap',    'specGapVal'],
+    ['specSmooth', 'specSmoothVal'],
   ];
   const vals = {
     vol0:             d.vol0             ?? '25',
@@ -199,6 +201,7 @@ export function applySettings(d) {
     specBars:         d.specBars         ?? '32',
     specAmp:          d.specAmp          ?? '100',
     specGap:          d.specGap          ?? '0',
+    specSmooth:       d.specSmooth       ?? '0',
   };
   sliders.forEach(([id]) => {
     if (vals[id] == null) return;
@@ -251,13 +254,6 @@ export function applySettings(d) {
       if (d.specShape  != null) state.mask.specShape  = d.specShape;
       if (d.specSym    != null) state.mask.specSym    = d.specSym;
       if (d.specRotate != null) state.mask.specRotate = parseInt(d.specRotate) || 0;
-      // 旧 specStyle から移行
-      if (d.specStyle && d.specShape == null) {
-        const _s = d.specStyle.startsWith('radial') ? 'radial' : d.specStyle;
-        const _map = { bars: ['bars','none'], mirror: ['bars','ud'], radial: ['radial','none'], symwave: ['radial','lr'] };
-        const [sh, sy] = _map[_s] || ['bars','none'];
-        state.mask.specShape = sh; state.mask.specSym = sy;
-      }
       document.querySelectorAll('.spec-shape-btn[data-specshape]').forEach(b =>
         b.classList.toggle('active', b.dataset.specshape === (state.mask.specShape || 'bars')));
       document.querySelectorAll('.spec-sym-btn[data-specsym]').forEach(b =>
@@ -269,6 +265,7 @@ export function applySettings(d) {
     document.getElementById('specBarsRow').style.display    = loadShape === 'spectrum' ? '' : 'none';
     document.getElementById('specAmpRow').style.display     = loadShape === 'spectrum' ? '' : 'none';
     document.getElementById('specGapRow').style.display     = loadShape === 'spectrum' ? '' : 'none';
+    document.getElementById('specSmoothRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
     document.getElementById('specSymRow').style.display     = loadShape === 'spectrum' ? '' : 'none';
     document.getElementById('specRotateRow').style.display  = loadShape === 'spectrum' ? '' : 'none';
     _updateFgFixedBtn();

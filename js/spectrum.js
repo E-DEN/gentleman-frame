@@ -42,13 +42,33 @@ export function getSpectrumBars(count) {
   const result = new Float32Array(count);
   for (let i = 0; i < count; i++) {
     // 対数スケールマッピング（低音域を広く、高音域を狭く）
+    // ただし log が圧縮されすぎる低端は i+1 で下限を保証（重複ビン防止）
     const t0 = i / count;
     const t1 = (i + 1) / count;
-    const s  = Math.floor(Math.pow(bins, t0));
-    const e  = Math.max(s + 1, Math.floor(Math.pow(bins, t1)));
+    const s  = Math.floor(Math.max(i + 1,     Math.pow(bins, t0)));
+    const e  = Math.max(s + 1, Math.floor(Math.max(i + 2, Math.pow(bins, t1))));
     let sum = 0, n = 0;
     for (let j = s; j < Math.min(e, bins); j++) { sum += _dataArray[j]; n++; }
     result[i] = n > 0 ? sum / n / 255 : 0;
   }
   return result;
+}
+
+/**
+ * バー配列にガウス空間平滑化を適用して返す。
+ * sigma: 標準偏差（バー数単位）。0以下は無変換。
+ */
+export function smoothBars(bars, sigma) {
+  if (!bars || sigma <= 0) return bars;
+  const n = bars.length;
+  const out = new Float32Array(n);
+  const r = Math.ceil(sigma * 3);
+  const g = []; let ws = 0;
+  for (let k = -r; k <= r; k++) { const w = Math.exp(-0.5 * k * k / (sigma * sigma)); g.push(w); ws += w; }
+  for (let i = 0; i < n; i++) {
+    let s = 0;
+    for (let k = -r; k <= r; k++) s += bars[Math.max(0, Math.min(n - 1, i + k))] * g[k + r];
+    out[i] = s / ws;
+  }
+  return out;
 }

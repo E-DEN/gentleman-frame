@@ -389,6 +389,7 @@ export const elSpectrumUiRow = document.getElementById('spectrumUiRow');
 export const elSpecBars = document.getElementById('specBars');
 export const elSpecAmp  = document.getElementById('specAmp');
 export const elSpecGap  = document.getElementById('specGap');
+export const elSpecSmooth = document.getElementById('specSmooth');
 export const elGlassesStyleBtns = Array.from(document.querySelectorAll('.glasses-ui-btn[data-gstyle]'));
 export const elPhoneUiBtnRoT = document.getElementById('phoneUiRoT');
 export const elPhoneUiBtnRec = document.getElementById('phoneUiRec');
