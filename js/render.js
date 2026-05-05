@@ -1213,6 +1213,36 @@ export function buildMaskPath(c, m, forStroke = false) {
           c.rect(m.x + i * (barW + gap), bottom - barH, barW, barH);
         }
       }
+    } else if (specShape === 'ring') {
+      // --- ring: 内側に膨らむドーナツ型スペクトラム ---
+      // 外円（固定 R）と内側の音声波形の間のリング領域をクリップ
+      // nonzero rule: 外円 CW(+1) ＋ 内波形 CCW(-1) → リング部分のみ塗り
+      const smooth = elSpecSmooth ? parseFloat(elSpecSmooth.value) / 100 : 0;
+      const sBars  = smooth > 0 && bars ? smoothBars(bars, smooth * BAR_COUNT * 1.5) : bars;
+      const R      = Math.min(m.w, m.h) / 2;
+      const rBase  = R * 0.80; // 無音時の内縁半径（外周 20% リングが常時見える）
+      const rMin_  = R * 0.12; // 最大音量時の内縁半径（外周 88% まで広がる）
+      const innerR = (i) => {
+        const v = sBars ? Math.min(1, sBars[i] * amp) : 0;
+        return rBase - v * (rBase - rMin_);
+      };
+      // 外円: 時計回り → 内部の巻き数 +1
+      c.arc(cx, cy, R, 0, Math.PI * 2);
+      c.closePath();
+      // 内側波形: 角度を逆順に辿る（反時計回り → 内部の巻き数 -1）
+      // → リング領域だけ巻き数 +1 (nonzero rule で塗り)
+      const innerPts = [];
+      for (let i = BAR_COUNT - 1; i >= 0; i--) {
+        const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2;
+        innerPts.push({ x: cx + Math.cos(angle) * innerR(i), y: cy + Math.sin(angle) * innerR(i) });
+      }
+      const iN = innerPts.length;
+      c.moveTo((innerPts[0].x + innerPts[iN - 1].x) / 2, (innerPts[0].y + innerPts[iN - 1].y) / 2);
+      for (let i = 0; i < iN; i++) {
+        const p1 = innerPts[i]; const p2 = innerPts[(i + 1) % iN];
+        c.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+      }
+      c.closePath();
     } else { // radial
       const smooth  = elSpecSmooth ? parseFloat(elSpecSmooth.value) / 100 : 0;
       const sBars   = smooth > 0 && bars ? smoothBars(bars, smooth * BAR_COUNT * 1.5) : bars;
