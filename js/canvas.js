@@ -2,9 +2,7 @@
 import { state } from './state.js';
 import { _glassesInitSize } from './render.js';
 
-// ============================================================
-//  ファイルハンドル（File System Access API + IndexedDB）
-// ============================================================
+// ---- ファイルハンドル（File System Access API + IndexedDB） ----
 export const _currentHandle  = [null, null];
 export const _loadedFileName = ['', ''];
 export const _loadedPageUrl  = ['', '']; // Iwara等ページURLを記憶（リンク表示用）
@@ -26,9 +24,7 @@ export const _IDB = (() => {
   };
 })();
 
-// ============================================================
-//  ハンドル
-// ============================================================
+// ---- ハンドル ----
 export const HANDLE_SZ = 3; // canvas座標の半サイズ
 
 export function getHandles(m) {
@@ -46,9 +42,7 @@ export function getHandles(m) {
   ];
 }
 
-// ============================================================
-//  動画 / 画像 要素
-// ============================================================
+// ---- 動画 / 画像 要素 ----
 export const vid = [document.createElement('video'), document.createElement('video')];
 export const img = [document.createElement('img'), document.createElement('img')];
 export const mediaType = ['video', 'video']; // 'video' | 'image'
@@ -95,9 +89,7 @@ vid.forEach(v => {
   v.preload = 'auto';
 });
 
-// ============================================================
-//  Canvas + オフスクリーン
-// ============================================================
+// ---- Canvas + オフスクリーン ----
 export const canvas  = document.getElementById('mainCanvas');
 export const displayCtx = canvas.getContext('2d');
 // 描画は renderCvs (desynchronized) で行い、rAF 末尾に displayCtx へ1回ブリット。
@@ -515,9 +507,7 @@ window.addEventListener('focus', () => {
   if (state.playing) _scheduleResync(80);
 });
 
-// ============================================================
-//  スライダー
-// ============================================================
+// ---- スライダー ----
 export function updateSliderFill(el) {
   const min = parseFloat(el.min) || 0;
   const max = parseFloat(el.max) || 100;
@@ -603,9 +593,7 @@ export function _syncZoomToMaskScale(oldW, newW) {
   updateSliderFill(elMaskZoom);
 }
 
-// ============================================================
-//  プログレスバー
-// ============================================================
+// ---- プログレスバー ----
 export function fmtTime(sec, forceHours = false) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);

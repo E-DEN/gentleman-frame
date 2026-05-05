@@ -3,13 +3,11 @@
 import { _activePresetIdx, _f2Target, setIsDraggingPreset, setActivePresetIdx, setF2Target } from './canvas.js';
 import { loadPresets, savePresets, renderPresets } from './presets.js';
 
-// ============================================================
-//  プリセット スムーズ並び替え — ゴースト要素方式
-//  コンテナベース: ゴーストがどのフォルダ内にあるかを毎フレーム検出。
-//  エスケープ/モード追跡ではなく、エリア検出で制御。
-//  対応: どこからでもドラッグ、z-index、フォルダ離脱、
-//           外部からフォルダアイテム間への挿入、クリック閾値。
-// ============================================================
+// ---- プリセット スムーズ並び替え（ゴースト要素方式）----
+// コンテナベース: ゴーストがどのフォルダ内にあるかを毎フレーム検出。
+// エスケープ/モード追跡ではなく、エリア検出で制御。
+// 対応: どこからでもドラッグ、z-index、フォルダ離脱、
+//       外部からフォルダアイテム間への挿入、クリック閾値。
 let _mDragSrcIdx     = null;
 let _mDraggedEl      = null;   // 元要素 = 非表示のプレースホルダー
 let _mGhost          = null;   // fixed-position の浮遊クローン

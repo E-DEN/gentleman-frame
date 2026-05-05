@@ -6,10 +6,7 @@ let _dataArray = null;
 
 const FFT_SIZE = 2048; // 1024 bins
 
-/**
- * vid[0] / vid[1] を AudioContext に接続する。
- * シェイプ選択時（ユーザジェスチャあり）に呼ぶこと。
- */
+// vid[0] / vid[1] を AudioContext に接続する（シェイプ選択時に呼ぶこと）
 export function connectAudioElements(v0, v1) {
   if (!_audioCtx) {
     _audioCtx = new AudioContext();
@@ -31,10 +28,7 @@ export function connectAudioElements(v0, v1) {
   });
 }
 
-/**
- * 現在のフレームの周波数データを count 本のバー値（0〜1）として返す。
- * AudioContext が未初期化なら null を返す。
- */
+// 現在フレームの周波数データを count 本のバー値（0〜1）で返す。未初期化なら null
 export function getSpectrumBars(count) {
   if (!_analyser) return null;
   _analyser.getByteFrequencyData(_dataArray);
@@ -54,10 +48,7 @@ export function getSpectrumBars(count) {
   return result;
 }
 
-/**
- * バー配列にガウス空間平滑化を適用して返す。
- * sigma: 標準偏差（バー数単位）。0以下は無変換。
- */
+// バー配列にガウス空間平滑化を適用して返す（sigma: 標準偏差、0以下は無変換）
 export function smoothBars(bars, sigma) {
   if (!bars || sigma <= 0) return bars;
   const n = bars.length;

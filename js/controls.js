@@ -48,9 +48,7 @@ import './lang.js';
 
 const _FPS_SNAPS = [0, 18, 23.976, 24, 29.97, 30, 48, 59.94, 60, 120];
 
-// ============================================================
-//  再生ボタン / tbtn グロー（再生関数本体は playback.js）
-// ============================================================
+// ---- 再生ボタン / tbtn グロー（再生関数本体は playback.js） ----
 function triggerTbtnGlow(btn) {
   btn.classList.remove('glow');
   void btn.offsetWidth;
@@ -71,9 +69,7 @@ if (stopBtn) {
   stopBtn.addEventListener('click', () => { syncStop(); triggerTbtnGlow(stopBtn); });
 }
 
-// ============================================================
-//  キーボードショートカット
-// ============================================================
+// ---- キーボードショートカット ----
 document.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -132,9 +128,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ============================================================
-//  スライダー
-// ============================================================
+// ---- スライダー ----
 export function bindSlider(id, valId, fmt, onChange) {
   const el = document.getElementById(id);
   const vl = document.getElementById(valId);
@@ -1017,9 +1011,7 @@ document.querySelectorAll('.offset-btn').forEach(btn => {
   });
 });
 
-// ============================================================
-//  シェイプボタン
-// ============================================================
+// ---- シェイプボタン ----
 let _phoneMaskState    = null;
 let _nonPhoneMaskState = null;
 
@@ -1275,9 +1267,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
   lucide.createIcons();
 });
 
-// ============================================================
-//  動画の入れ替え
-// ============================================================
+// ---- 動画の入れ替え ----
 export function swapVideos() {
   [vid[0], vid[1]]                   = [vid[1], vid[0]];
   [img[0], img[1]]                   = [img[1], img[0]];
@@ -1345,9 +1335,7 @@ canvas.addEventListener('mousedown', e => {
   if (e.button === 1) { e.preventDefault(); swapVideos(); }
 });
 
-// ============================================================
-//  プログレスバー シークバー
-// ============================================================
+// ---- プログレスバー シークバー ----
 (function() {
   const track = document.getElementById('progressTrack');
   let seeking = false;
@@ -1383,13 +1371,11 @@ canvas.addEventListener('mousedown', e => {
   document.addEventListener('touchend', () => { seeking = false; track.classList.remove('dragging'); });
 })();
 
-// ============================================================
-//  ページ可視性
-//  タブの表示・非表示を検知する Page Visibility API。
-//  別タブへの切り替えや最小化で document.hidden が true になる。
-//  非表示時は動画を一時停止してリソースを節約し、
-//  再表示時（かつ再生中だった場合）に自動で再開する。
-// ============================================================
+// ---- ページ可視性 ----
+// タブの表示・非表示を検知する Page Visibility API。
+// 別タブへの切り替えや最小化で document.hidden が true になる。
+// 非表示時は動画を一時停止してリソースを節約し、
+// 再表示時（かつ再生中だった場合）に自動で再開する。
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].pause(); });

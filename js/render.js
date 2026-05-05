@@ -34,9 +34,7 @@ import {
 } from './canvas.js';
 import { getSpectrumBars, smoothBars } from './spectrum.js';
 
-// ============================================================
-//  Canvas CSS フィルター（明るさ / コントラスト / 彩度）
-// ============================================================
+// ---- Canvas CSS フィルター（明るさ / コントラスト / 彩度） ----
 export function updateCanvasFilter() {
   if (effectsHidden) { effectsWrap.style.filter = ''; return; }
   const b  = parseFloat(elFilterBrightness.value);
@@ -57,9 +55,7 @@ export function updateBarsOverlay() {
     `linear-gradient(to bottom, #000 ${pct}%, transparent ${pct}%, transparent ${100 - pct}%, #000 ${100 - pct}%)`;
 }
 
-// ============================================================
-//  雨オーバーレイ（WebGL – Codrops RainEffect ベース）
-// ============================================================
+// ---- 雨オーバーレイ（WebGL – Codrops RainEffect ベース） ----
 export const rainOverlay      = document.getElementById('rainOverlay');
 export const elFilterRain     = document.getElementById('filterRain');
 export const elRainSpeed      = document.getElementById('rainSpeed');
@@ -146,9 +142,7 @@ export function _buildBorderGrad(ctx, m, phase, anim, bright) {
   return g;
 }
 
-// ============================================================
-//  レンダリングループ
-// ============================================================
+// ---- レンダリングループ ----
 // _renderFrame と displayCtx blit を同一 rAF コールバック内でアトミックに実行し、
 // setInterval との競合によるティアリングを防ぐ。
 export let _renderIntervalId = null; // 互換用（現在は未使用）
@@ -1071,7 +1065,7 @@ export function _updateCanvasHints() {
   elHintFg.classList.toggle('visible', showFg);
 }
 
-// ======================== メガネスタイル定義 (7種) ========================
+// ---- メガネスタイル定義（7種） ----
 const _GS = 4.166667; // SVGスケール定数
 // Path2D キャッシュ: _glassesPaths[i] = { lens: Path2D, full: Path2D } または null
 let _glassesPaths = [];

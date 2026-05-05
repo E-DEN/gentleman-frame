@@ -1,6 +1,4 @@
-// ============================================================
-//  app.js — エントリーポイント (ES Module)
-// ============================================================
+﻿// app.js — エントリーポイント (ES Module)
 import { state } from './state.js';
 import { canvas, loaded, mediaType, vid, _vidBitmap, _compositeT,
          overlayCanvas, effectsHidden,
@@ -13,9 +11,7 @@ import './media.js';
 import './presets.js';
 import './sortable.js';
 
-// ============================================================
-//  シアターモード & 全画面
-// ============================================================
+// ---- シアターモード & 全画面 ----
 const appBody    = document.querySelector('.app-body');
 const panel      = document.querySelector('.panel');
 const theaterBtn = document.getElementById('theaterBtn');
@@ -198,10 +194,8 @@ document.getElementById('canvasWrap').addEventListener('dblclick', () => {
 
 lucide.createIcons();
 
-// ============================================================
-//  ブラウザのデフォルトファイルオープン防止
-//  ドロップゾーン外にファイルをドロップしたときブラウザがファイルを
-//  開いてしまわないよう、document レベルで dragover/drop を抑制する。
-// ============================================================
+// ---- ブラウザのデフォルトファイルオープン防止 ----
+// ドロップゾーン外にファイルをドロップしたときブラウザがファイルを
+// 開いてしまわないよう、document レベルで dragover/drop を抑制する。
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop',     e => e.preventDefault());

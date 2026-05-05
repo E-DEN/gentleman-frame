@@ -1,15 +1,13 @@
-/**
- * GFRainEngine – WebGL rain-glass overlay for gentleman-frame
- *
- * Based on Codrops RainEffect by Lucas Bebber (MIT License)
- * Copyright (c) Codrops – https://tympanus.net/codrops/licensing/
- * https://tympanus.net/codrops/2015/11/04/rain-water-effect-experiments/
- * https://github.com/codrops/RainEffect
- *
- * Usage:
- *   GFRainEngine.start(overlayCanvas, mainCanvas, intensity)  // intensity: 1-10
- *   GFRainEngine.stop()
- */
+// GFRainEngine \u2013 WebGL rain-glass overlay for gentleman-frame
+//
+// Based on Codrops RainEffect by Lucas Bebber (MIT License)
+// Copyright (c) Codrops \u2013 https://tympanus.net/codrops/licensing/
+// https://tympanus.net/codrops/2015/11/04/rain-water-effect-experiments/
+// https://github.com/codrops/RainEffect
+//
+// Usage:
+//   GFRainEngine.start(overlayCanvas, mainCanvas, intensity)  // intensity: 1-10
+//   GFRainEngine.stop()
 'use strict';
 (function (global) {
 
@@ -722,13 +720,11 @@
   var _generation = 0; // incremented on each stop() to cancel in-flight loadImages callbacks
 
   global.GFRainEngine = {
-    /**
-     * Start the rain glass overlay.
-     * @param {HTMLCanvasElement} overlayCanvas  – the #rainOverlay canvas (WebGL will be used)
-     * @param {HTMLCanvasElement} mainCanvas     – the main rendering canvas (video frames)
-     * @param {number}           intensity       – 1-10
-     * @param {object}           [extra]         – { speed, refraction, shadow }
-     */
+    // 雨ガラスオーバーレイを開始する
+    // overlayCanvas: #rainOverlayキャンバス（WebGL使用）
+    // mainCanvas: メインレンダリングキャンバス（映像フレーム）
+    // intensity: 1−10
+    // extra: { speed, refraction, shadow }
     start: function (overlayCanvas, mainCanvas, intensity, extra) {
       // 実行中のインスタンスを先に停止する
       this.stop();
@@ -778,17 +774,14 @@
       });
     },
 
-    /**
-     * Advance rain by one frame. Call this from the main render loop
-     * so rain framerate is tied to filterFps.
-     */
+    // メインレンダーループから呼び出す。FPS制限に連動して雨フレームレートを制御する。
     tick: function () {
       if (!_state) return;
       _state.raindrops._update();
       _state.renderer._draw();
     },
 
-    /** Stop and clear the overlay. */
+    // 雨オーバーレイを停止・クリアする
     stop: function () {
       _generation++; // cancel any in-flight loadImages callback
       if (!_state) return;

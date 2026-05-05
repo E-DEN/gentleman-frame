@@ -15,9 +15,7 @@ import {
 } from './canvas.js';
 import { resetHintState } from './render.js';
 
-// ============================================================
-//  ファイル読み込み
-// ============================================================
+// ---- ファイル読み込み ----
 
 // proxy.js (yt-dlp) を使って Iwara ページURL → CDN URL を解決
 // ローカル実行時はローカルプロキシ、本番（Pages）ではWorkerを自動選択
@@ -471,9 +469,7 @@ function setupDropZone(index) {
 
 [0, 1].forEach(setupDropZone);
 
-// ============================================================
-//  動画コントロールリセット
-// ============================================================
+// ---- 動画コントロールリセット ----
 [0, 1].forEach(i => {
   document.getElementById(`resetBtn${i}`).addEventListener('click', () => {
     const resetSlider = id => {
@@ -487,9 +483,7 @@ function setupDropZone(index) {
   });
 });
 
-// ============================================================
-//  動画表示切り替え
-// ============================================================
+// ---- 動画表示切り替え ----
 const _vidHiddenOverlay = document.getElementById('vidHiddenOverlay');
 export function _syncVidHiddenOverlay() {
   const all = visHidden[0] && visHidden[1];
@@ -550,9 +544,7 @@ document.getElementById('vidResetAllBtn').addEventListener('click', () => {
   [0, 1].forEach(i => document.getElementById(`resetBtn${i}`).click());
 });
 
-// ============================================================
-//  動画削除
-// ============================================================
+// ---- 動画削除 ----
 export const DEFAULT_LABELS = () => [t('drop-label'), t('drop-label')];
 
 export function clearVideo(index) {
@@ -629,11 +621,9 @@ export async function processDropFiles(e, targetIdx) {
   }
 }
 
-// ============================================================
-//  キャンバスエリアへのドラッグ&ドロップ
-//  canvasWrap: 動画・画像のみ受け付ける（背景=0 へロード）
-//  maskDropOverlay: マスク領域が本物のD&Dターゲット（前景=1 へロード）
-// ============================================================
+// ---- キャンバスエリアへのドラッグ&ドロップ ----
+// canvasWrap: 動画・画像のみ受け付ける（背景=0 へロード）
+// maskDropOverlay: マスク領域が本物のD&Dターゲット（前景=1 へロード）
 const _isFileDrag = e => !!(e.dataTransfer?.types?.includes('Files'));
 
 canvasWrap.addEventListener('dragover', e => {

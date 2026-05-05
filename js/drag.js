@@ -12,9 +12,7 @@ import {
 import { buildMaskPath } from './render.js';
 import { syncPlay, syncPause } from './playback.js';
 
-// ============================================================
-//  マスクドラッグ + リサイズ（マウス + タッチ）
-// ============================================================
+// ---- マスクドラッグ + リサイズ（マウス + タッチ） ----
 export function canvasCoords(e) {
   const r  = canvas.getBoundingClientRect();
   const sx = canvas.width  / r.width;

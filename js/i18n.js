@@ -1,32 +1,24 @@
-// ============================================================
-//  i18n — Gentleman Frame 翻訳エンジン
-// ============================================================
-//  組み込み: ja（日本語）, en（英語）
+// i18n — Gentleman Frame 翻訳エンジン
+// 組み込み: ja（日本語）, en（英語）
 //
-//  ── 言語を追加するには ──────────────────────────────────────
-//  1. js/locales/_template.js をコピーして js/locales/XX.js を作成
-//  2. dict 内の全値を翻訳して埋める
-//  3. index.html の <script src="js/app.js"> の直前に追加:
-//       <script src="js/locales/XX.js"></script>
-//  → ドロップダウンに自動で表示されます。
+// ── 言語を追加するには ────────────────────────────────
+// 1. js/locales/_template.js をコピーして js/locales/XX.js を作成
+// 2. dict 内の全値を翻訳して埋める
+// 3. index.html の <script src="js/app.js"> の直前に追加:
+//      <script src="js/locales/XX.js"></script>
+// → ドロップダウンに自動で表示されます。
 //
-//  ── To add a language ──────────────────────────────────────
-//  1. Copy js/locales/_template.js → js/locales/XX.js
-//  2. Fill in every value in the dict
-//  3. In index.html, add BEFORE <script src="js/app.js">:
-//       <script src="js/locales/XX.js"></script>
-//  The language will appear automatically in the dropdown.
-// ============================================================
+// ── To add a language ────────────────────────────────
+// 1. Copy js/locales/_template.js → js/locales/XX.js
+// 2. Fill in every value in the dict
+// 3. In index.html, add BEFORE <script src="js/app.js">:
+//      <script src="js/locales/XX.js"></script>
+// The language will appear automatically in the dropdown.
 
 const _I18N_DICTS  = {};
 const _I18N_LABELS = {};
 
-/**
- * Register a translation.
- * @param {string} code   BCP-47 language code, e.g. 'zh', 'ko', 'fr'
- * @param {string} label  Display name shown in the dropdown, e.g. '中文'
- * @param {Object} dict   Key→value translation map (see locales/_template.js for all keys)
- */
+// 翻訳を登録する（code: BCP-47コード, label: ドロップダウン表示名, dict: キー値マップ）
 function registerLang(code, label, dict) {
   _I18N_DICTS[code]  = dict;
   _I18N_LABELS[code] = label;
@@ -37,7 +29,7 @@ function unregisterLang(code) {
   delete _I18N_LABELS[code];
 }
 
-/** Returns registered languages in insertion order: [{code, label}, …] */
+// 登録済み言語を挿入順で返す: [{code, label}, …]
 function getRegisteredLangs() {
   return Object.keys(_I18N_DICTS).map(code => ({ code, label: _I18N_LABELS[code] || code }));
 }
@@ -410,18 +402,8 @@ registerLang('zh', '中文', {
   'lang-add':'＋ 添加',
   'lang-cancel':'取消',  'lang-template-dl':'下载模板',});
 
-// ============================================================
-//  外部言語読み込み（JSON D&D / 貼り付け）
-// ============================================================
+// ---- 外部言語読み込み（JSON D&D / 貼り付け）----
 
-/**
- * Parse and register a language from a JSON string.
- * The JSON format matches js/locales/_template.json:
- *   { "code": "zh", "label": "中文", "dict": { ... } }
- * Persists to localStorage so the language survives page reload.
- * @param {string} jsonText
- * @returns {{ code: string, label: string }}
- */
 function loadLangJSON(jsonText) {
   const data = JSON.parse(jsonText);
   const { code, label, dict } = data;
@@ -447,10 +429,7 @@ function loadLangJSON(jsonText) {
   } catch (e) {}
 })();
 
-/**
- * 現在の組み込み 'ja' キー一覧をもとに空テンプレート JSON を生成し、
- * ファイルダウンロードをトリガーする。
- */
+// 現在の組み込み 'ja' キー一覧をもとに空テンプレート JSON を生成してダウンロードする
 function downloadLangTemplate() {
   const keys = Object.keys(_I18N_DICTS['ja'] || {});
   const en = _I18N_DICTS['en'] || {};

@@ -8,9 +8,7 @@ import { resetHintState, _updateCanvasHints } from './render.js';
 let _renderPresets = null;
 export function _setRenderPresets(fn) { _renderPresets = fn; }
 
-// ============================================================
-//  言語
-// ============================================================
+// ---- 言語 ----
 export function applyLang(lang) {
   _lang = lang;
   localStorage.setItem('gf-lang', lang);
@@ -46,9 +44,7 @@ export function applyLang(lang) {
   lucide.createIcons();
 }
 
-// ============================================================
-//  テーマ切り替え
-// ============================================================
+// ---- テーマ切り替え ----
 document.getElementById('themeBtn').addEventListener('click', () => {
   const html = document.documentElement;
   const isDark = html.dataset.theme === 'dark';
@@ -63,9 +59,7 @@ document.getElementById('themeBtn').addEventListener('click', () => {
   lucide.createIcons();
 });
 
-// ============================================================
-//  言語ダイアログ構築
-// ============================================================
+// ---- 言語ダイアログ構築 ----
 export function rebuildLangDialog() {
   const list = document.getElementById('langOptionList');
   list.innerHTML = '';
@@ -123,9 +117,7 @@ rebuildLangDialog();
 lucide.createIcons();
 applyLang(_lang);
 
-// ============================================================
-//  言語インポートダイアログ
-// ============================================================
+// ---- 言語インポートダイアログ ----
 (function () {
   const dialog   = document.getElementById('langImportDialog');
   const dropEl   = document.getElementById('langImportDrop');
