@@ -402,7 +402,7 @@ registerLang('zh', '中文', {
   'lang-add':'＋ 添加',
   'lang-cancel':'取消',  'lang-template-dl':'下载模板',});
 
-// ---- 外部言語読み込み（JSON D&D / 貼り付け）----
+// ---- 外部言語読み込み（JSON D&D / 貼り付け） ----
 
 function loadLangJSON(jsonText) {
   const data = JSON.parse(jsonText);

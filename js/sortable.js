@@ -3,7 +3,7 @@
 import { _activePresetIdx, _f2Target, setIsDraggingPreset, setActivePresetIdx, setF2Target } from './canvas.js';
 import { loadPresets, savePresets, renderPresets } from './presets.js';
 
-// ---- プリセット スムーズ並び替え（ゴースト要素方式）----
+// ---- プリセット スムーズ並び替え（ゴースト要素方式） ----
 // コンテナベース: ゴーストがどのフォルダ内にあるかを毎フレーム検出。
 // エスケープ/モード追跡ではなく、エリア検出で制御。
 // 対応: どこからでもドラッグ、z-index、フォルダ離脱、
