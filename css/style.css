@@ -43,6 +43,7 @@
       display: flex;
       flex-direction: column;
     }
+    body:has(.canvas-wrap.actual-size) { overflow: auto; }
 
     /* ===== Header ===== */
     header {
@@ -90,6 +91,12 @@
       will-change: transform;
       transform: translateZ(0);
       isolation: isolate;
+    }
+    /* videoArea: 全オーバーレイの基準となるラッパー。mainCanvas と同サイズになる */
+    #videoArea {
+      position: relative;
+      line-height: 0;
+      width: 100%;
     }
     #mainCanvas {
       display: block;
@@ -308,9 +315,12 @@
       border-color: transparent;
       pointer-events: none;
     }
-    .panel::-webkit-scrollbar { width: 4px; }
-    .panel::-webkit-scrollbar-track { background: transparent; }
-    .panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    /* --- スクロールバー統一テーマ --- */
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    *::-webkit-scrollbar { width: 4px; height: 4px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    *::-webkit-scrollbar-corner { background: transparent; }
 
     /* ===== Card ===== */
     .card {
@@ -614,12 +624,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       align-self: flex-start;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
     }
-    .preset-code-textarea::-webkit-scrollbar { width: 4px; height: 4px; }
-    .preset-code-textarea::-webkit-scrollbar-track { background: transparent; }
-    .preset-code-textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
     .preset-code-textarea::-webkit-scrollbar-corner { background: transparent; }
     .preset-code-textarea::-webkit-resizer { background: transparent; }
     .preset-code-load-btn {
@@ -1747,6 +1752,11 @@
       max-width: none !important;
       overflow: visible;
     }
+    .canvas-area:has(.canvas-wrap.actual-size) {
+      overflow: auto;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
     .app-body.theater .canvas-wrap {
       width: min(100%, calc((100vh - 48px) * var(--ar, 854/480)));
     }
@@ -1761,20 +1771,37 @@
       max-width: 100vw;
       background: #000;
       border-radius: 0 !important;
-      overflow: visible;
+      overflow: auto;
       box-shadow: none;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      align-items: flex-start;
+      justify-content: flex-start;
+      transform: none;        /* position:fixed を viewport 基準にするため transform を解除 */
+      will-change: auto;
     }
-    #canvasWrap:fullscreen canvas,
-    #canvasWrap:-webkit-full-screen canvas {
+    /* フルスクリーン: videoArea を中央寄せ (margin:auto で overflow 時も左上からスクロール可) */
+    #canvasWrap:fullscreen #videoArea,
+    #canvasWrap:-webkit-full-screen #videoArea {
+      width: min(100vw, calc(100vh * var(--ar, 854/480)));
+      margin: auto;
+    }
+    #canvasWrap:fullscreen #mainCanvas,
+    #canvasWrap:-webkit-full-screen #mainCanvas {
       width: min(100vw, calc(100vh * var(--ar, 854/480))) !important;
       height: auto !important;
     }
-    /* フルスクリーン中: トランスポートをデフォルト表示 (hover 不要) */
+    /* 原寸ボタン: 通常時非表示、フルスクリーン時のみ表示 */
+    #actualSizeBtn { display: none; }
+    #canvasWrap:fullscreen #actualSizeBtn,
+    #canvasWrap:-webkit-full-screen #actualSizeBtn { display: inline-flex; }
+
+    /* フルスクリーン中: トランスポートを画面下端に固定 */
     #canvasWrap:fullscreen .transport,
     #canvasWrap:-webkit-full-screen .transport {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
       opacity: 1;
       transition: opacity 0.15s ease;
       border-radius: 0;
@@ -2114,12 +2141,7 @@
       resize: vertical;
       width: 100%;
       box-sizing: border-box;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
     }
-    .lang-import-textarea::-webkit-scrollbar { width: 4px; height: 4px; }
-    .lang-import-textarea::-webkit-scrollbar-track { background: transparent; }
-    .lang-import-textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
     .lang-import-textarea::-webkit-scrollbar-corner { background: transparent; }
     .lang-import-textarea::-webkit-resizer { background: transparent; }
     .lang-import-textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }

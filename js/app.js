@@ -100,11 +100,28 @@ function setTheater(enable) {
 const actualSizeBtn = document.getElementById('actualSizeBtn');
 const canvasWrap    = document.getElementById('canvasWrap');
 
+const videoArea  = document.getElementById('videoArea');
+const mainCanvas = document.getElementById('mainCanvas');
+
 function setActualSize(enable) {
-  if (enable) {
-    canvasWrap.style.setProperty('--canvas-w', `${canvas.width}px`);
+  const isFs = !!document.fullscreenElement;
+  if (isFs) {
+    // フルスクリーン時: mainCanvas / videoArea に直接サイズを指定
+    if (enable) {
+      mainCanvas.style.setProperty('width',  `${canvas.width}px`,  'important');
+      mainCanvas.style.setProperty('height', `${canvas.height}px`, 'important');
+      videoArea.style.width = `${canvas.width}px`;
+    } else {
+      mainCanvas.style.removeProperty('width');
+      mainCanvas.style.removeProperty('height');
+      videoArea.style.width = '';
+    }
+  } else {
+    if (enable) {
+      canvasWrap.style.setProperty('--canvas-w', `${canvas.width}px`);
+    }
+    canvasWrap.classList.toggle('actual-size', enable);
   }
-  canvasWrap.classList.toggle('actual-size', enable);
   actualSizeBtn.innerHTML = enable
     ? '<i data-lucide="scan-search"></i>'
     : '<i data-lucide="scan"></i>';
@@ -113,7 +130,11 @@ function setActualSize(enable) {
 }
 
 actualSizeBtn.addEventListener('click', () => {
-  setActualSize(!canvasWrap.classList.contains('actual-size'));
+  const isFs = !!document.fullscreenElement;
+  const isActive = isFs
+    ? !!mainCanvas.style.getPropertyValue('width')
+    : canvasWrap.classList.contains('actual-size');
+  setActualSize(!isActive);
 });
 
 theaterBtn.addEventListener('click', () => {
@@ -156,22 +177,36 @@ _fsWrap.addEventListener('mousemove', (e) => {
 });
 _fsWrap.addEventListener('mousedown', _resetFsIdle);
 
+// フルスクリーン時、表示サイズがすでに原寸と同じなら原寸ボタンを隠す
+function _updateActualSizeBtnVisibility() {
+  if (!document.fullscreenElement) return;
+  const displayed = Math.round(mainCanvas.getBoundingClientRect().width);
+  actualSizeBtn.style.visibility = (displayed === canvas.width) ? 'hidden' : 'visible';
+}
+
 document.addEventListener('fullscreenchange', () => {
   const isFs = !!document.fullscreenElement;
   fsBtn.innerHTML = isFs ? '<i data-lucide="minimize"></i>' : '<i data-lucide="maximize"></i>';
   fsBtn.title = t(isFs ? 'fs-close' : 'fs-open');
   theaterBtn.style.display = isFs ? 'none' : '';
-  actualSizeBtn.style.display = isFs ? 'none' : '';
   if (!isFs) {
+    // フルスクリーン解除: フルスクリーン原寸をリセット
+    mainCanvas.style.removeProperty('width');
+    mainCanvas.style.removeProperty('height');
+    videoArea.style.width = '';
+    actualSizeBtn.style.visibility = '';
     setTheater(_wasTheaterBeforeFs);
     clearTimeout(_fsIdleTimer);
     _setFsIdle(false);
   } else {
-    setActualSize(false);
+    // requestAnimationFrame でレイアウト確定後に判定
+    requestAnimationFrame(_updateActualSizeBtnVisibility);
     _resetFsIdle();
   }
   lucide.createIcons();
 });
+
+window.addEventListener('resize', _updateActualSizeBtnVisibility);
 
 document.getElementById('canvasWrap').addEventListener('dblclick', () => {
   if (document.fullscreenElement) {
