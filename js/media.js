@@ -13,9 +13,17 @@ import {
   syncMaskDropOverlay,
   setMaskBorderFadeStart, setFgFadeStart,
 } from './canvas.js';
-import { resetHintState } from './render.js';
+import { resetHintState, _startRainOverlay, elFilterRain } from './render.js';
 
 // ---- ファイル読み込み ----
+
+// setCanvasAspectRatio のラッパー。
+// rainOverlay（WebGL）は _syncAllBuffers の対象外のため、
+// 解像度変更後に雨が有効なら再起動してサイズを同期する。
+function _setAR(w, h) {
+  setCanvasAspectRatio(w, h);
+  if (parseInt(elFilterRain.value, 10) > 0) _startRainOverlay();
+}
 
 // proxy.js (yt-dlp) を使って Iwara ページURL → CDN URL を解決
 // ローカル実行時はローカルプロキシ、本番（Pages）ではWorkerを自動選択
@@ -94,7 +102,7 @@ export async function loadVideoFromURL(index, url) {
           loaded[index] = true;
           zone.classList.remove('loading');
           _setDropSpinner(index, false);
-          if (index === 0) setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight);
+          if (index === 0) _setAR(img[0].naturalWidth, img[0].naturalHeight);
           if (index === 1 && _maskBorderFadeStart === 0) setMaskBorderFadeStart(performance.now());
           if (index === 1 && _fgFadeStart === 0) setFgFadeStart(performance.now());
           _setZoneLoaded(zone, false);
@@ -184,7 +192,7 @@ export async function loadVideoFromURL(index, url) {
       if (index === 1 && _maskBorderFadeStart === 0) setMaskBorderFadeStart(performance.now());
       if (index === 1 && _fgFadeStart === 0) setFgFadeStart(performance.now());
       vid[index].volume = (parseFloat(document.getElementById(`vol${index}`).value) / 100) ** 2;
-      if (index === 0) setCanvasAspectRatio(vid[0].videoWidth, vid[0].videoHeight);
+      if (index === 0) _setAR(vid[0].videoWidth, vid[0].videoHeight);
       _setZoneLoaded(zone, false);
       _setZoneLoaded(zone, true);
       const label = zone.querySelector(`.drop-label${index}`);
@@ -263,7 +271,7 @@ export function loadVideo(index, file, handle = null) {
     vid[index].volume = (parseFloat(document.getElementById(`vol${index}`).value) / 100) ** 2;
     // index 0（背景）がロードされたらアスペクト比を更新
     if (index === 0) {
-      setCanvasAspectRatio(vid[0].videoWidth, vid[0].videoHeight);
+      _setAR(vid[0].videoWidth, vid[0].videoHeight);
     }
     _setZoneLoaded(zone, false);
     _setZoneLoaded(zone, true);
@@ -297,7 +305,7 @@ export function loadImage(index, file, handle = null) {
     // mediaType[index] = 'image' はロード開始時に設定済み
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
-    if (index === 0) { setCanvasAspectRatio(img[0].naturalWidth, img[0].naturalHeight); if (_maskBorderFadeStart === 0) setMaskBorderFadeStart(performance.now()); }
+    if (index === 0) { _setAR(img[0].naturalWidth, img[0].naturalHeight); if (_maskBorderFadeStart === 0) setMaskBorderFadeStart(performance.now()); }
     if (index === 1 && _maskBorderFadeStart === 0) setMaskBorderFadeStart(performance.now());
     if (index === 1 && _fgFadeStart === 0) setFgFadeStart(performance.now());
     resetHintState(); // ヒント状態を強制再評価
