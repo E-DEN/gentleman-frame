@@ -1741,6 +1741,12 @@
 
     /* ===== Theater / Fullscreen ===== */
     .transport-spacer { flex: 1; }
+    /* --- 原寸表示 --- */
+    .canvas-wrap.actual-size {
+      width: var(--canvas-w, 854px) !important;
+      max-width: none !important;
+      overflow: visible;
+    }
     .app-body.theater .canvas-wrap {
       width: min(100%, calc((100vh - 48px) * var(--ar, 854/480)));
     }

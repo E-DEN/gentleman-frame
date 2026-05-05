@@ -96,6 +96,26 @@ function setTheater(enable) {
   lucide.createIcons();
 }
 
+// --- 原寸表示 ---
+const actualSizeBtn = document.getElementById('actualSizeBtn');
+const canvasWrap    = document.getElementById('canvasWrap');
+
+function setActualSize(enable) {
+  if (enable) {
+    canvasWrap.style.setProperty('--canvas-w', `${canvas.width}px`);
+  }
+  canvasWrap.classList.toggle('actual-size', enable);
+  actualSizeBtn.innerHTML = enable
+    ? '<i data-lucide="scan-search"></i>'
+    : '<i data-lucide="scan"></i>';
+  actualSizeBtn.title = t(enable ? 'actual-size-close' : 'actual-size-open');
+  lucide.createIcons();
+}
+
+actualSizeBtn.addEventListener('click', () => {
+  setActualSize(!canvasWrap.classList.contains('actual-size'));
+});
+
 theaterBtn.addEventListener('click', () => {
   setTheater(!appBody.classList.contains('theater'));
 });
@@ -141,11 +161,13 @@ document.addEventListener('fullscreenchange', () => {
   fsBtn.innerHTML = isFs ? '<i data-lucide="minimize"></i>' : '<i data-lucide="maximize"></i>';
   fsBtn.title = t(isFs ? 'fs-close' : 'fs-open');
   theaterBtn.style.display = isFs ? 'none' : '';
+  actualSizeBtn.style.display = isFs ? 'none' : '';
   if (!isFs) {
     setTheater(_wasTheaterBeforeFs);
     clearTimeout(_fsIdleTimer);
     _setFsIdle(false);
   } else {
+    setActualSize(false);
     _resetFsIdle();
   }
   lucide.createIcons();
