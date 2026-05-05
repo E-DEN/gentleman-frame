@@ -543,7 +543,7 @@ document.querySelectorAll('.banim-btn').forEach(btn => {
     });
     solidRow.appendChild(btn);
   });
-  // --- ネガポジ反転ボタン ---
+  // ---- ネガポジ反転ボタン ----
   const invertBtn = document.createElement('button');
   invertBtn.className = 'bcp-chip bcp-chip--invert';
   invertBtn.title = 'ネガポジ反転';

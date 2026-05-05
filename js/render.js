@@ -178,7 +178,7 @@ export function _renderFrame() {
 
   ctx.clearRect(0, 0, W, H);
 
-  // --- 背景 動画/画像（レイヤー 1）---
+  // ---- 背景 動画/画像（レイヤー 1） ----
   if (loaded[0] && !visHidden[0]) {
     try { ctx.drawImage(_getVidSrc(0), 0, 0, W, H); }
     catch (e) { ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H); }
@@ -190,7 +190,7 @@ export function _renderFrame() {
   const maskBlur = parseFloat(elMaskBlur.value);
   const pixelAmt = parseFloat(elMaskPixel.value);
 
-  // --- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ---
+  // ---- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ----
   const fgAlpha = _fgFadeStart < 0 ? 1
     : _fgFadeStart === 0 ? 0
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
@@ -219,7 +219,7 @@ export function _renderFrame() {
     } else {
       offCtx.drawImage(_getVidSrc(1), 0, 0, W, H);
     }
-    // --- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ---
+    // ---- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ----
     if (pixelAmt >= 1) {
       const pSize = Math.round(pixelAmt * 4);
       const pw = Math.ceil(W / pSize);
@@ -325,7 +325,7 @@ export function _renderFrame() {
     }
   }
 
-  // --- 色収差（放射状、スケールベース）---
+  // ---- 色収差（放射状、スケールベース） ----
   if (!effectsHidden) {
   const _maskClipOk = !maskHidden && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0]);
   const caAmt = parseFloat(elFilterCA.value);
@@ -366,7 +366,7 @@ export function _renderFrame() {
     }
   }
 
-  // --- Highlights (明るいトーン域を操作) ---
+  // ---- Highlights (明るいトーン域を操作) ----
   const hlAmt = parseFloat(elFilterHighlight.value);
   if (hlAmt !== 0) {
     const _foHL = state.filterMaskOnly.highlight && _maskClipOk;
@@ -385,7 +385,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Shadows (暗いトーン域を操作) ---
+  // ---- Shadows (暗いトーン域を操作) ----
   const shAmt = parseFloat(elFilterShadow.value);
   if (shAmt !== 0) {
     const _foSH = state.filterMaskOnly.shadow && _maskClipOk;
@@ -404,7 +404,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- ビネット ---
+  // ---- ビネット ----
   const vigAmt = parseFloat(elFilterVignette.value);
   if (vigAmt > 0) {
     const _foVIG = state.filterMaskOnly.vignette && _maskClipOk;
@@ -423,7 +423,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Color Temperature (色温度) ---
+  // ---- Color Temperature (色温度) ----
   const tempAmt = parseFloat(elFilterTemp.value);
   if (tempAmt !== 0) {
     const _foTMP = state.filterMaskOnly.temp && _maskClipOk;
@@ -438,7 +438,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Tint (色かぶり補正: マゼンタ ↔ グリーン) ---
+  // ---- Tint (色かぶり補正: マゼンタ ↔ グリーン) ----
   const tintAmt = parseFloat(elFilterTint.value);
   if (tintAmt !== 0) {
     const _foTINT = state.filterMaskOnly.tint && _maskClipOk;
@@ -453,7 +453,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Matte (黒浮き + 白浮き) ---
+  // ---- Matte (黒浮き + 白浮き) ----
   const matteAmt = parseFloat(elFilterMatte.value);
   if (matteAmt > 0) {
     const _foMAT = state.filterMaskOnly.matte && _maskClipOk;
@@ -471,7 +471,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Film Grain (フィルム粒子) ---
+  // ---- Film Grain (フィルム粒子) ----
   const grainAmt = parseFloat(elFilterGrain.value);
   if (grainAmt > 0) {
     const _foGR = state.filterMaskOnly.grain && _maskClipOk;
@@ -492,7 +492,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Bloom / にじみ ---
+  // ---- Bloom / にじみ ----
   const waterAmt = elFilterBloom ? parseFloat(elFilterBloom.value) : 0;
   if (waterAmt > 0) {
     const _foW = state.filterMaskOnly.bloom && _maskClipOk;
@@ -520,7 +520,7 @@ export function _renderFrame() {
     if (_foW) ctx.restore();
   }
 
-  // --- Sharpness (オーバーレイ unsharp mask) ---
+  // ---- Sharpness (オーバーレイ unsharp mask) ----
   const sharpAmt = parseFloat(elFilterSharpness.value);
   if (sharpAmt > 0) {
     const _foSHP = state.filterMaskOnly.sharpness && _maskClipOk;
@@ -538,7 +538,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Pencil (鉛筆スケッチ) ---
+  // ---- Pencil (鉛筆スケッチ) ----
   const pencilAmt = elFilterPencil ? parseFloat(elFilterPencil.value) : 0;
   if (pencilAmt > 0) {
     const _foP = state.filterMaskOnly.pencil && _maskClipOk;
@@ -565,7 +565,7 @@ export function _renderFrame() {
     if (_foP) ctx.restore();
   }
 
-  // --- Emboss (エンボス) ---
+  // ---- Emboss (エンボス) ----
   const embossAmt = elFilterEmboss ? parseFloat(elFilterEmboss.value) : 0;
   if (embossAmt > 0) {
     const _foE = state.filterMaskOnly.emboss && _maskClipOk;
@@ -590,7 +590,7 @@ export function _renderFrame() {
     if (_foE) ctx.restore();
   }
 
-  // --- Chalkboard (黒板) ---
+  // ---- Chalkboard (黒板) ----
   const chalkAmt = elFilterChalkboard ? parseFloat(elFilterChalkboard.value) : 0;
   if (chalkAmt > 0) {
     const _foC = state.filterMaskOnly.chalkboard && _maskClipOk;
@@ -613,7 +613,7 @@ export function _renderFrame() {
     if (_foC) ctx.restore();
   }
 
-  // --- Night Vision (暗視) ---
+  // ---- Night Vision (暗視) ----
   const nightVisionAmt = elFilterNightVision ? parseFloat(elFilterNightVision.value) : 0;
   if (nightVisionAmt > 0) {
     const _foN = state.filterMaskOnly.nightvision && _maskClipOk;
@@ -639,7 +639,7 @@ export function _renderFrame() {
     if (_foN) ctx.restore();
   }
 
-  // --- Airbrush (エアブラシ) ---
+  // ---- Airbrush (エアブラシ) ----
   const airbrushAmt = elFilterAirbrush ? parseFloat(elFilterAirbrush.value) : 0;
   if (airbrushAmt > 0) {
     const _foA = state.filterMaskOnly.airbrush && _maskClipOk;
@@ -657,7 +657,7 @@ export function _renderFrame() {
     if (_foA) ctx.restore();
   }
 
-  // --- Color Flare (カラーフレア) ---
+  // ---- Color Flare (カラーフレア) ----
   const flareAmt = parseFloat(elFilterFlare.value);
   if (flareAmt > 0) {
     const _foFL = state.filterMaskOnly.flare && _maskClipOk;
@@ -677,11 +677,11 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // --- Cinematic Bars: barsOverlay div (effectsWrap 外側) で描画— updateBarsOverlay() 制御 ---
+  // ---- Cinematic Bars: barsOverlay div (effectsWrap 外側) で描画— updateBarsOverlay() 制御 ----
 
   } // end !effectsHidden
 
-  // --- コンポジット時刻 ---
+  // ---- コンポジット時刻 ----
   const _rafNow = performance.now();
   if (state.playing && !_compositeSeekPending) {
     const [o1, o2] = _getOffsets();
@@ -808,7 +808,7 @@ export function _drawOverlays() {
   const m = state.mask;
   const bufScale = _lastBufScale;
 
-  // --- マスク枠 ---
+  // ---- マスク枠 ----
   const bw = parseFloat(elBorderW.value);
   if (bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
     let borderFadeA;
@@ -849,7 +849,7 @@ export function _drawOverlays() {
     }
   }
 
-  // --- リサイズハンドル ---
+  // ---- リサイズハンドル ----
   if ((state.maskHovered || state.drag.active || state.maskTouched) && !maskHidden && !visHidden[1] && state.followMode === 'none' && state.drag.mode !== 'fg-anchor') {
     dCtx.save();
     const accent = _cachedAccent;
@@ -864,11 +864,11 @@ export function _drawOverlays() {
     dCtx.restore();
   }
 
-  // --- 前景アンカー（phone + fgFixed ON 時）---
+  // ---- 前景アンカー（phone + fgFixed ON 時） ----
   // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
   anchorCtx.clearRect(0, 0, W, H);
 
-  // --- borderInvert 枠（anchorCanvas の difference 合成を利用）---
+  // ---- borderInvert 枠（anchorCanvas の difference 合成を利用） ----
   if (state.borderInvert && bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
     // ※ borderFadeA / anim 判定は上で計算済みなので再利用できないため再計算
     let bfa;
@@ -924,7 +924,7 @@ export function _drawOverlays() {
     anchorCtx.restore();
   }
 
-  // --- スマホ枠オーバーレイ ---
+  // ---- スマホ枠オーバーレイ ----
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'phone') {
     const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
     const phase = (performance.now() * 0.001 * speed) % 1;
@@ -937,7 +937,7 @@ export function _drawOverlays() {
     }
   }
 
-  // --- メガネ枠オーバーレイ ---
+  // ---- メガネ枠オーバーレイ ----
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'glasses') {
     const gfCtx = state.borderInvert ? anchorCtx : dCtx;
     _drawGlassesFrame(gfCtx, m, bufScale, state.borderInvert ? '#ffffff' : null);
@@ -1724,7 +1724,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
 
   ctx.restore();
 
-  // --- ベゼル ブラー/ティントをすべての描画の背面に合成（destination-over）---
+  // ---- ベゼル ブラー/ティントをすべての描画の背面に合成（destination-over） ----
   {
     const _fb = parseFloat(elFrameBlur.value);
     const _ft = parseInt(elFrameTint.value, 10);
