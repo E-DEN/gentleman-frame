@@ -10,7 +10,7 @@ import {
   _getOffsets,
 } from './canvas.js';
 
-// ---- 再生 ----
+// --- 再生 ---
 const _playFlashIcon = document.getElementById('playFlashIcon');
 function _showPlayFlash(playing) {
   _playFlashIcon.classList.remove('flash');

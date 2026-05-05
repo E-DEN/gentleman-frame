@@ -12,7 +12,7 @@ import {
 import { buildMaskPath } from './render.js';
 import { syncPlay, syncPause } from './playback.js';
 
-// ---- マスクドラッグ + リサイズ（マウス + タッチ） ----
+// --- マスクドラッグ + リサイズ（マウス + タッチ） ---
 export function canvasCoords(e) {
   const r  = canvas.getBoundingClientRect();
   const sx = canvas.width  / r.width;
@@ -183,7 +183,7 @@ canvas.addEventListener('click', () => {
   if (state.playing) syncPause(); else syncPlay();
 });
 
-// ---- マスク追従モード (右クリック) ----
+// --- マスク追従モード (右クリック) ---
 export function _setFollowMode(mode) {
   state.followMode = mode;
   canvasWrap.classList.toggle('mask-follow', mode !== 'none');

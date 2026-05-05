@@ -1,4 +1,4 @@
-// GFRainEngine \u2013 WebGL rain-glass overlay for gentleman-frame
+﻿// GFRainEngine \u2013 WebGL rain-glass overlay for gentleman-frame
 //
 // Based on Codrops RainEffect by Lucas Bebber (MIT License)
 // Copyright (c) Codrops \u2013 https://tympanus.net/codrops/licensing/

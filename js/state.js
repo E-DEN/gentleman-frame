@@ -1,4 +1,4 @@
-// state.js — アプリケーション状態 + 定数
+﻿// state.js — アプリケーション状態 + 定数
 
 export const PRESET_KEY = 'gentleFrame_presets';
 export let _presetsReady = false;
@@ -35,7 +35,7 @@ export function _setZoneLoaded(zone, isLoaded) {
   }, true);
 })();
 
-// ---- プリセット名ホバースライド計算 ----
+// --- プリセット名ホバースライド計算 ---
 export function _calcOverflows(item) {
   const actions = item.querySelector('.preset-item-actions');
   if (actions) {
@@ -60,7 +60,7 @@ export function _calcOverflows(item) {
   }
 }
 
-// ---- 状態（すべてのモジュール間可変状態を一元管理） ----
+// --- 状態（すべてのモジュール間可変状態を一元管理） ---
 export const state = {
   playing: false,
   maskHovered: false,

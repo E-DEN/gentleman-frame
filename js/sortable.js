@@ -3,7 +3,7 @@
 import { _activePresetIdx, _f2Target, setIsDraggingPreset, setActivePresetIdx, setF2Target } from './canvas.js';
 import { loadPresets, savePresets, renderPresets } from './presets.js';
 
-// ---- プリセット スムーズ並び替え（ゴースト要素方式） ----
+// --- プリセット スムーズ並び替え（ゴースト要素方式） ---
 // コンテナベース: ゴーストがどのフォルダ内にあるかを毎フレーム検出。
 // エスケープ/モード追跡ではなく、エリア検出で制御。
 // 対応: どこからでもドラッグ、z-index、フォルダ離脱、
@@ -129,7 +129,7 @@ function _mUpdateSlide(ghostMidY) {
   _mLastGhostMidY = ghostMidY;
   _mGhost.style.top = (ghostMidY - _mDraggedH / 2) + 'px';
 
-  // ---- ゴーストが現在どのコンテナ上にあるかを検出 ----
+  // --- ゴーストが現在どのコンテナ上にあるかを検出 ---
   // フォルダはネスト不可なので、フォルダドラッグ時はコンテナ検出をスキップ。
   const srcIsFolder = loadPresets()[_mDragSrcIdx]?.type === 'folder';
   // 常に実際のカーソル Y（= ghost top + pointerOffset）を全ての比較に使用。
@@ -139,7 +139,7 @@ function _mUpdateSlide(ghostMidY) {
   const refY = ghostMidY - _mDraggedH / 2 + _mPointerOffsetY;  // = mouseY
   _mLastRefY = refY;
 
-  // ---- フォルダヘッダーのホバー（全フォルダ: 開いたもの、閉じたもの、空のもの） ----
+  // --- フォルダヘッダーのホバー（全フォルダ: 開いたもの、閉じたもの、空のもの） ---
   // ヘッダー検出はコンテナ検出よりも優先される。
   // フォルダヘッダーをホバーすると青枠を表示し、フォルダ末尾へドロップする。
   let newFolderTarget = null;
@@ -152,7 +152,7 @@ function _mUpdateSlide(ghostMidY) {
     });
   }
 
-  // ---- コンテナ検出（子エリア; ヘッダーホバー中はスキップ） ----
+  // --- コンテナ検出（子エリア; ヘッダーホバー中はスキップ） ---
   if (!srcIsFolder) {
     const newContainer = newFolderTarget ? null : _mDetectContainer(refY);
     if (newContainer !== _mCurContainer) {
@@ -178,7 +178,7 @@ function _mUpdateSlide(ghostMidY) {
     }
   }
 
-  // ---- 「新しいフォルダ」ボタンへのドロップターゲット（ルートプリセットのみ） ----
+  // --- 「新しいフォルダ」ボタンへのドロップターゲット（ルートプリセットのみ） ---
   const srcIsRootPreset = !srcIsFolder && _mSrcContainerEl === null;
   const addFolderBtn = document.getElementById('presetAddFolderBtn');
   let newAddFolderTarget = false;
@@ -194,7 +194,7 @@ function _mUpdateSlide(ghostMidY) {
     if (addFolderBtn) addFolderBtn.classList.toggle('drag-over', newAddFolderTarget);
   }
 
-  // ---- アクティブ兄弟要素をスライド ----
+  // --- アクティブ兄弟要素をスライド ---
   const ghostIsExternal = _mCurContainer !== null && !_mCurContainer.contains(_mDraggedEl);
   // フォルダからルートレベルへの離脱は、外部からの挿入と同じ視覚的意味を持つ:
   // ゴーストは上から到着するため、ゴースト位置以下のアイテムは挿入ギャップを示すため下にスライドする。
@@ -220,7 +220,7 @@ function _mUpdateSlide(ghostMidY) {
       : '';
   });
 
-  // ---- コンテナフォロワー（_mCurContainer より後ろのルート要素）をプッシュ ----
+  // --- コンテナフォロワー（_mCurContainer より後ろのルート要素）をプッシュ ---
   const visibleSibs = _mActiveSiblings.filter(s => s !== _mDraggedEl);
   const lastSib = visibleSibs[visibleSibs.length - 1];
   let followerShift = 0;
@@ -248,7 +248,7 @@ function _mCalcInsertAt() {
   const srcIsFolder = list[_mDragSrcIdx]?.type === 'folder';
   const sibs = _mActiveSiblings.filter(s => s !== _mDraggedEl && !s.classList.contains('preset-root-separator'));
 
-  // ---- ルートレベルへドロップされた非フォルダアイテム ----
+  // --- ルートレベルへドロップされた非フォルダアイテム ---
   // データモデル上、ルートアイテムは必ず最初のフォルダエントリより前に置かなければならない。
   // 「F2 の末尾」でも F2 内になるため、insertAt を firstFolderIdx 以下に据える。
   if (_mCurContainer === null && !srcIsFolder) {
@@ -267,7 +267,7 @@ function _mCalcInsertAt() {
     return firstFolderIdx !== -1 ? firstFolderIdx : list.length;
   }
 
-  // ---- ルートでのフォルダドラッグ、またはフォルダコンテナ内でのアイテムドラッグ ----
+  // --- ルートでのフォルダドラッグ、またはフォルダコンテナ内でのアイテムドラッグ ---
   let insertAfterSib = null;
   for (const sib of sibs) {
     if (+sib.dataset.mOrigMidY < _mLastRefY) insertAfterSib = sib;

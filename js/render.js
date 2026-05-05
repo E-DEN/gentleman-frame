@@ -34,7 +34,7 @@ import {
 } from './canvas.js';
 import { getSpectrumBars, smoothBars } from './spectrum.js';
 
-// ---- Canvas CSS フィルター（明るさ / コントラスト / 彩度） ----
+// --- Canvas CSS フィルター（明るさ / コントラスト / 彩度） ---
 export function updateCanvasFilter() {
   if (effectsHidden) { effectsWrap.style.filter = ''; return; }
   const b  = parseFloat(elFilterBrightness.value);
@@ -55,7 +55,7 @@ export function updateBarsOverlay() {
     `linear-gradient(to bottom, #000 ${pct}%, transparent ${pct}%, transparent ${100 - pct}%, #000 ${100 - pct}%)`;
 }
 
-// ---- 雨オーバーレイ（WebGL – Codrops RainEffect ベース） ----
+// --- 雨オーバーレイ（WebGL – Codrops RainEffect ベース） ---
 export const rainOverlay      = document.getElementById('rainOverlay');
 export const elFilterRain     = document.getElementById('filterRain');
 export const elRainSpeed      = document.getElementById('rainSpeed');
@@ -142,7 +142,7 @@ export function _buildBorderGrad(ctx, m, phase, anim, bright) {
   return g;
 }
 
-// ---- レンダリングループ ----
+// --- レンダリングループ ---
 // _renderFrame と displayCtx blit を同一 rAF コールバック内でアトミックに実行し、
 // setInterval との競合によるティアリングを防ぐ。
 export let _renderIntervalId = null; // 互換用（現在は未使用）
@@ -178,7 +178,7 @@ export function _renderFrame() {
 
   ctx.clearRect(0, 0, W, H);
 
-  // ---- 背景 動画/画像（レイヤー 1） ----
+  // --- 背景 動画/画像（レイヤー 1） ---
   if (loaded[0] && !visHidden[0]) {
     try { ctx.drawImage(_getVidSrc(0), 0, 0, W, H); }
     catch (e) { ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H); }
@@ -190,7 +190,7 @@ export function _renderFrame() {
   const maskBlur = parseFloat(elMaskBlur.value);
   const pixelAmt = parseFloat(elMaskPixel.value);
 
-  // ---- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ----
+  // --- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ---
   const fgAlpha = _fgFadeStart < 0 ? 1
     : _fgFadeStart === 0 ? 0
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
@@ -219,7 +219,7 @@ export function _renderFrame() {
     } else {
       offCtx.drawImage(_getVidSrc(1), 0, 0, W, H);
     }
-    // ---- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ----
+    // --- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ---
     if (pixelAmt >= 1) {
       const pSize = Math.round(pixelAmt * 4);
       const pw = Math.ceil(W / pSize);
@@ -325,7 +325,7 @@ export function _renderFrame() {
     }
   }
 
-  // ---- 色収差（放射状、スケールベース） ----
+  // --- 色収差（放射状、スケールベース） ---
   if (!effectsHidden) {
   const _maskClipOk = !maskHidden && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0]);
   const caAmt = parseFloat(elFilterCA.value);
@@ -366,7 +366,7 @@ export function _renderFrame() {
     }
   }
 
-  // ---- Highlights (明るいトーン域を操作) ----
+  // --- Highlights (明るいトーン域を操作) ---
   const hlAmt = parseFloat(elFilterHighlight.value);
   if (hlAmt !== 0) {
     const _foHL = state.filterMaskOnly.highlight && _maskClipOk;
@@ -385,7 +385,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Shadows (暗いトーン域を操作) ----
+  // --- Shadows (暗いトーン域を操作) ---
   const shAmt = parseFloat(elFilterShadow.value);
   if (shAmt !== 0) {
     const _foSH = state.filterMaskOnly.shadow && _maskClipOk;
@@ -404,7 +404,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- ビネット ----
+  // --- ビネット ---
   const vigAmt = parseFloat(elFilterVignette.value);
   if (vigAmt > 0) {
     const _foVIG = state.filterMaskOnly.vignette && _maskClipOk;
@@ -423,7 +423,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Color Temperature (色温度) ----
+  // --- Color Temperature (色温度) ---
   const tempAmt = parseFloat(elFilterTemp.value);
   if (tempAmt !== 0) {
     const _foTMP = state.filterMaskOnly.temp && _maskClipOk;
@@ -438,7 +438,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Tint (色かぶり補正: マゼンタ ↔ グリーン) ----
+  // --- Tint (色かぶり補正: マゼンタ ↔ グリーン) ---
   const tintAmt = parseFloat(elFilterTint.value);
   if (tintAmt !== 0) {
     const _foTINT = state.filterMaskOnly.tint && _maskClipOk;
@@ -453,7 +453,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Matte (黒浮き + 白浮き) ----
+  // --- Matte (黒浮き + 白浮き) ---
   const matteAmt = parseFloat(elFilterMatte.value);
   if (matteAmt > 0) {
     const _foMAT = state.filterMaskOnly.matte && _maskClipOk;
@@ -471,7 +471,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Film Grain (フィルム粒子) ----
+  // --- Film Grain (フィルム粒子) ---
   const grainAmt = parseFloat(elFilterGrain.value);
   if (grainAmt > 0) {
     const _foGR = state.filterMaskOnly.grain && _maskClipOk;
@@ -492,7 +492,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Bloom / にじみ ----
+  // --- Bloom / にじみ ---
   const waterAmt = elFilterBloom ? parseFloat(elFilterBloom.value) : 0;
   if (waterAmt > 0) {
     const _foW = state.filterMaskOnly.bloom && _maskClipOk;
@@ -520,7 +520,7 @@ export function _renderFrame() {
     if (_foW) ctx.restore();
   }
 
-  // ---- Sharpness (オーバーレイ unsharp mask) ----
+  // --- Sharpness (オーバーレイ unsharp mask) ---
   const sharpAmt = parseFloat(elFilterSharpness.value);
   if (sharpAmt > 0) {
     const _foSHP = state.filterMaskOnly.sharpness && _maskClipOk;
@@ -538,7 +538,7 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Pencil (鉛筆スケッチ) ----
+  // --- Pencil (鉛筆スケッチ) ---
   const pencilAmt = elFilterPencil ? parseFloat(elFilterPencil.value) : 0;
   if (pencilAmt > 0) {
     const _foP = state.filterMaskOnly.pencil && _maskClipOk;
@@ -565,7 +565,7 @@ export function _renderFrame() {
     if (_foP) ctx.restore();
   }
 
-  // ---- Emboss (エンボス) ----
+  // --- Emboss (エンボス) ---
   const embossAmt = elFilterEmboss ? parseFloat(elFilterEmboss.value) : 0;
   if (embossAmt > 0) {
     const _foE = state.filterMaskOnly.emboss && _maskClipOk;
@@ -590,7 +590,7 @@ export function _renderFrame() {
     if (_foE) ctx.restore();
   }
 
-  // ---- Chalkboard (黒板) ----
+  // --- Chalkboard (黒板) ---
   const chalkAmt = elFilterChalkboard ? parseFloat(elFilterChalkboard.value) : 0;
   if (chalkAmt > 0) {
     const _foC = state.filterMaskOnly.chalkboard && _maskClipOk;
@@ -613,7 +613,7 @@ export function _renderFrame() {
     if (_foC) ctx.restore();
   }
 
-  // ---- Night Vision (暗視) ----
+  // --- Night Vision (暗視) ---
   const nightVisionAmt = elFilterNightVision ? parseFloat(elFilterNightVision.value) : 0;
   if (nightVisionAmt > 0) {
     const _foN = state.filterMaskOnly.nightvision && _maskClipOk;
@@ -639,7 +639,7 @@ export function _renderFrame() {
     if (_foN) ctx.restore();
   }
 
-  // ---- Airbrush (エアブラシ) ----
+  // --- Airbrush (エアブラシ) ---
   const airbrushAmt = elFilterAirbrush ? parseFloat(elFilterAirbrush.value) : 0;
   if (airbrushAmt > 0) {
     const _foA = state.filterMaskOnly.airbrush && _maskClipOk;
@@ -657,7 +657,7 @@ export function _renderFrame() {
     if (_foA) ctx.restore();
   }
 
-  // ---- Color Flare (カラーフレア) ----
+  // --- Color Flare (カラーフレア) ---
   const flareAmt = parseFloat(elFilterFlare.value);
   if (flareAmt > 0) {
     const _foFL = state.filterMaskOnly.flare && _maskClipOk;
@@ -677,11 +677,11 @@ export function _renderFrame() {
     ctx.restore();
   }
 
-  // ---- Cinematic Bars: barsOverlay div (effectsWrap 外側) で描画— updateBarsOverlay() 制御 ----
+  // --- Cinematic Bars: barsOverlay div (effectsWrap 外側) で描画— updateBarsOverlay() 制御 ---
 
   } // end !effectsHidden
 
-  // ---- コンポジット時刻 ----
+  // --- コンポジット時刻 ---
   const _rafNow = performance.now();
   if (state.playing && !_compositeSeekPending) {
     const [o1, o2] = _getOffsets();
@@ -808,7 +808,7 @@ export function _drawOverlays() {
   const m = state.mask;
   const bufScale = _lastBufScale;
 
-  // ---- マスク枠 ----
+  // --- マスク枠 ---
   const bw = parseFloat(elBorderW.value);
   if (bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
     let borderFadeA;
@@ -849,7 +849,7 @@ export function _drawOverlays() {
     }
   }
 
-  // ---- リサイズハンドル ----
+  // --- リサイズハンドル ---
   if ((state.maskHovered || state.drag.active || state.maskTouched) && !maskHidden && !visHidden[1] && state.followMode === 'none' && state.drag.mode !== 'fg-anchor') {
     dCtx.save();
     const accent = _cachedAccent;
@@ -864,11 +864,11 @@ export function _drawOverlays() {
     dCtx.restore();
   }
 
-  // ---- 前景アンカー（phone + fgFixed ON 時） ----
+  // --- 前景アンカー（phone + fgFixed ON 時） ---
   // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
   anchorCtx.clearRect(0, 0, W, H);
 
-  // ---- borderInvert 枠（anchorCanvas の difference 合成を利用） ----
+  // --- borderInvert 枠（anchorCanvas の difference 合成を利用） ---
   if (state.borderInvert && bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
     // ※ borderFadeA / anim 判定は上で計算済みなので再利用できないため再計算
     let bfa;
@@ -924,7 +924,7 @@ export function _drawOverlays() {
     anchorCtx.restore();
   }
 
-  // ---- スマホ枠オーバーレイ ----
+  // --- スマホ枠オーバーレイ ---
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'phone') {
     const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
     const phase = (performance.now() * 0.001 * speed) % 1;
@@ -937,7 +937,7 @@ export function _drawOverlays() {
     }
   }
 
-  // ---- メガネ枠オーバーレイ ----
+  // --- メガネ枠オーバーレイ ---
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'glasses') {
     const gfCtx = state.borderInvert ? anchorCtx : dCtx;
     _drawGlassesFrame(gfCtx, m, bufScale, state.borderInvert ? '#ffffff' : null);
@@ -1065,7 +1065,7 @@ export function _updateCanvasHints() {
   elHintFg.classList.toggle('visible', showFg);
 }
 
-// ---- メガネスタイル定義（7種） ----
+// --- メガネスタイル定義（7種） ---
 const _GS = 4.166667; // SVGスケール定数
 // Path2D キャッシュ: _glassesPaths[i] = { lens: Path2D, full: Path2D } または null
 let _glassesPaths = [];
@@ -1485,7 +1485,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
   ctx.save();
   ctx.globalAlpha = opacity;
 
-  // ---- 本体アウトライン（選択色 / アニメ対応）----
+  // --- 本体アウトライン（選択色 / アニメ対応）----
   if (!skipOutline) {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
@@ -1515,7 +1515,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.restore(); return;
   }
 
-  // ---- パンチホールカメラ ----
+  // --- パンチホールカメラ ---
   if (state.phoneShowDot && !skipDot) {
     const dotR = Math.max(2, Math.round(2.5 * s));
     ctx.save();
@@ -1530,7 +1530,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.restore();
   }
 
-  // ---- サイドボタン ----
+  // --- サイドボタン ---
   ctx.save();
   if (_animOn) ctx.globalAlpha = opacity * _btnA;
   ctx.fillStyle = colBtn;
@@ -1557,7 +1557,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
   }
   ctx.restore();
 
-  // ---- ホームインジケーター（固定グレー＋シャドウ → 枠色に依存しない）----
+  // --- ホームインジケーター（固定グレー＋シャドウ → 枠色に依存しない）----
   {
     ctx.save();
     ctx.globalAlpha = opacity * (_animOn ? _homeA : 1.0);
@@ -1578,7 +1578,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.restore();
   }
 
-  // ---- 三等分グリッド（Rule of Thirds）----
+  // --- 三等分グリッド（Rule of Thirds）----
   if (state.phoneShowRoT) {
     ctx.save();
     ctx.beginPath();
@@ -1597,14 +1597,14 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.restore();
   }
 
-  // ---- モーフタイマー更新（カメラUI・シャッター・RECで共用）----
+  // --- モーフタイマー更新（カメラUI・シャッター・RECで共用）----
   const nowMs = performance.now();
   const dtMs  = Math.min(50, _shutterMorphLast > 0 ? nowMs - _shutterMorphLast : 16);
   _shutterMorphLast = nowMs;
   _shutterMorphT += ((state.playing ? 1 : 0) - _shutterMorphT) * Math.min(1, (dtMs / 1000) * 7.0);
   const mt = _shutterMorphT;
 
-  // ---- シャッターボタン ----
+  // --- シャッターボタン ---
   // 縦: 横中央・下寄り、横: 右寄り・縦中央（参考画像に小わせ）
   const sbCx = _land ? scrX + scrW * 0.855 : scrX + scrW / 2;
   const sbCy = _land ? scrY + scrH / 2      : scrY + scrH * 0.855;
@@ -1614,7 +1614,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
 
   const glassR = sbR + Math.max(4, Math.round(4 * s));
 
-  // ---- 背景透過: ガウスブラー磨りガラス ----
+  // --- 背景透過: ガウスブラー磨りガラス ---
   // getImageData(desynchronized canvas)はGPU Stall→動画ラグの原因。
   // drawImageで GPU間コピーのみ使用する。
   if (state.phoneShowRec) {
@@ -1652,7 +1652,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     }
   }
 
-  // ---- 録画インジケーター（赤丸→赤四角モーフ）＋タイムコード ----
+  // --- 録画インジケーター（赤丸→赤四角モーフ）＋タイムコード ---
   const pulse = 0.60 + 0.40 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
   if (state.phoneShowRec) {
     const iSide = sbR * 2 * (1 - mt) + sqSide * mt;
@@ -1665,7 +1665,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.fill();
     ctx.restore();
 
-    // ---- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン）----
+    // --- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン）----
     if (mt > 0.001) {
     const dur = (loaded[0] && mediaType[0] === 'video' && vid[0].duration > 0)
       ? vid[0].duration
@@ -1724,7 +1724,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
 
   ctx.restore();
 
-  // ---- ベゼル ブラー/ティントをすべての描画の背面に合成（destination-over） ----
+  // --- ベゼル ブラー/ティントをすべての描画の背面に合成（destination-over） ---
   {
     const _fb = parseFloat(elFrameBlur.value);
     const _ft = parseInt(elFrameTint.value, 10);

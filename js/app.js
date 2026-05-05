@@ -11,13 +11,13 @@ import './media.js';
 import './presets.js';
 import './sortable.js';
 
-// ---- シアターモード & 全画面 ----
+// --- シアターモード & 全画面 ---
 const appBody    = document.querySelector('.app-body');
 const panel      = document.querySelector('.panel');
 const theaterBtn = document.getElementById('theaterBtn');
 const fsBtn      = document.getElementById('fullscreenBtn');
 
-// ---- リシンク ----
+// --- リシンク ---
 document.getElementById('resyncBtn').addEventListener('click', async () => {
   await _applyCompositeT(_compositeT);
   // 一時停止中は requestVideoFrameCallback が起動しないことがあるため、
@@ -34,7 +34,7 @@ document.getElementById('resyncBtn').addEventListener('click', async () => {
   }
 });
 
-// ---- スクリーンショット保存 ----
+// --- スクリーンショット保存 ---
 document.getElementById('screenshotBtn').addEventListener('click', () => {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -161,7 +161,7 @@ document.getElementById('canvasWrap').addEventListener('dblclick', () => {
   }
 });
 
-// ---- Card collapse (カード折りたたみ) ----
+// --- Card collapse (カード折りたたみ) ---
 (function () {
   const STORAGE_KEY = 'gf-card-collapsed';
   const getSaved = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; } };
@@ -194,7 +194,7 @@ document.getElementById('canvasWrap').addEventListener('dblclick', () => {
 
 lucide.createIcons();
 
-// ---- ブラウザのデフォルトファイルオープン防止 ----
+// --- ブラウザのデフォルトファイルオープン防止 ---
 // ドロップゾーン外にファイルをドロップしたときブラウザがファイルを
 // 開いてしまわないよう、document レベルで dragover/drop を抑制する。
 document.addEventListener('dragover', e => e.preventDefault());

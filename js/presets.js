@@ -1,4 +1,4 @@
-// presets.js — プリセット管理・コーデック・エクスポート/インポート
+﻿// presets.js — プリセット管理・コーデック・エクスポート/インポート
 
 import { state, _animColors, PRESET_KEY, setPresetsReady,
   _calcOverflows } from './state.js';
@@ -47,11 +47,11 @@ import {
   _startRainOverlay, _stopRainOverlay,
 } from './render.js';
 
-// ---- プリセット CRUD ----
+// --- プリセット CRUD ---
 export function loadPresets() { return JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); }
 export function savePresets(list) { localStorage.setItem(PRESET_KEY, JSON.stringify(list)); }
 
-// ---- 設定収集 / 適用 ----
+// --- 設定収集 / 適用 ---
 export function collectSettings() {
   return {
     vol0:          elVol0.value,
@@ -358,12 +358,12 @@ export function applySettings(d) {
   if (rAmt > 0 && !effectsHidden) _startRainOverlay(); else _stopRainOverlay();
 }
 
-// ---- XSSエスケープ ----
+// --- XSSエスケープ ---
 function _esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ---- ファイル再リンクダイアログ ----
+// --- ファイル再リンクダイアログ ---
 async function _tryFromFolder(dirHandle, filename) {
   try {
     const fh = await dirHandle.getFileHandle(filename);
@@ -569,7 +569,7 @@ function _showFileResolveDialog(slots, slotNames, startHint, preResolvedMap = ne
   });
 }
 
-// ---- ステータスメッセージ（トースト） ----
+// --- ステータスメッセージ（トースト） ---
 function _presetStatusMsg(msg, ok = true) {
   const container = document.getElementById('gf-toast-container');
   if (!container) return;
@@ -581,7 +581,7 @@ function _presetStatusMsg(msg, ok = true) {
   setTimeout(remove, ok ? 3000 : 5000);
 }
 
-// ---- renderPresets ----
+// --- renderPresets ---
 export function renderPresets() {
   const list = loadPresets();
   const el = document.getElementById('presetList');
@@ -981,7 +981,7 @@ export function renderPresets() {
   _bindPresetAddBtn();
 }
 
-// ---- プリセット追加・F2・フォルダ追加 ----
+// --- プリセット追加・F2・フォルダ追加 ---
 const _doPresetAdd = async () => {
   const presetId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const data = { ...collectSettings(), presetId };
@@ -1094,7 +1094,7 @@ document.getElementById('presetAddFolderBtn').addEventListener('click', () => {
   });
 });
 
-// ---- インラインインポート ----
+// --- インラインインポート ---
 const _doInlineImport = async (rawOverride) => {
   const inp = document.getElementById('presetCodeInput');
   const raw = (typeof rawOverride === 'string' ? rawOverride : inp.value)
@@ -1188,7 +1188,7 @@ document.getElementById('presetCodeInput').addEventListener('input', () => { doc
   });
 })());
 
-// ---- JSON / gf~ コード D&D → プリセットカード全体で受付 ----
+// --- JSON / gf~ コード D&D → プリセットカード全体で受付 ---
 ((() => {
   const card = document.getElementById('presetCard');
   const list = document.getElementById('presetList');
@@ -1258,7 +1258,7 @@ document.getElementById('presetImportToggleBtn').addEventListener('click', () =>
   if (open) document.getElementById('presetCodeInput').focus();
 });
 
-// ---- プリセット圧縮コーデック ----
+// --- プリセット圧縮コーデック ---
 const _B64U = b => {
   const arr = new Uint8Array(b);
   let bin = '';
@@ -1346,7 +1346,7 @@ async function _presetDecodeMulti(code) {
   });
 }
 
-// ---- エクスポート / インポート UI ----
+// --- エクスポート / インポート UI ---
 document.getElementById('presetJsonExportBtn').addEventListener('click', () => {
   const list = loadPresets();
   if (!list.length) { _presetStatusMsg(t('no-presets'), false); return; }
@@ -1385,7 +1385,7 @@ document.getElementById('presetCopyAllBtn').addEventListener('click', async () =
   }
 });
 
-// ---- 初期化 ----
+// --- 初期化 ---
 setPresetsReady(true);
 renderPresets();
 _setRenderPresets(renderPresets);

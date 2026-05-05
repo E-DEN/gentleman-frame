@@ -15,7 +15,7 @@ import {
 } from './canvas.js';
 import { resetHintState, _startRainOverlay, elFilterRain } from './render.js';
 
-// ---- ファイル読み込み ----
+// --- ファイル読み込み ---
 
 // setCanvasAspectRatio のラッパー。
 // rainOverlay（WebGL）は _syncAllBuffers の対象外のため、
@@ -400,7 +400,7 @@ function setupDropZone(index) {
     else loadVideo(index, f);
   });
 
-  // ---- D&D: vid-section カード全体 ----
+  // --- D&D: vid-section カード全体 ---
   // section レベルで統括。zone のイベントはバブリングさせて section に集約する。
   // zone.drop のみ stopPropagation を維持（section.drop との二重処理防止）。
 
@@ -477,7 +477,7 @@ function setupDropZone(index) {
 
 [0, 1].forEach(setupDropZone);
 
-// ---- 動画コントロールリセット ----
+// --- 動画コントロールリセット ---
 [0, 1].forEach(i => {
   document.getElementById(`resetBtn${i}`).addEventListener('click', () => {
     const resetSlider = id => {
@@ -491,7 +491,7 @@ function setupDropZone(index) {
   });
 });
 
-// ---- 動画表示切り替え ----
+// --- 動画表示切り替え ---
 const _vidHiddenOverlay = document.getElementById('vidHiddenOverlay');
 export function _syncVidHiddenOverlay() {
   const all = visHidden[0] && visHidden[1];
@@ -552,7 +552,7 @@ document.getElementById('vidResetAllBtn').addEventListener('click', () => {
   [0, 1].forEach(i => document.getElementById(`resetBtn${i}`).click());
 });
 
-// ---- 動画削除 ----
+// --- 動画削除 ---
 export const DEFAULT_LABELS = () => [t('drop-label'), t('drop-label')];
 
 export function clearVideo(index) {
@@ -629,7 +629,7 @@ export async function processDropFiles(e, targetIdx) {
   }
 }
 
-// ---- キャンバスエリアへのドラッグ&ドロップ ----
+// --- キャンバスエリアへのドラッグ&ドロップ ---
 // canvasWrap: 動画・画像のみ受け付ける（背景=0 へロード）
 // maskDropOverlay: マスク領域が本物のD&Dターゲット（前景=1 へロード）
 const _isFileDrag = e => !!(e.dataTransfer?.types?.includes('Files'));
