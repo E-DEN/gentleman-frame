@@ -23,7 +23,7 @@ const fs     = require('fs');
 
 const PORT = parseInt(process.env.PORT, 10) || 8788;
 
-// ---------- Iwara direct API resolver ----------
+// --- Iwara direct API resolver ---
 
 function httpsGetJson(url, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
@@ -204,7 +204,7 @@ async function resolveIwaraAPI(pageUrl, token = '') {
   return { url: finalUrl, title, author };
 }
 
-// ---------- yt-dlp fallback (non-iwara) ----------
+// --- yt-dlp fallback (non-iwara) ---
 
 function resolveWithYtDlp(pageUrl) {
   return new Promise((resolve, reject) => {
@@ -325,7 +325,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ---- 汎用 CORS プロキシ (?url=) ----
+  // --- 汎用 CORS プロキシ (?url=) ---
   const genericTarget = reqUrl.searchParams.get('url');
   if (reqUrl.pathname === '/' && genericTarget) {
     let targetUrl;

@@ -10,7 +10,7 @@
  *     npx wrangler deploy server/cors-worker.js --name gf-proxy --compatibility-date 2024-01-01
  */
 
-// ---- 許可ホスト (cors-worker.js の CORS プロキシで使用) ----
+// --- 許可ホスト (cors-worker.js の CORS プロキシで使用) ---
 
 export const ALLOWED_HOSTS = [
   'iwara.tv',       // *.iwara.tv 全サブドメイン（CDNホスト名が動的に変わるため）
@@ -34,14 +34,14 @@ export const REFERER_MAP = {
   'i-f.pximg.net': 'https://www.pixiv.net/',
 };
 
-// ---- SHA-1 hex (Web Crypto API — Node.js 18+ / Workers 両対応) ----
+// --- SHA-1 hex (Web Crypto API — Node.js 18+ / Workers 両対応) ---
 
 export async function sha1hex(str) {
   const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ---- iwara API resolver ----
+// --- iwara API resolver ---
 
 /**
  * iwara ページ URL → { url, title, author }

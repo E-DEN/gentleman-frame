@@ -1,4 +1,4 @@
-/**
+﻿/**
  * gentle-frame 本番用 CORS プロキシ — Cloudflare Worker
  *
  * 【デプロイ手順】
@@ -54,7 +54,7 @@ export default {
       }
     }
 
-    // ---- 汎用 CORS プロキシ (?url=) ----
+    // --- 汎用 CORS プロキシ (?url=) ---
     const target = reqUrl.searchParams.get('url');
     if (!target) return new Response('Missing ?url=', { status: 400, headers: CORS_HEADERS });
 
