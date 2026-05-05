@@ -1222,8 +1222,21 @@ export function buildMaskPath(c, m, forStroke = false) {
       const R      = Math.min(m.w, m.h) / 2;
       const rBase  = R * 0.80; // 無音時の内縁半径（外周 20% リングが常時見える）
       const rMin_  = R * 0.12; // 最大音量時の内縁半径（外周 88% まで広がる）
+      const HALF_R = Math.floor(BAR_COUNT / 2);
       const innerR = (i) => {
-        const v = sBars ? Math.min(1, sBars[i] * amp) : 0;
+        let barIdx;
+        if (specSym === 'lr') {
+          // 垂直軸（i=0:上 / i=HALF:下）で折り返し → 左右対称
+          barIdx = i <= HALF_R ? i : BAR_COUNT - i;
+        } else if (specSym === 'ud') {
+          // 水平軸（i=N/4:右 / i=3N/4:左）で折り返し → 上下対称
+          const shifted = (i + Math.round(BAR_COUNT / 4)) % BAR_COUNT;
+          barIdx = shifted <= HALF_R ? shifted : BAR_COUNT - shifted;
+        } else {
+          barIdx = i;
+        }
+        barIdx = Math.min(barIdx, BAR_COUNT - 1);
+        const v = sBars ? Math.min(1, sBars[barIdx] * amp) : 0;
         return rBase - v * (rBase - rMin_);
       };
       // 外円: 時計回り → 内部の巻き数 +1
