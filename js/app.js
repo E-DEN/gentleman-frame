@@ -181,7 +181,7 @@ _fsWrap.addEventListener('mousedown', _resetFsIdle);
 function _updateActualSizeBtnVisibility() {
   if (!document.fullscreenElement) return;
   const displayed = Math.round(mainCanvas.getBoundingClientRect().width);
-  actualSizeBtn.style.visibility = (displayed === canvas.width) ? 'hidden' : 'visible';
+  actualSizeBtn.style.display = (displayed === canvas.width) ? 'none' : '';
 }
 
 document.addEventListener('fullscreenchange', () => {
@@ -194,7 +194,7 @@ document.addEventListener('fullscreenchange', () => {
     mainCanvas.style.removeProperty('width');
     mainCanvas.style.removeProperty('height');
     videoArea.style.width = '';
-    actualSizeBtn.style.visibility = '';
+    actualSizeBtn.style.display = '';
     setTheater(_wasTheaterBeforeFs);
     clearTimeout(_fsIdleTimer);
     _setFsIdle(false);
