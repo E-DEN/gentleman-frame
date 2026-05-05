@@ -9,11 +9,10 @@
   <link rel="stylesheet" href="css/style.css">
   <!-- i18n エンジン（app.js より先に読み込む必要あり） -->
   <script src="js/i18n.js"></script>
-  <!-- 言語ファイルはアプリ内の「言語読込」ボタンから JSON で読み込めます -->
 </head>
 <body>
 
-<!-- ===== ヘッダー ===== -->
+<!-- --- ヘッダー --- -->
 <header>
   <div class="logo" style="cursor:pointer" onclick="window.scrollTo({top:0,behavior:'smooth'})">Gentleman Frame</div>
   <div class="header-controls">
@@ -50,7 +49,7 @@
   </div>
 </header>
 
-<!-- ===== アプリ本体 ===== -->
+<!-- --- アプリ本体 --- -->
 <div class="app-body">
 
   <!-- SVGフィルター定義 -->
@@ -59,7 +58,7 @@
       <feGaussianBlur id="svgGblur" edgeMode="duplicate" stdDeviation="0"/>
     </filter>
   </svg>
-  <!-- ===== キャンバス ＋ トランスポート（オーバーレイ） ===== -->
+  <!-- --- キャンバス + トランスポート --- -->
   <div class="canvas-area">
     <div class="canvas-wrap" id="canvasWrap">
       <!-- 色調補正フィルターをここに適用（mainCanvas + rainOverlay が対象） -->
@@ -117,14 +116,14 @@
           <div class="time-label" id="timeLabel">0:00 / 0:00</div>
           <button class="tbtn" id="resyncBtn" data-i18n-title="resync" title="リシンク"><i data-lucide="refresh-cw"></i></button>
           <button class="tbtn" id="screenshotBtn" data-i18n-title="screenshot-title" title="スクリーンショット保存"><i data-lucide="camera"></i></button>
-          <button class="tbtn" id="theaterBtn" title="シアターモード（パネル非表示）"><i data-lucide="panel-right-close"></i></button>
-          <button class="tbtn" id="fullscreenBtn" title="フルスクリーン"><i data-lucide="maximize"></i></button>
+          <button class="tbtn" id="theaterBtn" data-i18n-title="theater-open"><i data-lucide="panel-right-close"></i></button>
+          <button class="tbtn" id="fullscreenBtn" data-i18n-title="fs-open"><i data-lucide="maximize"></i></button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ===== 右パネル ===== -->
+  <!-- --- 右パネル --- -->
   <div class="panel">
 
     <!-- 動画 -->
@@ -141,7 +140,7 @@
           </div>
         </div>
         <div class="drop-zone" id="drop0" role="button" tabindex="0">
-        <div class="drop-loading-overlay" style="display:none"></div>
+          <div class="drop-loading-overlay" style="display:none"></div>
           <button class="drop-delete" id="del0" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
           <a class="drop-link" id="dropLink0" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
           <div class="drop-icon"><i data-lucide="upload"></i></div>
@@ -193,7 +192,7 @@
           </div>
         </div>
         <div class="drop-zone" id="drop1" role="button" tabindex="0">
-        <div class="drop-loading-overlay" style="display:none"></div>
+          <div class="drop-loading-overlay" style="display:none"></div>
           <button class="drop-delete" id="del1" data-i18n-title="del-title" title="削除"><i data-lucide="x"></i></button>
           <a class="drop-link" id="dropLink1" data-i18n-title="open-page-title" target="_blank" rel="noopener" title="元ページを開く" tabindex="-1"><i data-lucide="external-link"></i></a>
           <div class="drop-icon"><i data-lucide="upload"></i></div>
@@ -373,11 +372,13 @@
         <label data-i18n="fg-pin-lerp">アンカー追従</label>
         <input type="range" id="fgPinLerp" min="0" max="100" value="50" step="1">
         <input type="text" class="ctrl-val" id="fgPinLerpVal" value="50" spellcheck="false" autocomplete="off">
-      </div>      <div class="ctrl-row" id="fgPinOpacityRow" style="display:none">
+      </div>
+      <div class="ctrl-row" id="fgPinOpacityRow" style="display:none">
         <label data-i18n="fg-pin-opacity">アンカー透過</label>
         <input type="range" id="fgPinOpacity" min="0" max="100" value="100" step="1">
         <input type="text" class="ctrl-val" id="fgPinOpacityVal" value="100" spellcheck="false" autocomplete="off">
-      </div>        <div class="ctrl-row" id="borderColRow">
+      </div>
+      <div class="ctrl-row" id="borderColRow">
           <label data-i18n="border-col">枠色</label>
           <input type="color" id="borderColor" value="#ffffff" style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;">
           <input type="hidden" id="borderAnim" value="none">
