@@ -318,7 +318,7 @@
       padding: 4px 14px 14px;
     }
 
-    /* ---- 動画カード内のサブセクション ---- */
+    /* --- 動画カード内のサブセクション --- */
     .vid-section {
       display: flex;
       flex-direction: column;
@@ -398,7 +398,7 @@
     .card--collapsed .card-title { margin-bottom: 0; }
     .card--collapsed { padding: 4px 14px; }
 
-    /* ---- Quick filter preset buttons ---- */
+    /* --- Quick filter preset buttons --- */
     .fqp-btn {
       display: inline-flex;
       align-items: center;
@@ -647,7 +647,7 @@
     .url-load-btn.loading { border-color: var(--accent); color: var(--accent); cursor: default; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ---- 再生/一時停止フラッシュ ---- */
+    /* --- 再生/一時停止フラッシュ --- */
     @keyframes play-flash {
       0%   { opacity: 0.85; transform: scale(0.7); }
       30%  { opacity: 0.85; transform: scale(1.1); }

@@ -1485,7 +1485,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
   ctx.save();
   ctx.globalAlpha = opacity;
 
-  // --- 本体アウトライン（選択色 / アニメ対応）----
+  // --- 本体アウトライン（選択色 / アニメ対応） ---
   if (!skipOutline) {
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
@@ -1557,7 +1557,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
   }
   ctx.restore();
 
-  // --- ホームインジケーター（固定グレー＋シャドウ → 枠色に依存しない）----
+  // --- ホームインジケーター（固定グレー＋シャドウ → 枠色に依存しない） ---
   {
     ctx.save();
     ctx.globalAlpha = opacity * (_animOn ? _homeA : 1.0);
@@ -1578,7 +1578,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.restore();
   }
 
-  // --- 三等分グリッド（Rule of Thirds）----
+  // --- 三等分グリッド（Rule of Thirds） ---
   if (state.phoneShowRoT) {
     ctx.save();
     ctx.beginPath();
@@ -1597,7 +1597,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.restore();
   }
 
-  // --- モーフタイマー更新（カメラUI・シャッター・RECで共用）----
+  // --- モーフタイマー更新（カメラUI・シャッター・RECで共用） ---
   const nowMs = performance.now();
   const dtMs  = Math.min(50, _shutterMorphLast > 0 ? nowMs - _shutterMorphLast : 16);
   _shutterMorphLast = nowMs;
@@ -1665,7 +1665,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     ctx.fill();
     ctx.restore();
 
-    // --- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン）----
+    // --- タイムコード表示（mt > 0 のとき＝レコード四角化と同条件、mt でフェードイン） ---
     if (mt > 0.001) {
     const dur = (loaded[0] && mediaType[0] === 'video' && vid[0].duration > 0)
       ? vid[0].duration
