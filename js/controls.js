@@ -1065,7 +1065,15 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     if (prevShape !== 'phone' && newShape === 'phone') {
       // メガネからの遷移: 横長サイズがそのまま残らないよう h×h に正規化して保存
       const saveW = prevShape === 'glasses' ? state.mask.h : state.mask.w;
-      _nonPhoneMaskState = { w: saveW, h: state.mask.h, x: state.mask.x, y: state.mask.y };
+      const saveH = state.mask.h;
+      // メガネ幅はマスクサイズが変わるので x/y を保存せず、保存サイズに合わせて再中央寄せする
+      const saveX = prevShape === 'glasses'
+        ? Math.round((canvas.width  - saveW) / 2)
+        : state.mask.x;
+      const saveY = prevShape === 'glasses'
+        ? Math.round((canvas.height - saveH) / 2)
+        : state.mask.y;
+      _nonPhoneMaskState = { w: saveW, h: saveH, x: saveX, y: saveY };
     } else if (prevShape === 'phone' && newShape !== 'phone') {
       _phoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y };
       if (_nonPhoneMaskState) {
