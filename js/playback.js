@@ -5,7 +5,7 @@ import {
   vid, mediaType, loaded,
   _compositeT, _playDelayTimers,
   setCompositeT, setCompositeLastRaf, setCompositeSeekPending,
-  _scheduleResync, _resyncTimer,
+  _scheduleResync, _cancelResync,
   elPlayBtn,
   _getOffsets,
 } from './canvas.js';
@@ -77,7 +77,7 @@ export async function syncPlay() {
     return Math.abs(vid[i].currentTime - vt) >= 0.05;
   });
   if (!needsSeek) {
-    clearTimeout(_resyncTimer);
+    _cancelResync();
     _playDelayTimers.forEach(t => clearTimeout(t));
     _playDelayTimers.length = 0;
     setCompositeLastRaf(null);
@@ -102,7 +102,7 @@ export async function syncPlay() {
 }
 
 export function syncPause() {
-  clearTimeout(_resyncTimer);
+  _cancelResync();
   _playDelayTimers.forEach(t => clearTimeout(t));
   _playDelayTimers.length = 0;
   setCompositeLastRaf(null);
@@ -112,7 +112,7 @@ export function syncPause() {
 }
 
 export function syncStop() {
-  clearTimeout(_resyncTimer);
+  _cancelResync();
   _playDelayTimers.forEach(t => clearTimeout(t));
   _playDelayTimers.length = 0;
   setCompositeLastRaf(null);

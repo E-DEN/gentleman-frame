@@ -443,11 +443,22 @@ export function setModalOpen(v) { _modalOpen = v; }
 export function setEffectsHidden(v) { effectsHidden = v; }
 export function setMaskHidden(v) { maskHidden = v; }
 
+// _resyncGen: キャンセルトークン。
+// _doResync は async のため await 中に pause/seek が割り込むと
+// 古いインスタンスが seeked 復帰後に vid[1] を誤操作するレースが生じる。
+// _scheduleResync / _cancelResync でインクリメントし、await 後に世代チェックして即 return する。
+let _resyncGen = 0;
 export function _scheduleResync(initialDelay = 100) {
   clearTimeout(_resyncTimer);
+  ++_resyncGen; // in-flight の _doResync を無効化
   _resyncTimer = setTimeout(_doResync, initialDelay);
 }
+export function _cancelResync() {
+  clearTimeout(_resyncTimer);
+  ++_resyncGen; // in-flight の _doResync を無効化
+}
 export async function _doResync() {
+  const _gen = ++_resyncGen; // このインスタンス固有のトークン
   if (!state.playing || _compositeSeekPending) return;
   if (!loaded[0] || !loaded[1]) return;
   if (mediaType[0] !== 'video' || mediaType[1] !== 'video') return;
@@ -468,6 +479,7 @@ export async function _doResync() {
     await new Promise(res => {
       vid[1].addEventListener('seeked', res, { once: true });
     });
+    if (_gen !== _resyncGen) return; // 別の resync/pause が割り込んだのでキャンセル
     if (state.playing && !_compositeSeekPending) {
       // シーク中に vid[0] が進んだ分の残差を playbackRate で吸収
       const postDiff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
