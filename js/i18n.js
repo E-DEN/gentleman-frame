@@ -162,6 +162,7 @@ registerLang('ja', '日本語', {
   'lang-add':'＋ 追加',
   'lang-cancel':'キャンセル',
   'lang-template-dl':'テンプレートをDL',
+  'toast-ok':'完了','toast-err':'エラー','toast-warn':'注意','toast-info':'情報','toast-loading':'処理中',
 });
 
 // \u2500\u2500 \u7d44\u307f\u8fbc\u307f: \u82f1\u8a9e \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -285,6 +286,7 @@ registerLang('en', 'English', {
   'lang-add':'+ Add',
   'lang-cancel':'Cancel',
   'lang-template-dl':'Download Template',
+  'toast-ok':'Done','toast-err':'Error','toast-warn':'Warning','toast-info':'Info','toast-loading':'Loading',
 });
 
 // \u2500\u2500 \u7d44\u307f\u8fbc\u307f: \u4e2d\u56fd\u8a9e\uff08\u7c21\u4f53\u5b57\uff09 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -403,7 +405,9 @@ registerLang('zh', '中文', {
   'lang-import-apply':'应用',
   'lang-import-err':'加载语言文件失败',
   'lang-add':'＋ 添加',
-  'lang-cancel':'取消',  'lang-template-dl':'下载模板',});
+  'lang-cancel':'取消',  'lang-template-dl':'下载模板',
+  'toast-ok':'完成','toast-err':'错误','toast-warn':'警告','toast-info':'信息','toast-loading':'处理中',
+});
 
 // --- 外部言語読み込み（JSON D&D / 貼り付け） ---
 

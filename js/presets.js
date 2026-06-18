@@ -40,6 +40,7 @@ import {
   _applyBorderAnim, _syncAnimColors,
 } from './controls.js';
 import { _setRenderPresets, applyLang } from './lang.js';
+import { showToast } from './toast.js';
 import { syncStop, _applyCompositeT } from './playback.js';
 import { loadVideoFromHandle, loadVideoFromURL } from './media.js';
 import {
@@ -571,14 +572,7 @@ function _showFileResolveDialog(slots, slotNames, startHint, preResolvedMap = ne
 
 // --- ステータスメッセージ（トースト） ---
 function _presetStatusMsg(msg, ok = true) {
-  const container = document.getElementById('gf-toast-container');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = 'gf-toast ' + (ok ? 'ok' : 'err');
-  toast.textContent = msg;
-  container.appendChild(toast);
-  const remove = () => { toast.classList.add('out'); setTimeout(() => toast.remove(), 320); };
-  setTimeout(remove, ok ? 3000 : 5000);
+  showToast(msg, ok ? 'ok' : 'err');
 }
 
 // --- renderPresets ---
