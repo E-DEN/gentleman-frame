@@ -131,7 +131,7 @@ function _mUpdateSlide(ghostMidY) {
 
   // --- ゴーストが現在どのコンテナ上にあるかを検出 ---
   // フォルダはネスト不可なので、フォルダドラッグ時はコンテナ検出をスキップ。
-  const srcIsFolder = loadPresets()[_mDragSrcIdx]?.type === 'folder';
+  const srcIsFolder = _mSrcIsFolder; // ドラッグ開始時にキャッシュ済み（毎回 localStorage を読まない）
   // 常に実際のカーソル Y（= ghost top + pointerOffset）を全ての比較に使用。
   // ghostMidY はゴーストの位置決定にのみ使う。
   // 以前は非フォルダドラッグで ghostMidY（= mouseY + H/2 - offset）を使っていたため、
@@ -290,6 +290,7 @@ function _mCalcInsertAt() {
   return _mDragSrcIdx; // fallback: 変更なし
 }
 function _mCleanup() {
+  if (_mRafId !== null) { cancelAnimationFrame(_mRafId); _mRafId = null; }
   setIsDraggingPreset(false);
   document.body.classList.remove('preset-dragging', 'dragging-folder');
   document.removeEventListener('mousemove', _mOnMouseMove);
@@ -378,7 +379,8 @@ function _mStartDrag(pending) {
   const closestFolderChildren = unit.closest('.preset-folder-children');
   _mCurContainer = closestFolderChildren ? unit.closest('.preset-folder') : null;
 
-  const srcIsFolder2 = loadPresets()[_mDragSrcIdx]?.type === 'folder';
+  _mSrcIsFolder = loadPresets()[_mDragSrcIdx]?.type === 'folder';
+  const srcIsFolder2 = _mSrcIsFolder;
   let initSibs;
   if (_mCurContainer) {
     initSibs = _mGetFolderItems(_mCurContainer);
@@ -444,8 +446,12 @@ function _mCancelPending() {
 function _mOnMouseMove(e) {
   if (!_mDraggedEl) return;
   e.preventDefault();
-  const y = e.clientY ?? e.touches?.[0]?.clientY;
-  _mUpdateSlide(y - _mPointerOffsetY + _mDraggedH / 2);
+  // 最新カーソル位置を保存し、rAF で 1 フレームに 1 回だけ _mUpdateSlide を実行。
+  // mousemove は 200+回/秒 発火するが、DOM 更新は rAF レートで十分。
+  _mLastGhostMidY = (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - _mPointerOffsetY + _mDraggedH / 2;
+  if (_mRafId === null) {
+    _mRafId = requestAnimationFrame(() => { _mRafId = null; _mUpdateSlide(_mLastGhostMidY); });
+  }
 }
 const _mOnTouchMove = e => { if (_mDraggedEl) { e.preventDefault(); _mOnMouseMove(e); } };
 function _mOnMouseUp() {
