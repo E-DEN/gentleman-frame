@@ -56,6 +56,7 @@ export const _vidBitmapPending = [false, false];  // 互換用
 const _vidFrameCvs = [document.createElement('canvas'), document.createElement('canvas')];
 const _vidFrameCtx = _vidFrameCvs.map(c => c.getContext('2d'));
 const _vidFrameReady = [false, false];
+const _vidFrameTs  = [0, 0]; // rVFC が最後にフレームを書き込んだ timestamp (ms)
 export function _startBitmapCapture(i) {
   if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
   function onFrame() {
@@ -64,7 +65,7 @@ export function _startBitmapCapture(i) {
       if (_vidFrameCvs[i].width !== w || _vidFrameCvs[i].height !== h) {
         _vidFrameCvs[i].width = w; _vidFrameCvs[i].height = h;
       }
-      try { _vidFrameCtx[i].drawImage(vid[i], 0, 0); _vidFrameReady[i] = true; } catch (_) {}
+      try { _vidFrameCtx[i].drawImage(vid[i], 0, 0); _vidFrameReady[i] = true; _vidFrameTs[i] = performance.now(); } catch (_) {}
     }
     vid[i].requestVideoFrameCallback(onFrame);
   }
@@ -75,9 +76,16 @@ export function _stopBitmapCapture(i) {
   if (_vidBitmap[i]) { _vidBitmap[i].close(); _vidBitmap[i] = null; }
 }
 
+// rVFC フレームの鮮度チェック閾値 (ms)。
+// ドラッグ中に Chrome が compositor を占有すると rVFC が停止するため、
+// 閾値を超えた場合は vid[i] への直接描画にフォールバックして凍結を防ぐ。
+const _RVFC_STALE_MS = 100;
 export function getMediaSrc(i) {
   if (mediaType[i] === 'image') return img[i];
-  return _vidFrameReady[i] ? _vidFrameCvs[i] : vid[i];
+  if (_vidFrameReady[i] && (performance.now() - _vidFrameTs[i]) < _RVFC_STALE_MS) {
+    return _vidFrameCvs[i]; // rVFC が新鮮: オフスクリーン Canvas を使用
+  }
+  return vid[i]; // rVFC が stale: 直接描画にフォールバック
 }
 
 export const loaded = [false, false];
@@ -497,13 +505,28 @@ export async function _doResync() {
     await new Promise(res => {
       vid[1].addEventListener('seeked', res, { once: true });
     });
-    if (_gen !== _resyncGen) return; // 別の resync/pause が割り込んだのでキャンセル
+    if (_gen !== _resyncGen) {
+      // 別の resync/pause が割り込んだ場合でも vid[1] を paused のまま放置しない。
+      // このまま return すると「vid[1].paused チェック → 80ms 再スケジュール」の
+      // 無限ループに陥り vid[1] が永遠に停止し続けるため、再生可能なら再開する。
+      if (state.playing && !_compositeSeekPending) vid[1].play().catch(() => {});
+      return;
+    }
     if (state.playing && !_compositeSeekPending) {
-      // シーク中に vid[0] が進んだ分の残差を playbackRate で吸収
+      // シーク中に vid[0] が進んだ分の残差を playbackRate で吸収。
+      // タイマーを比例遅延 |postDiff|/gain*1.1 にすることで
+      // 1 サイクルで必ず残差を回収し、再シークループへの突入を防ぐ。
       const postDiff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
-      vid[1].playbackRate = postDiff < -0.016 ? 1.08 : postDiff > 0.016 ? 0.94 : 1.0;
+      const absPD = Math.abs(postDiff);
+      const gain = absPD > 0.300 ? 0.50   // ×1.5 / ×0.67
+                 : absPD > 0.100 ? 0.25   // ×1.25 / ×0.80
+                 : 0.08;                   // ×1.08 / ×0.94
+      const rate  = absPD > 0.016 ? (postDiff < 0 ? 1 + gain : 1 - gain) : 1.0;
+      // delay = |postDiff| / gain * 1100ms: このサイクル内で残差を確実に 1.1 倍以上回収
+      const delay = absPD > 0.016 ? Math.min(Math.ceil(absPD / gain * 1100), 2000) : 300;
+      vid[1].playbackRate = rate;
       vid[1].play().catch(() => {});
-      _resyncTimer = setTimeout(_doResync, 300);
+      _resyncTimer = setTimeout(_doResync, delay);
     }
     return;
   } else if (Math.abs(diff) > 0.016) {
