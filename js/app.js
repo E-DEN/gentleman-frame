@@ -20,18 +20,8 @@ const fsBtn      = document.getElementById('fullscreenBtn');
 // --- リシンク ---
 document.getElementById('resyncBtn').addEventListener('click', async () => {
   await _applyCompositeT(_compositeT);
-  // 一時停止中は requestVideoFrameCallback が起動しないことがあるため、
-  // シーク完了後に createImageBitmap で _vidBitmap を強制リフレッシュしてキャンバスに即反映
-  if (!state.playing && 'createImageBitmap' in window) {
-    await Promise.all([0, 1].map(async i => {
-      if (!loaded[i] || mediaType[i] !== 'video') return;
-      try {
-        const bmp = await createImageBitmap(vid[i]);
-        if (_vidBitmap[i]) _vidBitmap[i].close();
-        _vidBitmap[i] = bmp;
-      } catch (e) {}
-    }));
-  }
+  // drawImage(video) 直接参照のため rAF ループが次フレームで自動的に最新フレームを描画する。
+  // 別途ビットマップ更新は不要。
 });
 
 // --- スクリーンショット保存 ---

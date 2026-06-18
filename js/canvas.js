@@ -47,30 +47,14 @@ export const vid = [document.createElement('video'), document.createElement('vid
 export const img = [document.createElement('img'), document.createElement('img')];
 export const mediaType = ['video', 'video']; // 'video' | 'image'
 
-// requestVideoFrameCallback で各フレームを ImageBitmap にスナップショット。
-// render ループはライブな video テクスチャではなくこの bitmap から描画する。
-// → GPU overlay demotion 時の drawImage(video) ブロッキングを回避。
-export const _vidBitmap = [null, null];
-export const _vidBitmapPending = [false, false];
-export function _startBitmapCapture(i) {
-  if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
-  function onFrame() {
-    if (!_vidBitmapPending[i]) {
-      _vidBitmapPending[i] = true;
-      createImageBitmap(vid[i]).then(bmp => {
-        if (_vidBitmap[i]) _vidBitmap[i].close();
-        _vidBitmap[i] = bmp;
-        _vidBitmapPending[i] = false;
-      }).catch(() => { _vidBitmapPending[i] = false; });
-    }
-    vid[i].requestVideoFrameCallback(onFrame);
-  }
-  vid[i].requestVideoFrameCallback(onFrame);
-}
-
+// vid[] は DOM 非追加要素のため GPU ハードウェアオーバーレイに入らず、
+// drawImage(video) 直接描画でデモーション問題は発生しない。
+// createImageBitmap 経由の非同期 GPU コピー + GC オーバーヘッドを避けるため直接参照に変更。
+export const _vidBitmap = [null, null];       // 互換用（常に null）
+export const _vidBitmapPending = [false, false]; // 互換用
+export function _startBitmapCapture(_i) { /* no-op: drawImage(video) 直接使用 */ }
 export function _stopBitmapCapture(i) {
   if (_vidBitmap[i]) { _vidBitmap[i].close(); _vidBitmap[i] = null; }
-
 }
 
 export function getMediaSrc(i) {
@@ -190,6 +174,11 @@ export function _syncMaskSliders() {
   _syncOffsetSliders();
 }
 
+// maskOffXVal / maskOffYVal は _syncOffsetSliders から頻繁に参照するためキャッシュ
+const _elOffXVal = document.getElementById('maskOffXVal');
+const _elOffYVal = document.getElementById('maskOffYVal');
+// min/max はキャンバスリサイズ時のみ変化するため前回値をキャッシュして比較
+let _offHalfW = -1, _offHalfH = -1;
 export function _syncOffsetSliders() {
   const cw = canvas.width, ch = canvas.height;
   const cx = Math.round((cw - state.mask.w) / 2);
@@ -198,10 +187,12 @@ export function _syncOffsetSliders() {
   const offY = state.mask.y - cy;
   const halfW = Math.floor(cw / 2);
   const halfH = Math.floor(ch / 2);
-  elMaskOffX.min = -halfW; elMaskOffX.max = halfW; elMaskOffX.value = offX;
-  elMaskOffY.min = -halfH; elMaskOffY.max = halfH; elMaskOffY.value = offY;
-  document.getElementById('maskOffXVal').value = offX;
-  document.getElementById('maskOffYVal').value = offY;
+  if (halfW !== _offHalfW) { elMaskOffX.min = -halfW; elMaskOffX.max = halfW; _offHalfW = halfW; }
+  if (halfH !== _offHalfH) { elMaskOffY.min = -halfH; elMaskOffY.max = halfH; _offHalfH = halfH; }
+  elMaskOffX.value = offX;
+  elMaskOffY.value = offY;
+  _elOffXVal.value = offX;
+  _elOffYVal.value = offY;
   updateSliderFill(elMaskOffX);
   updateSliderFill(elMaskOffY);
 }

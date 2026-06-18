@@ -260,7 +260,7 @@ document.addEventListener('mousemove', e => {
     if (state.followMode === 'mask') {
       state.mask.x = Math.round(p.x - state.mask.w / 2);
       state.mask.y = Math.round(p.y - state.mask.h / 2);
-      _syncOffsetSliders();
+      // _syncOffsetSliders は _renderFrame 内で rAF 毎に呼ばれるため、mousemove では省略
     }
     if (state.followMode === 'anchor' && state.fgFixed) {
       const nx = Math.max(-1920, Math.min(1920, Math.round(p.x - canvas.width  / 2)));
