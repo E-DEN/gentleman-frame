@@ -1819,6 +1819,7 @@
     #canvasWrap:-webkit-full-screen #mainCanvas {
       width: min(100vw, calc(100vh * var(--ar, 854/480))) !important;
       height: auto !important;
+      will-change: transform;  /* Chrome ネイティブ UI 合成時のレイヤー再計算を防ぐ */
     }
     /* 原寸ボタン: 通常時非表示、フルスクリーン時のみ表示 */
     #actualSizeBtn { display: none; }
@@ -1835,6 +1836,7 @@
       opacity: 1;
       transition: opacity 0.15s ease;
       border-radius: 0;
+      will-change: opacity;  /* compositor スレッドで opacity アニメを完結させる */
     }
     #canvasWrap:fullscreen .tbtn,
     #canvasWrap:fullscreen .progress-track,
