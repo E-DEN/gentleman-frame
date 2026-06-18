@@ -47,19 +47,37 @@ export const vid = [document.createElement('video'), document.createElement('vid
 export const img = [document.createElement('img'), document.createElement('img')];
 export const mediaType = ['video', 'video']; // 'video' | 'image'
 
-// vid[] は DOM 非追加要素のため GPU ハードウェアオーバーレイに入らず、
-// drawImage(video) 直接描画でデモーション問題は発生しない。
-// createImageBitmap 経由の非同期 GPU コピー + GC オーバーヘッドを避けるため直接参照に変更。
-export const _vidBitmap = [null, null];       // 互換用（常に null）
-export const _vidBitmapPending = [false, false]; // 互換用
-export function _startBitmapCapture(_i) { /* no-op: drawImage(video) 直接使用 */ }
+// requestVideoFrameCallback でフレーム到着タイミングに drawImage(video) → オフスクリーン Canvas。
+// rAF はその Canvas から描画することで GPU 同期コストを rAF の外側に移動させる。
+// - createImageBitmap と違い非同期 Promise / GC オーバーヘッドなし
+// - drawImage(video) 直接描画と違い rAF がブロックされない
+export const _vidBitmap = [null, null];          // 互換用（常に null）
+export const _vidBitmapPending = [false, false];  // 互換用
+const _vidFrameCvs = [document.createElement('canvas'), document.createElement('canvas')];
+const _vidFrameCtx = _vidFrameCvs.map(c => c.getContext('2d'));
+const _vidFrameReady = [false, false];
+export function _startBitmapCapture(i) {
+  if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
+  function onFrame() {
+    const w = vid[i].videoWidth, h = vid[i].videoHeight;
+    if (w && h) {
+      if (_vidFrameCvs[i].width !== w || _vidFrameCvs[i].height !== h) {
+        _vidFrameCvs[i].width = w; _vidFrameCvs[i].height = h;
+      }
+      try { _vidFrameCtx[i].drawImage(vid[i], 0, 0); _vidFrameReady[i] = true; } catch (_) {}
+    }
+    vid[i].requestVideoFrameCallback(onFrame);
+  }
+  vid[i].requestVideoFrameCallback(onFrame);
+}
 export function _stopBitmapCapture(i) {
+  _vidFrameReady[i] = false;
   if (_vidBitmap[i]) { _vidBitmap[i].close(); _vidBitmap[i] = null; }
 }
 
 export function getMediaSrc(i) {
   if (mediaType[i] === 'image') return img[i];
-  return (_vidBitmap[i]) ? _vidBitmap[i] : vid[i];
+  return _vidFrameReady[i] ? _vidFrameCvs[i] : vid[i];
 }
 
 export const loaded = [false, false];
