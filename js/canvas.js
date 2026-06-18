@@ -67,7 +67,6 @@ export function _startBitmapCapture(i) {
       }
       try { _vidFrameCtx[i].drawImage(vid[i], 0, 0); _vidFrameReady[i] = true; _vidFrameTs[i] = performance.now(); } catch (_) {}
     }
-    if (i === 0) _rvcSyncCheck(); // vid[0] フレームごとに P コントローラで同期補正
     vid[i].requestVideoFrameCallback(onFrame);
   }
   vid[i].requestVideoFrameCallback(onFrame);
@@ -75,32 +74,6 @@ export function _startBitmapCapture(i) {
 export function _stopBitmapCapture(i) {
   _vidFrameReady[i] = false;
   if (_vidBitmap[i]) { _vidBitmap[i].close(); _vidBitmap[i] = null; }
-}
-
-// rVFC P コントローラ: _doResync がシークで 80ms 以内に収めた後、
-// vid[0] のフレームコールバック(~16ms)のたびに diff を計測して playbackRate を微調整。
-// seek 不要・pause 不要で < 1 フレーム精度を維持する。
-let _rvcSyncEnabled = false;
-function _rvcSyncCheck() {
-  if (!_rvcSyncEnabled) return;
-  if (!state.playing || _compositeSeekPending) return;
-  if (!loaded[0] || !loaded[1]) return;
-  if (mediaType[0] !== 'video' || mediaType[1] !== 'video') return;
-  if (vid[0].paused || vid[1].paused) return;
-  const [o1, o2] = _getOffsets();
-  const diff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
-  if (Math.abs(diff) > 0.150) {
-    // P コントローラ範囲外 → _doResync (シーク) に委ねる
-    _rvcSyncEnabled = false;
-    _scheduleResync(0);
-    return;
-  }
-  // P コントローラ: rate = 1.0 - kP * diff
-  // diff > 0 (vid[1] 進みすぎ) → rate < 1.0 で減速
-  // diff < 0 (vid[1] 遅れ)    → rate > 1.0 で加速
-  // kP=2.0: 50ms ズレ → rate=0.90x (10% ピッチ変化) → 約 2s で < 1ms に収束
-  const kP = 2.0;
-  vid[1].playbackRate = Math.max(0.7, Math.min(1.3, 1.0 - kP * diff));
 }
 
 // rVFC フレームの鮮度チェック閾値 (ms)。
@@ -502,15 +475,13 @@ export function setMaskHidden(v) { maskHidden = v; }
 // _scheduleResync / _cancelResync でインクリメントし、await 後に世代チェックして即 return する。
 let _resyncGen = 0;
 export function _scheduleResync(initialDelay = 100) {
-  _rvcSyncEnabled = false; // P コントローラを停止してシークフェーズへ
   clearTimeout(_resyncTimer);
-  ++_resyncGen;
+  ++_resyncGen; // in-flight の _doResync を無効化
   _resyncTimer = setTimeout(_doResync, initialDelay);
 }
 export function _cancelResync() {
-  _rvcSyncEnabled = false;
   clearTimeout(_resyncTimer);
-  ++_resyncGen;
+  ++_resyncGen; // in-flight の _doResync を無効化
 }
 export async function _doResync() {
   const _gen = ++_resyncGen; // このインスタンス固有のトークン
@@ -558,14 +529,18 @@ export async function _doResync() {
       _resyncTimer = setTimeout(_doResync, delay);
     }
     return;
+  } else if (Math.abs(diff) > 0.016) {
+    // 中ズレ(1フレーム超): playbackRate で滑らかに追いつかせる
+    // vid[1] が遅れている(diff<0) → 少し速く。進みすぎ(diff>0) → 少し遅く。
+    const rate = diff < 0 ? 1.08 : 0.94;
+    vid[1].playbackRate = rate;
+    _resyncTimer = setTimeout(_doResync, 300);
+    return;
   } else {
-    // diff < 80ms: rVFC P コントローラに引き継ぎ。
-    // 毎フレーム(~16ms)補正で seek せずに < 1 フレーム精度を維持。
+    // 1フレーム以内: 速度を戻す
     vid[1].playbackRate = 1.0;
-    _rvcSyncEnabled = true;
-    // rVFC が止まった場合の安全網 (3s 後に再確認)
-    _resyncTimer = setTimeout(_doResync, 3000);
   }
+  _resyncTimer = setTimeout(_doResync, 1500);
 }
 
 // バックグラウンド復帰時に即座再同期（動画が進んでいる場合のみ。復帰後のズレが大きいことがあるため）
