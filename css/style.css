@@ -97,6 +97,7 @@
       position: relative;
       line-height: 0;
       width: 100%;
+      overflow: hidden;
     }
     #mainCanvas {
       display: block;
