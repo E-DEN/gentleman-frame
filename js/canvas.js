@@ -484,63 +484,64 @@ export function _cancelResync() {
   ++_resyncGen; // in-flight の _doResync を無効化
 }
 export async function _doResync() {
-  const _gen = ++_resyncGen; // このインスタンス固有のトークン
+  const _gen = ++_resyncGen;
   if (!state.playing || _compositeSeekPending) return;
   if (!loaded[0] || !loaded[1]) return;
   if (mediaType[0] !== 'video' || mediaType[1] !== 'video') return;
-  // play() 呼び出し直後はまだ paused のままのことがある → リスケジュールして待つ
+  // play() 直後はまだ paused のことがある → リスケジュール
   if (vid[0].paused || vid[1].paused) {
     _resyncTimer = setTimeout(_doResync, 80);
     return;
   }
+
   const [o1, o2] = _getOffsets();
-  const t0 = vid[0].currentTime - o1;
-  const diff = vid[1].currentTime - (t0 + o2); // 正=vid[1]が進みすぎ、負=遅れ
-  if (Math.abs(diff) > 0.080) {
-    // 80ms超のズレ: vid[0] は継続再生させ、vid[1] だけをシークして補正
-    // play() 直後の起動ズレ(30〜100ms)も含めて即スナップ
-    vid[1].playbackRate = 1.0;
-    vid[1].pause();
-    vid[1].currentTime = Math.max(0, Math.min(vid[1].duration || 0, vid[0].currentTime - o1 + o2));
-    await new Promise(res => {
-      vid[1].addEventListener('seeked', res, { once: true });
-    });
-    if (_gen !== _resyncGen) {
-      // 別の resync/pause が割り込んだ場合でも vid[1] を paused のまま放置しない。
-      // このまま return すると「vid[1].paused チェック → 80ms 再スケジュール」の
-      // 無限ループに陥り vid[1] が永遠に停止し続けるため、再生可能なら再開する。
-      if (state.playing && !_compositeSeekPending) vid[1].play().catch(() => {});
-      return;
-    }
-    if (state.playing && !_compositeSeekPending) {
-      // シーク中に vid[0] が進んだ分の残差を playbackRate で吸収。
-      // タイマーを比例遅延 |postDiff|/gain*1.1 にすることで
-      // 1 サイクルで必ず残差を回収し、再シークループへの突入を防ぐ。
-      const postDiff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
-      const absPD = Math.abs(postDiff);
-      const gain = absPD > 0.300 ? 0.50   // ×1.5 / ×0.67
-                 : absPD > 0.100 ? 0.25   // ×1.25 / ×0.80
-                 : 0.08;                   // ×1.08 / ×0.94
-      const rate  = absPD > 0.016 ? (postDiff < 0 ? 1 + gain : 1 - gain) : 1.0;
-      // delay = |postDiff| / gain * 1100ms: このサイクル内で残差を確実に 1.1 倍以上回収
-      const delay = absPD > 0.016 ? Math.min(Math.ceil(absPD / gain * 1100), 2000) : 300;
-      vid[1].playbackRate = rate;
-      vid[1].play().catch(() => {});
-      _resyncTimer = setTimeout(_doResync, delay);
-    }
+  const diff = vid[1].currentTime - (vid[0].currentTime - o1 + o2);
+
+  if (Math.abs(diff) <= 0.030) {
+    // 30ms 以内は許容範囲。playbackRate が残っていた場合に備えてリセット
+    [0, 1].forEach(i => { vid[i].playbackRate = 1.0; });
+    _resyncTimer = setTimeout(_doResync, 1500);
     return;
-  } else if (Math.abs(diff) > 0.016) {
-    // 中ズレ(1フレーム超): playbackRate で滑らかに追いつかせる
-    // vid[1] が遅れている(diff<0) → 少し速く。進みすぎ(diff>0) → 少し遅く。
-    const rate = diff < 0 ? 1.08 : 0.94;
-    vid[1].playbackRate = rate;
-    _resyncTimer = setTimeout(_doResync, 300);
-    return;
-  } else {
-    // 1フレーム以内: 速度を戻す
-    vid[1].playbackRate = 1.0;
   }
-  _resyncTimer = setTimeout(_doResync, 1500);
+
+  // 30ms 超: 手動リシンクと同じ方式（両動画ポーズ → 両シーク → 同時再生）
+  // playbackRate 補正は音声フェイザー・視覚スタッターの原因になるため使用しない。
+  // シーク後 300ms で残差を再チェックし、2〜3 回のシークで < 30ms に収束させる。
+  _playDelayTimers.forEach(t => clearTimeout(t));
+  _playDelayTimers.length = 0;
+  setCompositeLastRaf(null);
+  setCompositeSeekPending(true);
+  vid[0].pause();
+  vid[1].pause();
+  const T = _compositeT;
+  await Promise.all([0, 1].map(i => {
+    const o = i === 0 ? o1 : o2;
+    const vt = Math.max(0, Math.min(vid[i].duration || 0, T + o));
+    if (Math.abs(vid[i].currentTime - vt) < 0.003) return Promise.resolve();
+    return new Promise(res => {
+      // seeked が来ない場合に永久ハングするのを防ぐ安全タイムアウト
+      const t = setTimeout(res, 1000);
+      vid[i].addEventListener('seeked', () => { clearTimeout(t); res(); }, { once: true });
+      vid[i].currentTime = vt;
+    });
+  }));
+  if (_gen !== _resyncGen) {
+    setCompositeSeekPending(false);
+    if (state.playing) { vid[0].play().catch(() => {}); vid[1].play().catch(() => {}); }
+    return;
+  }
+  setCompositeSeekPending(false);
+  if (!state.playing) return;
+  [0, 1].forEach(i => { vid[i].playbackRate = 1.0; });
+  [o1, o2].forEach((o, i) => {
+    if (T + o < 0) {
+      _playDelayTimers.push(setTimeout(() => { if (state.playing) vid[i].play().catch(() => {}); }, -(T + o) * 1000));
+    } else {
+      vid[i].play().catch(() => {});
+    }
+  });
+  // 300ms 後に残差チェック（複数回収束用）
+  _resyncTimer = setTimeout(_doResync, 300);
 }
 
 // バックグラウンド復帰時に即座再同期（動画が進んでいる場合のみ。復帰後のズレが大きいことがあるため）
