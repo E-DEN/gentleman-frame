@@ -18,6 +18,11 @@ import { resetHintState, _startRainOverlay, elFilterRain } from './render.js';
 
 // --- ファイル読み込み ---
 
+// スロット単位のロードキャンセレーショントークン（0=vid0, 1=vid1）
+// loadVideoFromURL / loadVideo 開始時にインクリメントし、
+// 非同期ハンドラ内でチェックすることで古いロードの副作用を防ぐ
+const _loadSlotGen = [0, 0];
+
 // setCanvasAspectRatio のラッパー。
 // rainOverlay（WebGL）は _syncAllBuffers の対象外のため、
 // 解像度変更後に雨が有効なら再起動してサイズを同期する。
@@ -51,6 +56,7 @@ export async function resolveIwaraURL(pageUrl) {
 
 export async function loadVideoFromURL(index, url) {
   if (!url) return;
+  const _gen = ++_loadSlotGen[index]; // このスロットのロードを一意に識別
   const input    = document.getElementById(`urlInput${index}`);
   const btn      = document.getElementById(`urlLoadBtn${index}`);
   const zone = document.getElementById(`drop${index}`);
@@ -160,6 +166,7 @@ export async function loadVideoFromURL(index, url) {
       const result = await resolveIwaraURL(url);
       if (!result) throw new Error(t('url-resolve-fail'));
       setStatus('CDN URLを取得中...');
+      if (_loadSlotGen[index] !== _gen) { setStatus(''); _restoreBtn(); return; } // 別ロードに差し替えられた
       resolvedUrl = result.url;
       const author = result.author || '';
       name = result.name || result.title || name;
@@ -183,6 +190,7 @@ export async function loadVideoFromURL(index, url) {
     vid[index].src = `${_MY_PROXY}/?url=${encodeURIComponent(resolvedUrl)}`;
     vid[index].load();
     vid[index].onloadedmetadata = () => {
+      if (_loadSlotGen[index] !== _gen) return; // このスロットは別ロードに差し替え済み
       setStatus('');
       loaded[index] = true;
       _stopBitmapCapture(index);
@@ -206,6 +214,7 @@ export async function loadVideoFromURL(index, url) {
       }, 1800);
     };
     vid[index].onerror = () => {
+      if (_loadSlotGen[index] !== _gen) return; // このスロットは別ロードに差し替え済み
       setStatus('');
       zone.classList.remove('loading');
       _setDropSpinner(index, false);
@@ -216,6 +225,7 @@ export async function loadVideoFromURL(index, url) {
     };
     input.style.borderColor = '';
   } catch (e) {
+    if (_loadSlotGen[index] !== _gen) return; // 別ロードが開始済みなのでエラー処理も不要
     setStatus('');
     zone.classList.remove('loading');
     _setDropSpinner(index, false);
@@ -223,7 +233,7 @@ export async function loadVideoFromURL(index, url) {
     const errEl = document.getElementById(`urlErr${index}`);
     if (errEl) errEl.textContent = e.message;
   } finally {
-    if (!_pendingLoad) _restoreBtn();
+    if (!_pendingLoad && _loadSlotGen[index] === _gen) _restoreBtn();
   }
 }
 
@@ -235,6 +245,7 @@ export async function loadVideoFromURL(index, url) {
 });
 
 export function loadVideo(index, file, handle = null) {
+  const _gen = ++_loadSlotGen[index]; // 前の loadVideoFromURL の onloadedmetadata/onerror を無効化
   if (img[index].src?.startsWith('blob:')) { URL.revokeObjectURL(img[index].src); img[index].removeAttribute('src'); }
   mediaType[index] = 'video';
   updateMediaControls(index);
@@ -260,6 +271,7 @@ export function loadVideo(index, file, handle = null) {
   vid[index].src = url;
   vid[index].load();
   vid[index].onloadedmetadata = () => {
+    if (_loadSlotGen[index] !== _gen) return; // このスロットは別ロードに差し替え済み
     loaded[index] = true;
     _stopBitmapCapture(index);
     _startBitmapCapture(index);
@@ -279,7 +291,7 @@ export function loadVideo(index, file, handle = null) {
     const label = zone.querySelector(`.drop-label${index}`);
     if (label) label.textContent = file.name;
   };
-  vid[index].onerror = () => { zone.classList.remove('loading'); _setDropSpinner(index, false); };
+  vid[index].onerror = () => { if (_loadSlotGen[index] !== _gen) return; zone.classList.remove('loading'); _setDropSpinner(index, false); };
 }
 
 export function loadImage(index, file, handle = null) {
