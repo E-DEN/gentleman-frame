@@ -654,10 +654,9 @@ export function updateProgress() {
                : (loaded[1] && mediaType[1] === 'video' && vid[1].duration) ? vid[1].duration : 0;
   if (!refDur) return;
   const pct = Math.min(1, Math.max(0, _compositeT / refDur));
-  // width/left (layout プロパティ) の代わりに transform を使い、毎フレームの layout 発生を防ぐ。
-  // .progress-track に contain: layout があるため thumb の left 変更も外部に伝播しない。
+  // width/left (layout プロパティ) の代わりに transform/translate を使い、毎フレームの layout を回避する。
   elProgressFill.style.transform = `scaleX(${pct})`;
-  elProgressThumb.style.left = `${pct * 100}%`;
+  elProgressThumb.style.translate = `${pct * 100}% 0`;
   const useHours = refDur >= 3600;
   elTimeLabel.textContent = `${fmtTime(Math.min(_compositeT, refDur), useHours)} / ${fmtTime(refDur, useHours)}`;
 }

@@ -19,6 +19,7 @@ import { syncPlay, syncPause } from './playback.js';
 // getBoundingClientRect() は CSS :hover 状態変化や classList 変更が pending なときに呼ぶと
 // 強制レイアウトフラッシュになるため、mousemove から切り離す。
 let _canvasRectCache = null;
+let _canvasScaleX = 1, _canvasScaleY = 1; // Pointer Lock中の movementX/Y 変換用スケール
 export function invalidateCanvasRect() { _canvasRectCache = null; }
 window.addEventListener('resize', invalidateCanvasRect);
 document.addEventListener('fullscreenchange', invalidateCanvasRect);
@@ -28,6 +29,8 @@ export function canvasCoords(e) {
   const r  = _canvasRectCache;
   const sx = canvas.width  / r.width;
   const sy = canvas.height / r.height;
+  _canvasScaleX = sx; // Pointer Lock 中の movementX/Y 変換用に最新値を保存
+  _canvasScaleY = sy;
   const src = (e.touches && e.touches[0]) ? e.touches[0] : e;
   return {
     x: (src.clientX - r.left) * sx,
@@ -196,16 +199,46 @@ canvas.addEventListener('click', () => {
 
 // --- マスク追従モード (右クリック) ---
 export function _setFollowMode(mode) {
+  const prevMode = state.followMode;
   state.followMode = mode;
   canvasWrap.classList.toggle('mask-follow', mode !== 'none');
   if (mode === 'anchor' && !state.zoomLock) {
     state.zoomLock = true;
     _updateZoomLockBtn();
   }
+  // 追従モード終了時にスライダーを一度だけ同期（毎フレーム同期を避けるため）
+  if (prevMode === 'mask' && mode === 'none') {
+    _syncOffsetSliders();
+  }
+  // Pointer Lock: フルスクリーン中の mask モードで要求（Chrome Native UI 表示防止）
+  if (mode === 'mask' && document.fullscreenElement) {
+    canvas.requestPointerLock().catch(() => {});
+  } else if (prevMode === 'mask' && document.pointerLockElement) {
+    document.exitPointerLock();
+  }
 }
 
+// Pointer Lock が Esc 等で意図せず解除された場合は追従モードを OFF にする
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && state.followMode === 'mask') {
+    _setFollowMode('none');
+  }
+});
+
 canvas.addEventListener('contextmenu', e => {
+  e.preventDefault(); // OS コンテキストメニューを抑制するのみ
+});
+
+// 追従モードの ON/OFF は mousedown(button=2) で処理する。
+// contextmenu イベントは Pointer Lock 中に Chrome が抑制するため使わない。
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 2) return;
   e.preventDefault();
+  // Pointer Lock 中: 座標不定のため即解除
+  if (document.pointerLockElement === canvas) {
+    _setFollowMode('none');
+    return;
+  }
   const p = canvasCoords(e);
   state.followTargetX = p.x;
   state.followTargetY = p.y;
@@ -264,6 +297,14 @@ canvas.addEventListener('mouseleave', () => { state.maskHovered = false; state.a
 
 document.addEventListener('mousemove', e => {
   if (_modalOpen) return;
+
+  // Pointer Lock 中（フルスクリーン mask 追従モード）: movementX/Y でカーソル座標を画面外に出さず経緡
+  if (document.pointerLockElement === canvas) {
+    state.followTargetX = Math.max(0, Math.min(canvas.width,  state.followTargetX + e.movementX * _canvasScaleX));
+    state.followTargetY = Math.max(0, Math.min(canvas.height, state.followTargetY + e.movementY * _canvasScaleY));
+    return;
+  }
+
   if (document.fullscreenElement && e.clientY < 100) return; // Chrome native UI ゾーン — getBoundingClientRect を呼ばない
   const p = canvasCoords(e);
   if (state.followMode !== 'none') {

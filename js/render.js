@@ -155,7 +155,7 @@ export function _renderFrame() {
     const cy = state.followTargetY - state.mask.h / 2;
     state.mask.x = Math.round(state.mask.x + (cx - state.mask.x) * lerpK);
     state.mask.y = Math.round(state.mask.y + (cy - state.mask.y) * lerpK);
-    _syncOffsetSliders();
+    // _syncOffsetSliders は追従モード終了時に _setFollowMode から呼ぶ（毎フレームのDOM更新を避ける）
   } else if (state.drag.active && state.drag.mode === 'move') {
     // drag 中も rAF 毎にスライダーを同期（mousemove 毎の DOM 更新を避けるため）
     _syncOffsetSliders();
