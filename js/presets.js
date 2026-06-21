@@ -48,6 +48,10 @@ import {
   _startRainOverlay, _stopRainOverlay,
 } from './render.js';
 
+// --- プリセットロードキャンセレーション ---
+// 別プリセットを選択したとき進行中のロードを無効化するためのトークン
+let _presetLoadGen = 0;
+
 // --- プリセット CRUD ---
 export function loadPresets() { return JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); }
 export function savePresets(list) { localStorage.setItem(PRESET_KEY, JSON.stringify(list)); }
@@ -727,6 +731,7 @@ export function renderPresets() {
       const idx = +info.dataset.idx;
       const p = loadPresets()[idx];
       if (!p || p.type === 'folder') return;
+      const _gen = ++_presetLoadGen; // 新しいロード開始: 旧ロードを無効化
       syncStop();
       applySettings(p.data);
       setActivePresetIdx(idx);
@@ -746,6 +751,7 @@ export function renderPresets() {
         _IDB.get('gf_folder_hint').catch(() => null),
         _IDB.get('gf_folder_handle').catch(() => null),
       ]);
+      if (_presetLoadGen !== _gen) return; // 別プリセットが選択されたためキャンセル
       const _slotsLocal    = [0, 1].filter(si => !p.data[`vid${si}Url`] && !!p.data[`vid${si}Name`]);
       const _slotsNeedPick = _slotsLocal.filter(si => !_idbHandles[si]);
       const _prePickedHandles = new Map();
@@ -767,6 +773,7 @@ export function renderPresets() {
       for (const si of _slotsLocal) {
         if (_idbHandles[si]) {
           const ok = await loadVideoFromHandle(si, _idbHandles[si]);
+          if (_presetLoadGen !== _gen) return;
           _preLoadOk.set(si, ok);
           if (ok && si === 1) vid1HasSource = true;
         }
@@ -783,6 +790,7 @@ export function renderPresets() {
           }
         }
         const _resolvedMap = await _showFileResolveDialog(_slotsLocal, _slotNames, _startHint, _preResolved);
+        if (_presetLoadGen !== _gen) return;
         if (_resolvedMap) {
           for (const [si, { fh }] of _resolvedMap) _prePickedHandles.set(si, fh);
           const _list2 = loadPresets();
@@ -815,6 +823,7 @@ export function renderPresets() {
           if (loaded_ok && _mkey) _resolvedFiles.add(_mkey);
         } else if (handle) {
           loaded_ok = await loadVideoFromHandle(i, handle);
+          if (_presetLoadGen !== _gen) return;
           if (loaded_ok && _mkey) _resolvedFiles.add(_mkey);
         }
         if (!loaded_ok) {
@@ -827,6 +836,7 @@ export function renderPresets() {
             const urlInput = document.getElementById(`urlInput${i}`);
             if (urlInput) urlInput.value = savedUrl;
             await loadVideoFromURL(i, savedUrl);
+            if (_presetLoadGen !== _gen) return;
             const resolved = _loadedFileName[i];
             if (resolved && resolved !== p.data[`vid${i}Name`]) {
               const list2 = loadPresets();
@@ -843,9 +853,11 @@ export function renderPresets() {
               }
               if (p.data.presetId) {
                 await _IDB.set(`preset_${p.data.presetId}_${i}`, newHandle).catch(() => {});
+                if (_presetLoadGen !== _gen) return;
                 if (_mkey) _missingFiles.delete(_mkey);
               }
               loaded_ok = await loadVideoFromHandle(i, newHandle);
+              if (_presetLoadGen !== _gen) return;
               if (loaded_ok) { needsRender = true; if (_mkey) { _resolvedFiles.add(_mkey); _pendingFiles.delete(_mkey); } }
             } else if (!window.showOpenFilePicker) {
               if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
