@@ -23,6 +23,8 @@ let _canvasScaleX = 1, _canvasScaleY = 1; // Pointer Lock中の movementX/Y 変�
 export function invalidateCanvasRect() { _canvasRectCache = null; }
 window.addEventListener('resize', invalidateCanvasRect);
 document.addEventListener('fullscreenchange', invalidateCanvasRect);
+// canvas のサイズ変化（動画ロード後のアスペクト比変更等）でもキャッシュを破棄する
+new ResizeObserver(invalidateCanvasRect).observe(canvas);
 
 export function canvasCoords(e) {
   if (!_canvasRectCache) _canvasRectCache = canvas.getBoundingClientRect();
@@ -298,14 +300,16 @@ canvas.addEventListener('mouseleave', () => { state.maskHovered = false; state.a
 document.addEventListener('mousemove', e => {
   if (_modalOpen) return;
 
-  // Pointer Lock 中（フルスクリーン mask 追従モード）: movementX/Y でカーソル座標を画面外に出さず経緡
+  // Pointer Lock 中（フルスクリーン mask 追従モード）: movementX/Y で仮想カーソル座標を蓄積
   if (document.pointerLockElement === canvas) {
-    state.followTargetX = Math.max(0, Math.min(canvas.width,  state.followTargetX + e.movementX * _canvasScaleX));
-    state.followTargetY = Math.max(0, Math.min(canvas.height, state.followTargetY + e.movementY * _canvasScaleY));
+    state.followTargetX += e.movementX * _canvasScaleX;
+    state.followTargetY += e.movementY * _canvasScaleY;
     return;
   }
 
-  if (document.fullscreenElement && e.clientY < 100) return; // Chrome native UI ゾーン — getBoundingClientRect を呼ばない
+  // フルスクリーン上端100px ゾーン: ドラッグ中・追従中はスキップしない（枠を上端まで移動できるようにする）
+  // ホバーのみの場合は getBoundingClientRect を呼ばないようにスキップ
+  if (document.fullscreenElement && e.clientY < 100 && !state.drag.active && state.followMode === 'none') return;
   const p = canvasCoords(e);
   if (state.followMode !== 'none') {
     state.followTargetX = p.x;

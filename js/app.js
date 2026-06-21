@@ -80,6 +80,7 @@ document.getElementById('screenshotBtn').addEventListener('click', () => {
 function setTheater(enable) {
   appBody.classList.toggle('theater', enable);
   panel.classList.toggle('collapsed', enable);
+  invalidateCanvasRect(); // パネル開閉でcanvasの表示位置が変わるためキャッシュを破棄
   theaterBtn.innerHTML = enable
     ? '<i data-lucide="panel-right-open"></i>'
     : '<i data-lucide="panel-right-close"></i>';
