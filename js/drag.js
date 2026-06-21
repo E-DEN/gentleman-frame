@@ -196,6 +196,7 @@ canvas.addEventListener('mousedown', e => {
 });
 canvas.addEventListener('click', () => {
   if (_canvasClickMoved) return;
+  if (state.followMode !== 'none') return; // 追従モード中は再生/停止しない
   if (state.playing) syncPause(); else syncPlay();
 });
 
