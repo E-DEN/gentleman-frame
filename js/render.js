@@ -156,6 +156,9 @@ export function _renderFrame() {
     state.mask.x = Math.round(state.mask.x + (cx - state.mask.x) * lerpK);
     state.mask.y = Math.round(state.mask.y + (cy - state.mask.y) * lerpK);
     _syncOffsetSliders();
+  } else if (state.drag.active && state.drag.mode === 'move') {
+    // drag 中も rAF 毎にスライダーを同期（mousemove 毎の DOM 更新を避けるため）
+    _syncOffsetSliders();
   }
 
   // アンカー描画位置を lerp で補間（ドラッグ中も滑らかに追従）
@@ -1392,6 +1395,8 @@ let _shutterMorphT = 0;    // モーフ状態 (0=丸, 1=角丸四角)
 let _shutterMorphLast = 0; // 前回の nowMs
 let _glassSamplerCvs  = null; // 背景サンプリングキャッシュ（シャッター）
 let _glassSamplerCtx  = null;
+let _glassBlurCvs     = null; // blur済みキャッシュ（DOM外 → overlayCtxへのfilter設定を避ける）
+let _glassBlurCtx     = null;
 
 export function _drawGlassesFrame(ctx, m, bufScale, overrideColor = null) {
   const bw = parseFloat(elBorderW.value);
@@ -1679,14 +1684,23 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
         }
         // GPU間コピー（CPU readbackなし）
         _glassSamplerCtx.drawImage(ctx.canvas, safeGx, safeGy, safeW, safeH, 0, 0, safeW, safeH);
+        // blur を DOM外Canvas で適用（overlayCtxへのfilter設定が強制スタイル再計算を引き起こすため）
+        if (!_glassBlurCvs || _glassBlurCvs.width !== safeW || _glassBlurCvs.height !== safeH) {
+          _glassBlurCvs = document.createElement('canvas');
+          _glassBlurCvs.width  = safeW;
+          _glassBlurCvs.height = safeH;
+          _glassBlurCtx = _glassBlurCvs.getContext('2d');
+        }
+        const blurPx = Math.max(4, Math.round(glassR * 0.45));
+        _glassBlurCtx.clearRect(0, 0, safeW, safeH);
+        _glassBlurCtx.filter = `blur(${blurPx}px)`;
+        _glassBlurCtx.drawImage(_glassSamplerCvs, 0, 0);
+        _glassBlurCtx.filter = 'none';
         ctx.save();
         ctx.beginPath();
         ctx.arc(sbCx, sbCy, glassR, 0, Math.PI * 2);
         ctx.clip();
-        const blurPx = Math.max(4, Math.round(glassR * 0.45));
-        ctx.filter = `blur(${blurPx}px)`;
-        ctx.drawImage(_glassSamplerCvs, safeGx, safeGy);
-        ctx.filter = 'none';
+        ctx.drawImage(_glassBlurCvs, safeGx, safeGy);
         // 薄白膜（曇り感）
         ctx.fillStyle = 'rgba(255,255,255,0.10)';
         ctx.fill();

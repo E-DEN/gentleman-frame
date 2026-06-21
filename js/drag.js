@@ -301,7 +301,7 @@ document.addEventListener('mousemove', e => {
   } else if (state.drag.mode === 'move') {
     state.mask.x = Math.round(p.x - state.drag.ox);
     state.mask.y = Math.round(p.y - state.drag.oy);
-    _syncOffsetSliders();
+    // _syncOffsetSliders は _renderFrame 内で rAF 毎に呼ばれるため、mousemove では省略
   } else {
     applyResize(state.drag.mode, p.x - state.drag.sp.x, p.y - state.drag.sp.y, e.shiftKey);
   }
