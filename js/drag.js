@@ -13,8 +13,19 @@ import { buildMaskPath } from './render.js';
 import { syncPlay, syncPause } from './playback.js';
 
 // --- マスクドラッグ + リサイズ（マウス + タッチ） ---
+
+// canvas.getBoundingClientRect() のキャッシュ
+// resize / fullscreenchange / 原寸切替 で無効化し、それ以外の mousemove では再取得しない。
+// getBoundingClientRect() は CSS :hover 状態変化や classList 変更が pending なときに呼ぶと
+// 強制レイアウトフラッシュになるため、mousemove から切り離す。
+let _canvasRectCache = null;
+export function invalidateCanvasRect() { _canvasRectCache = null; }
+window.addEventListener('resize', invalidateCanvasRect);
+document.addEventListener('fullscreenchange', invalidateCanvasRect);
+
 export function canvasCoords(e) {
-  const r  = canvas.getBoundingClientRect();
+  if (!_canvasRectCache) _canvasRectCache = canvas.getBoundingClientRect();
+  const r  = _canvasRectCache;
   const sx = canvas.width  / r.width;
   const sy = canvas.height / r.height;
   const src = (e.touches && e.touches[0]) ? e.touches[0] : e;
@@ -253,6 +264,7 @@ canvas.addEventListener('mouseleave', () => { state.maskHovered = false; state.a
 
 document.addEventListener('mousemove', e => {
   if (_modalOpen) return;
+  if (document.fullscreenElement && e.clientY < 100) return; // Chrome native UI ゾーン — getBoundingClientRect を呼ばない
   const p = canvasCoords(e);
   if (state.followMode !== 'none') {
     state.followTargetX = p.x;
@@ -279,7 +291,8 @@ document.addEventListener('mousemove', e => {
     const inAnchor = hitTestAnchor(p.x, p.y);
     state.maskHovered = !!(hh || inMask);
     state.anchorHovered = !!inAnchor;
-    canvas.style.cursor = inAnchor ? 'grab' : (hh ? hh.cur : (inMask ? 'grab' : 'default'));
+    const _cur = inAnchor ? 'grab' : (hh ? hh.cur : (inMask ? 'grab' : 'default'));
+    if (canvas.style.cursor !== _cur) canvas.style.cursor = _cur;
     return;
   }
   _canvasClickMoved = true;

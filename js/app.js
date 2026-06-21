@@ -4,6 +4,7 @@ import { canvas, loaded, mediaType, vid, _vidBitmap, _compositeT,
          overlayCanvas, effectsHidden,
          elFilterBrightness, elFilterContrast, elFilterSaturation, elFilterHue, elFilterBars } from './canvas.js';
 import { _applyCompositeT } from './playback.js';
+import { invalidateCanvasRect } from './drag.js';
 // 以下のモジュールはインポート時にトップレベル初期化コードを実行する
 import { rainOverlay } from './render.js';
 import './controls.js';
@@ -112,6 +113,7 @@ function setActualSize(enable) {
     }
     canvasWrap.classList.toggle('actual-size', enable);
   }
+  invalidateCanvasRect(); // mainCanvas の表示サイズが変わるためキャッシュを破棄
   actualSizeBtn.innerHTML = enable
     ? '<i data-lucide="scan-search"></i>'
     : '<i data-lucide="scan"></i>';
@@ -153,9 +155,16 @@ function _setFsIdle(idle) {
   _fsIsIdle = idle;
   _fsWrap.classList.toggle('fs-idle', idle);
 }
+let _fsResetRafId = null;
 function _resetFsIdle() {
-  _setFsIdle(false);
   clearTimeout(_fsIdleTimer);
+  // classList 変更を rAF に委譲してキャンバス描画との干渉を防ぐ
+  if (_fsResetRafId === null) {
+    _fsResetRafId = requestAnimationFrame(() => {
+      _fsResetRafId = null;
+      _setFsIdle(false);
+    });
+  }
   if (document.fullscreenElement) {
     _fsIdleTimer = setTimeout(() => _setFsIdle(true), 3000);
   }

@@ -182,6 +182,7 @@
       cursor: pointer;
       position: relative;
       margin-left: 8px;
+      contain: layout;
     }
     .progress-track::before {
       content: '';
@@ -194,8 +195,10 @@
       height: 100%;
       background: linear-gradient(90deg, var(--accent), var(--accent2));
       border-radius: 3px;
-      width: 0%;
+      width: 100%;
       pointer-events: none;
+      transform-origin: left center;
+      transform: scaleX(0);
     }
     .progress-thumb {
       position: absolute;
@@ -1815,6 +1818,7 @@
     #canvasWrap:-webkit-full-screen #videoArea {
       width: min(100vw, calc(100vh * var(--ar, 854/480)));
       margin: auto;
+      will-change: transform;  /* Chrome native UI 合成時に videoArea 全体を独立 GPU レイヤーへ昇格し再描画を防ぐ */
     }
     #canvasWrap:fullscreen #mainCanvas,
     #canvasWrap:-webkit-full-screen #mainCanvas {
