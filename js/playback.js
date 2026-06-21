@@ -36,32 +36,50 @@ export async function _applyCompositeT(T) {
   [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].pause(); });
 
   const [o1, o2] = _getOffsets();
+  const offsets = [o1, o2];
+
+  // Phase 1: fastSeek — 最近傍キーフレームへ素早く移動（デコード開始コストを下げる）
   await Promise.all([0, 1].map(i => {
-    if (mediaType[i] !== 'video') return Promise.resolve();
-    const o = i === 0 ? o1 : o2;
-    if (!loaded[i] || !vid[i].duration) return Promise.resolve();
-    const vt = Math.max(0, Math.min(vid[i].duration, T + o));
+    if (!loaded[i] || mediaType[i] !== 'video' || !vid[i].duration) return Promise.resolve();
+    const vt = Math.max(0, Math.min(vid[i].duration, T + offsets[i]));
     if (Math.abs(vid[i].currentTime - vt) < 0.003) return Promise.resolve();
     return new Promise(res => {
       vid[i].addEventListener('seeked', res, { once: true });
-      vid[i].currentTime = vt;
+      typeof vid[i].fastSeek === 'function' ? vid[i].fastSeek(vt) : (vid[i].currentTime = vt);
     });
   }));
+
+  // Phase 2: vid[0] の実際の着地位置を基準に vid[1] を正確同期
+  const hasPrimary   = loaded[0] && mediaType[0] === 'video' && !!vid[0].duration;
+  const hasSecondary = loaded[1] && mediaType[1] === 'video' && !!vid[1].duration;
+  if (hasPrimary && hasSecondary) {
+    const actualT = vid[0].currentTime - o1;
+    const target1 = Math.max(0, Math.min(vid[1].duration, actualT + o2));
+    if (Math.abs(vid[1].currentTime - target1) >= 0.003) {
+      await new Promise(res => {
+        vid[1].addEventListener('seeked', res, { once: true });
+        vid[1].currentTime = target1;
+      });
+    }
+  }
 
   setCompositeSeekPending(false);
   if (!state.playing) return;
 
   [0, 1].forEach(i => { if (mediaType[i] === 'video') vid[i].playbackRate = 1.0; });
+
+  // 再生開始（実際の着地位置を基準にディレイを計算）
+  const actualT = hasPrimary ? vid[0].currentTime - o1 : hasSecondary ? vid[1].currentTime - o2 : T;
   [o1, o2].forEach((o, i) => {
     if (!loaded[i] || mediaType[i] !== 'video') return;
-    if (T + o < 0) {
-      const t = setTimeout(() => { if (state.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(T + o) * 1000);
+    if (actualT + o < 0) {
+      const t = setTimeout(() => { if (state.playing && loaded[i]) vid[i].play().catch(() => {}); }, -(actualT + o) * 1000);
       _playDelayTimers.push(t);
     } else {
       vid[i].play().catch(() => {});
     }
   });
-  if (loaded[0] && loaded[1] && mediaType[0] === 'video' && mediaType[1] === 'video') {
+  if (hasPrimary && hasSecondary) {
     _scheduleResync(80);
   }
 }

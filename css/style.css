@@ -203,7 +203,7 @@
     .progress-thumb {
       position: absolute;
       top: 50%;
-      left: 0;
+      left: 0%;
       width: 12px;
       height: 12px;
       border-radius: 50%;
