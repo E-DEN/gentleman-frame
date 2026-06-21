@@ -303,8 +303,8 @@ document.addEventListener('mousemove', e => {
 
   // Pointer Lock 中（フルスクリーン mask 追従モード）: movementX/Y で仮想カーソル座標を蓄積
   if (document.pointerLockElement === canvas) {
-    state.followTargetX += e.movementX * _canvasScaleX;
-    state.followTargetY += e.movementY * _canvasScaleY;
+    state.followTargetX = Math.max(0, Math.min(canvas.width,  state.followTargetX + e.movementX * _canvasScaleX));
+    state.followTargetY = Math.max(0, Math.min(canvas.height, state.followTargetY + e.movementY * _canvasScaleY));
     return;
   }
 
