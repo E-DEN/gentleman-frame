@@ -34,6 +34,8 @@ import {
   setEffectsHidden, setMaskHidden,
   _activePresetIdx,
   _showDelPopup,
+  _cancelResync, _scheduleResync,
+  _isMuted,
 } from './canvas.js';
 import {
   updateCanvasFilter, updateBarsOverlay,
@@ -42,7 +44,7 @@ import {
 } from './render.js';
 import { updateMediaControls, _updateDropLink } from './media.js';
 import { syncPlay, syncPause, syncStop, _applyCompositeT } from './playback.js';
-import { connectAudioElements } from './spectrum.js';
+import { connectAudioElements, setMuteGain, swapGainNodes } from './spectrum.js';
 import './drag.js';
 import './lang.js';
 
@@ -974,25 +976,31 @@ document.querySelectorAll('.fqp-btn[data-fqp]').forEach(btn => {
 _renderCustomFQP();
 
 // ミュートボタン
+// vid[i].volume / vid[i].muted を触ると Chromium の audio clock が乱れて currentTime がズレる。
+// GainNode.gain で制御することで audio pipeline を停止させずにミュートを実現する。
 const _muteVolume = [null, null];
 [0, 1].forEach(i => {
   const btn   = document.getElementById(`mute${i}`);
   const volEl = document.getElementById(`vol${i}`);
   const valEl = document.getElementById(`vol${i}Val`);
   btn.addEventListener('click', () => {
-    vid[i].muted = !vid[i].muted;
-    btn.classList.toggle('muted', vid[i].muted);
-    if (vid[i].muted) {
+    // 初回クリックでユーザー操作内に AudioContext & GainNode を初期化
+    connectAudioElements(vid[0], vid[1]);
+    _isMuted[i] = !_isMuted[i];
+    btn.classList.toggle('muted', _isMuted[i]);
+    setMuteGain(i, _isMuted[i]);
+    if (_isMuted[i]) {
       _muteVolume[i] = parseFloat(volEl.value);
       volEl.value = 0;
       valEl.value = '0';
       updateSliderFill(volEl);
     } else {
       const prev = _muteVolume[i] ?? 50;
+      _muteVolume[i] = null;
       volEl.value = prev;
       valEl.value = String(Math.round(prev));
       updateSliderFill(volEl);
-      vid[i].volume = (prev / 100) ** 2;
+      // vid[i].volume は変更しない（GainNode が 0→1 になるので既存の volume がそのまま適用される）
     }
   });
 });
@@ -1278,6 +1286,8 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
 
 // --- 動画の入れ替え ---
 export function swapVideos() {
+  // 進行中のリシンクをキャンセル（vid[] 入れ替え時に参照が変わるため）
+  _cancelResync();
   [vid[0], vid[1]]                   = [vid[1], vid[0]];
   [img[0], img[1]]                   = [img[1], img[0]];
   [mediaType[0], mediaType[1]]       = [mediaType[1], mediaType[0]];
@@ -1289,9 +1299,6 @@ export function swapVideos() {
   [_vidBitmap[0],      _vidBitmap[1]]      = [_vidBitmap[1],      _vidBitmap[0]];
   [_vidBitmapPending[0], _vidBitmapPending[1]] = [_vidBitmapPending[1], _vidBitmapPending[0]];
   [visHidden[0],       visHidden[1]]       = [visHidden[1],       visHidden[0]];
-
-  if (mediaType[0] === 'video') vid[0].volume = (parseFloat(elVol0.value) / 100) ** 2;
-  if (mediaType[1] === 'video') vid[1].volume = (parseFloat(elVol1.value) / 100) ** 2;
 
   updateMediaControls(0);
   updateMediaControls(1);
@@ -1332,10 +1339,25 @@ export function swapVideos() {
     updateSliderFill(r2);
   });
 
+  // スライダー入れ替え後に volume・mute 状態を正しく同期する
+  swapGainNodes();
+  [_muteVolume[0], _muteVolume[1]] = [_muteVolume[1], _muteVolume[0]];
+  [_isMuted[0], _isMuted[1]] = [_isMuted[1], _isMuted[0]];
+  [0, 1].forEach(i => {
+    if (mediaType[i] !== 'video') return;
+    const btn   = document.getElementById(`mute${i}`);
+    const volEl = document.getElementById(`vol${i}`);
+    if (btn) btn.classList.toggle('muted', _isMuted[i]);
+    if (!_isMuted[i]) vid[i].volume = (parseFloat(volEl.value) / 100) ** 2;
+  });
+
   [0, 1].forEach(i => {
     _stopBitmapCapture(i);
     if (mediaType[i] === 'video' && loaded[i]) _startBitmapCapture(i);
   });
+
+  // 入れ替え後に同期をやり直す (1500ms 待機: swap 直後の誤検知による不要 seek を防ぐ)
+  _scheduleResync(1500);
 }
 
 document.getElementById('swapBtn').addEventListener('click', swapVideos);

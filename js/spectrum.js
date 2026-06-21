@@ -3,29 +3,56 @@
 let _audioCtx  = null;
 let _analyser  = null;
 let _dataArray = null;
+// スロット別 GainNode。vid[i].volume / vid[i].muted を触らずにミュートを制御する。
+// GainNode.gain = 0 でも audio pipeline は停止しないため currentTime がズレない。
+const _gainNodes = [null, null];
 
 const FFT_SIZE = 2048; // 1024 bins
 
-// vid[0] / vid[1] を AudioContext に接続する（シェイプ選択時に呼ぶこと）
+function _ensureCtx() {
+  if (_audioCtx) return;
+  _audioCtx = new AudioContext();
+  _analyser = _audioCtx.createAnalyser();
+  _analyser.fftSize             = FFT_SIZE;
+  _analyser.smoothingTimeConstant = 0.82;
+  _analyser.minDecibels         = -90;
+  _analyser.maxDecibels         = -10;
+  _dataArray = new Uint8Array(_analyser.frequencyBinCount);
+  _analyser.connect(_audioCtx.destination);
+}
+
+function _connectVideo(v, i) {
+  if (!v || v._specConnected) return;
+  try {
+    const source = _audioCtx.createMediaElementSource(v);
+    const gain   = _audioCtx.createGain();
+    gain.gain.value = 1.0;
+    _gainNodes[i]   = gain;
+    source.connect(gain);
+    gain.connect(_analyser);
+    v._specConnected = true;
+  } catch (_) {}
+}
+
+// vid[0]/vid[1] をオーディオグラフに接続する
+// スペクトラム選択時 & ミュートボタン初回クリック時に呼ぶ（ユーザー操作内で呼ぶこと）
 export function connectAudioElements(v0, v1) {
-  if (!_audioCtx) {
-    _audioCtx = new AudioContext();
-    _analyser = _audioCtx.createAnalyser();
-    _analyser.fftSize             = FFT_SIZE;
-    _analyser.smoothingTimeConstant = 0.82;
-    _analyser.minDecibels         = -90;
-    _analyser.maxDecibels         = -10;
-    _dataArray = new Uint8Array(_analyser.frequencyBinCount);
-    _analyser.connect(_audioCtx.destination);
-  }
+  _ensureCtx();
   if (_audioCtx.state === 'suspended') _audioCtx.resume();
-  [v0, v1].forEach(v => {
-    if (!v || v._specConnected) return;
-    try {
-      _audioCtx.createMediaElementSource(v).connect(_analyser);
-      v._specConnected = true;
-    } catch (_) {}
-  });
+  _connectVideo(v0, 0);
+  _connectVideo(v1, 1);
+}
+
+// スロット i のミュート GainNode を設定する。未接続なら false を返す
+export function setMuteGain(i, muted) {
+  if (!_gainNodes[i]) return false;
+  _gainNodes[i].gain.value = muted ? 0 : 1;
+  return true;
+}
+
+// スワップ時にスロット割り当てを入れ替える
+export function swapGainNodes() {
+  [_gainNodes[0], _gainNodes[1]] = [_gainNodes[1], _gainNodes[0]];
 }
 
 // 現在フレームの周波数データを count 本のバー値（0〜1）で返す。未初期化なら null

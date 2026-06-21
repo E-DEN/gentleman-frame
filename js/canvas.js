@@ -90,6 +90,7 @@ export function getMediaSrc(i) {
 
 export const loaded = [false, false];
 export const visHidden = [false, false];
+export const _isMuted = [false, false]; // muted 属性の代わりに volume=0 で管理する状態
 export let maskHidden = false;
 export let effectsHidden = false;
 

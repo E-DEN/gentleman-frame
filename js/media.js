@@ -12,6 +12,7 @@ import {
   _isDraggingPreset,
   syncMaskDropOverlay,
   setMaskBorderFadeStart, setFgFadeStart,
+  _isMuted,
 } from './canvas.js';
 import { resetHintState, _startRainOverlay, elFilterRain } from './render.js';
 
@@ -508,9 +509,9 @@ export function _syncVidHiddenOverlay() {
     lucide.createIcons({ nodes: [btn] });
     // 非表示→ミュート、再表示→ミュート解除
     const muteBtn = document.getElementById(`mute${i}`);
-    if (visHidden[i] && !vid[i].muted) {
+    if (visHidden[i] && !_isMuted[i]) {
       muteBtn.click();
-    } else if (!visHidden[i] && vid[i].muted) {
+    } else if (!visHidden[i] && _isMuted[i]) {
       muteBtn.click();
     }
     // 全体ボタンのアイコンを同期
@@ -534,9 +535,9 @@ document.getElementById('vidVisAllBtn').addEventListener('click', () => {
       lucide.createIcons({ nodes: [btn] });
       // 非表示→ミュート、再表示→ミュート解除
       const muteBtn = document.getElementById(`mute${i}`);
-      if (next && !vid[i].muted) {
+      if (next && !_isMuted[i]) {
         muteBtn.click();
-      } else if (!next && vid[i].muted) {
+      } else if (!next && _isMuted[i]) {
         muteBtn.click();
       }
     }
