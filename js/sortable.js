@@ -24,9 +24,11 @@ let _mSrcContainerEl = null;   // ドラッグ開始時のコンテナ（_mCurCo
 let _mLastRefY       = 0;      // スライド/挿入の基準Y: フォルダドラッグ時は mouseY、それ以外は ghostMidY
 let _mAddFolderTarget = false; // ゴーストが「新しいフォルダ」ボタン上にあるとき true
 let _mFolderHoverTimer = null; // ホバー展開タイマー
+let _mSrcIsFolder    = false;  // ドラッグ元がフォルダか（_mStartDrag で確定・キャッシュ）
 // 移動閾値を超える前のドラッグ待機状態
 let _mPending        = null;
 const _M_THRESHOLD   = 5;
+let _mRafId          = null;   // mousemove スロットル用 requestAnimationFrame ID
 
 function _mGetRootUnits() {
   const list = document.getElementById('presetList');
