@@ -339,13 +339,22 @@ export function applySettings(d) {
   if (d.borderW != null && parseFloat(d.borderW) > 0) {
     setMaskBorderFadeStart(loaded[1] ? performance.now() : 0);
   }
-  if (d.filterMaskOnly && typeof d.filterMaskOnly === 'object') {
+  if (true) {
+    const _saved = (d.filterMaskOnly && typeof d.filterMaskOnly === 'object') ? d.filterMaskOnly : {};
     const _moButtons = {
+      highlight:   'filterHighlightMOBtn',
+      shadow:      'filterShadowMOBtn',
+      temp:        'filterTempMOBtn',
+      tint:        'filterTintMOBtn',
       sharpness:   'filterSharpnessMOBtn',
       ca:          'filterCAMOBtn',
+      vignette:    'filterVignetteMOBtn',
       matte:       'filterMatteMOBtn',
+      grain:       'filterGrainMOBtn',
       bloom:       'filterBloomMOBtn',
+      blur:        'filterBlurMOBtn',
       flare:       'filterFlareMOBtn',
+      rain:        'filterRainMOBtn',
       pencil:      'filterPencilMOBtn',
       emboss:      'filterEmbossMOBtn',
       chalkboard:  'filterChalkboardMOBtn',
@@ -353,7 +362,7 @@ export function applySettings(d) {
       airbrush:    'filterAirbrushMOBtn',
     };
     Object.entries(_moButtons).forEach(([key, btnId]) => {
-      const val = !!d.filterMaskOnly[key];
+      const val = !!_saved[key];
       state.filterMaskOnly[key] = val;
       document.getElementById(btnId)?.classList.toggle('active', val);
     });
