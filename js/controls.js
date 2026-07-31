@@ -225,8 +225,9 @@ export function bindSlider(id, valId, fmt, onChange) {
   lucide.createIcons({ nodes: [resetBtn] });
 }
 
-bindSlider('vol0',    'vol0Val',    v => `${Math.round(v)}`,    v => { vid[0].volume = (v / 100) ** 2; });
-bindSlider('vol1',    'vol1Val',    v => `${Math.round(v)}`,    v => { vid[1].volume = (v / 100) ** 2; });
+bindSlider('vol0',      'vol0Val',      v => `${Math.round(v)}`, v => { vid[0].volume = (v / 100) ** 2; });
+bindSlider('vol1',      'vol1Val',      v => `${Math.round(v)}`, v => { vid[1].volume = (v / 100) ** 2; });
+bindSlider('fgOpacity', 'fgOpacityVal', v => `${Math.round(v)}`);
 
 // --- マスターボリューム ---
 {

@@ -24,7 +24,7 @@ import {
   elBorderW, elBorderColor, elBorderOpacity,
   elBorderAnim, elBorderAnimSpeed, elBorderAnimBright,
   elFrameBlur, elFrameTint,
-  elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
+  elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity, elFgOpacity,
   elMaskZoom, elMaskBlur, elMaskPixel,
   elSpecBars, elSpecAmp, elSpecGap, elSpecSmooth,
   _scheduleResync,
@@ -197,6 +197,7 @@ export function _renderFrame() {
   const fgAlpha = _fgFadeStart < 0 ? 1
     : _fgFadeStart === 0 ? 0
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
+  const fgDraw = fgAlpha * (elFgOpacity ? parseFloat(elFgOpacity.value) / 100 : 1);
   setLastFgAlpha(fgAlpha);
   if (loaded[1] && !visHidden[1]) {
     offCtx.clearRect(0, 0, W, H);
@@ -249,13 +250,13 @@ export function _renderFrame() {
       ctx.save();
       if (!maskHidden) { const _gp1 = buildMaskPath(ctx, m); _gp1 ? ctx.clip(_gp1) : ctx.clip(); }
       ctx.filter = `blur(${bp}px)`;
-      ctx.globalAlpha = fgAlpha;
+      ctx.globalAlpha = fgDraw;
       ctx.drawImage(offCvs, 0, 0);
       ctx.filter = 'none';
       ctx.globalAlpha = 1;
       ctx.restore();
     } else {
-      ctx.save(); ctx.globalAlpha = fgAlpha;
+      ctx.save(); ctx.globalAlpha = fgDraw;
       ctx.drawImage(offCvs, 0, 0);
       ctx.globalAlpha = 1; ctx.restore();
     }
@@ -287,7 +288,7 @@ export function _renderFrame() {
         const _gp2 = buildMaskPath(offCtx, m);
         _gp2 ? offCtx.fill(_gp2) : offCtx.fill();
         offCtx.globalCompositeOperation = 'source-over';
-        ctx.save(); ctx.globalAlpha = fgAlpha;
+        ctx.save(); ctx.globalAlpha = fgDraw;
         ctx.drawImage(offCvs, 0, 0);
         ctx.globalAlpha = 1; ctx.restore();
       } else {
@@ -295,7 +296,7 @@ export function _renderFrame() {
         ctx.save();
         const _gp3 = buildMaskPath(ctx, m); _gp3 ? ctx.clip(_gp3) : ctx.clip();
         ctx.filter = `blur(${bp}px)`;
-        ctx.globalAlpha = fgAlpha;
+        ctx.globalAlpha = fgDraw;
         ctx.drawImage(offCvs, 0, 0);
         ctx.filter = 'none'; ctx.globalAlpha = 1;
         ctx.restore();
