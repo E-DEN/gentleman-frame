@@ -741,11 +741,15 @@ export function renderPresets() {
     info.addEventListener('click', async e => {
       if (e.target.closest('[contenteditable]:not([contenteditable="false"])')) return;
       const idx = +info.dataset.idx;
-      // .preset-file-line は行全体が block 幅のため、テキスト本体 (.pname-inner) への
-      // クリックのみを再指定トリガーとする（行の余白クリックで誤爆させないため）
+      // ファイル名が長い場合、見切れた分も含めて可視範囲いっぱいまでテキストが埋まるため、
+      // 座標判定だけでは「行全体クリック」と区別できない。そのため、既に赤字・未リンク・
+      // 保留中として表示されているスロット（何か問題があるスロット）をクリックした場合のみ
+      // 強制再指定として扱う。正常表示（白文字）のスロットは通常のプリセット読み込みにする
       const _fileNameEl = e.target.closest('.preset-file-line > .pname-inner');
       const _fileLine = _fileNameEl ? _fileNameEl.closest('.preset-file-line') : null;
-      const _forceRelinkSlot = _fileLine ? Number(_fileLine.dataset.slot) : null;
+      const _forceRelinkSlot = _fileLine?.matches('.preset-file-missing, .preset-file-unlinked')
+        ? Number(_fileLine.dataset.slot)
+        : null;
       const p = loadPresets()[idx];
       if (!p || p.type === 'folder') return;
       const _gen = ++_presetLoadGen; // 新しいロード開始: 旧ロードを無効化
@@ -801,8 +805,7 @@ export function renderPresets() {
       // 誤爆で毎回開くのを防ぐため対象外とする
       _slotsNeedPick = _slotsLocal.filter(si => {
         if (si === _forceRelinkSlot) return true;
-        if (!_idbHandles[si]) return true;
-        return !!_preLoadOk.get(si)?.missing;
+        return !_idbHandles[si] || !!_preLoadOk.get(si)?.missing;
       });
 
       if (_slotsLocal.length > 0 && _slotsNeedPick.length > 0 && window.showOpenFilePicker) {
