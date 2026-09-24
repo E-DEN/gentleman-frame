@@ -789,17 +789,22 @@ export function renderPresets() {
       const _preLoadOk = new Map();
       for (const si of _slotsLocal) {
         if (_idbHandles[si]) {
-          const ok = await loadVideoFromHandle(si, _idbHandles[si]);
+          const r = await loadVideoFromHandle(si, _idbHandles[si]);
           if (_presetLoadGen !== _gen) return;
-          _preLoadOk.set(si, ok);
-          if (ok && si === 1) vid1HasSource = true;
+          _preLoadOk.set(si, r);
+          if (r.ok && si === 1) vid1HasSource = true;
         }
       }
 
-      // ハンドルは残っていても、権限切れやファイル移動で読み込めない場合は再選択させる
-      _slotsNeedPick = _slotsLocal.filter(si =>
-        !_preLoadOk.get(si) || si === _forceRelinkSlot
-      );
+      // ハンドルはあるが読み込めない場合、権限の再取得に失敗しただけの可能性があるため、
+      // ファイル自体が確実に無い（missing）と判定できた場合のみ自動でダイアログを出す
+      _slotsNeedPick = _slotsLocal.filter(si => {
+        if (si === _forceRelinkSlot) return true;
+        const r = _preLoadOk.get(si);
+        if (r?.ok) return false;
+        if (!_idbHandles[si]) return true; // ハンドル自体が無い＝確実に無効
+        return !!r?.missing;
+      });
 
       if (_slotsLocal.length > 0 && _slotsNeedPick.length > 0 && window.showOpenFilePicker) {
         _dialogShown = true;
@@ -807,7 +812,7 @@ export function renderPresets() {
         for (const si of _slotsLocal) _slotNames[si] = p.data[`vid${si}Name`] ?? '';
         const _preResolved = new Map();
         for (const si of _slotsLocal) {
-          if (_preLoadOk.get(si)) {
+          if (_preLoadOk.get(si)?.ok) {
             _preResolved.set(si, { fh: _idbHandles[si], name: _loadedFileName[si] || p.data[`vid${si}Name`] || '' });
           }
         }
@@ -839,13 +844,18 @@ export function renderPresets() {
       for (const i of [0, 1]) {
         const handle = _idbHandles[i];
         let loaded_ok = false;
+        let _confirmedMissing = false;
         const _mkey = p.data.presetId ? `${p.data.presetId}_${i}` : null;
         if (_preLoadOk.has(i)) {
-          loaded_ok = _preLoadOk.get(i);
+          const r = _preLoadOk.get(i);
+          loaded_ok = r.ok;
+          _confirmedMissing = r.missing;
           if (loaded_ok && _mkey) _resolvedFiles.add(_mkey);
         } else if (handle) {
-          loaded_ok = await loadVideoFromHandle(i, handle);
+          const r = await loadVideoFromHandle(i, handle);
           if (_presetLoadGen !== _gen) return;
+          loaded_ok = r.ok;
+          _confirmedMissing = r.missing;
           if (loaded_ok && _mkey) _resolvedFiles.add(_mkey);
         }
         if (!loaded_ok) {
@@ -878,14 +888,19 @@ export function renderPresets() {
                 if (_presetLoadGen !== _gen) return;
                 if (_mkey) _missingFiles.delete(_mkey);
               }
-              loaded_ok = await loadVideoFromHandle(i, newHandle);
+              loaded_ok = (await loadVideoFromHandle(i, newHandle)).ok;
               if (_presetLoadGen !== _gen) return;
               if (loaded_ok) { needsRender = true; if (_mkey) { _resolvedFiles.add(_mkey); _pendingFiles.delete(_mkey); } }
             } else if (!window.showOpenFilePicker) {
               if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
               _presetStatusMsg(t('preset-file-missing'), false);
             } else if (!_dialogShown) {
-              if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
+              if (_confirmedMissing) {
+                if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
+              } else {
+                // ファイル消失と確定できない失敗（権限の再取得待ちなど）は赤字にせず再試行を促すのみ
+                _presetStatusMsg(t('preset-file-permission'), false);
+              }
             }
           }
         } else if (handle || _preLoadOk.has(i)) {

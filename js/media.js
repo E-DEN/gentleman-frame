@@ -358,16 +358,18 @@ export function _updateDropLink(index) {
   }
 }
 
+// missing: true は「ファイル自体が失われた」ことが確定した場合のみ。
+// リロード直後の権限再取得失敗など、原因が曖昧な場合は missing: false で区別する。
 export async function loadVideoFromHandle(index, handle) {
   try {
     let perm = await handle.queryPermission({ mode: 'read' });
     if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'read' });
-    if (perm !== 'granted') return false;
+    if (perm !== 'granted') return { ok: false, missing: perm === 'denied' };
     const file = await handle.getFile();
     if (file.type.startsWith('image/') || IMAGE_EXT.test(file.name)) loadImage(index, file, handle);
     else loadVideo(index, file, handle);
-    return true;
-  } catch (e) { return false; }
+    return { ok: true, missing: false };
+  } catch (e) { return { ok: false, missing: e?.name === 'NotFoundError' }; }
 }
 
 function setupDropZone(index) {
