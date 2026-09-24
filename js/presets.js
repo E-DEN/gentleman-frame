@@ -741,7 +741,10 @@ export function renderPresets() {
     info.addEventListener('click', async e => {
       if (e.target.closest('[contenteditable]:not([contenteditable="false"])')) return;
       const idx = +info.dataset.idx;
-      const _fileLine = e.target.closest('.preset-file-line');
+      // .preset-file-line は行全体が block 幅のため、テキスト本体 (.pname-inner) への
+      // クリックのみを再指定トリガーとする（行の余白クリックで誤爆させないため）
+      const _fileNameEl = e.target.closest('.preset-file-line > .pname-inner');
+      const _fileLine = _fileNameEl ? _fileNameEl.closest('.preset-file-line') : null;
       const _forceRelinkSlot = _fileLine ? Number(_fileLine.dataset.slot) : null;
       const p = loadPresets()[idx];
       if (!p || p.type === 'folder') return;
