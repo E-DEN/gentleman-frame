@@ -358,13 +358,15 @@ export function _updateDropLink(index) {
   }
 }
 
-// missing: true は「ファイル自体が失われた」ことが確定した場合のみ。
-// リロード直後の権限再取得失敗など、原因が曖昧な場合は missing: false で区別する。
+// missing: true は getFile() が NotFoundError を投げた場合のみ（ファイル消失の確定シグナル）。
+// permission が 'denied' になるのは、同一クリック内で他スロットが先にユーザー操作可能な
+// 許可要求を消費し、ジェスチャー無しでの再要求が拒否扱いになるケースが多いため、
+// 権限だけの失敗はここでは「missing」とみなさない。
 export async function loadVideoFromHandle(index, handle) {
   try {
     let perm = await handle.queryPermission({ mode: 'read' });
     if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'read' });
-    if (perm !== 'granted') return { ok: false, missing: perm === 'denied' };
+    if (perm !== 'granted') return { ok: false, missing: false };
     const file = await handle.getFile();
     if (file.type.startsWith('image/') || IMAGE_EXT.test(file.name)) loadImage(index, file, handle);
     else loadVideo(index, file, handle);
