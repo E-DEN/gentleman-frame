@@ -765,7 +765,7 @@ export function renderPresets() {
       ]);
       if (_presetLoadGen !== _gen) return; // 別プリセットが選択されたためキャンセル
       const _slotsLocal    = [0, 1].filter(si => !p.data[`vid${si}Url`] && !!p.data[`vid${si}Name`]);
-      const _slotsNeedPick = _slotsLocal.filter(si => !_idbHandles[si]);
+      let _slotsNeedPick = _slotsLocal.filter(si => !_idbHandles[si]);
       const _prePickedHandles = new Map();
       let _dialogShown = false;
 
@@ -790,6 +790,9 @@ export function renderPresets() {
           if (ok && si === 1) vid1HasSource = true;
         }
       }
+
+      // ハンドルは残っていても、権限切れやファイル移動で読み込めない場合は再選択させる
+      _slotsNeedPick = _slotsLocal.filter(si => !_preLoadOk.get(si));
 
       if (_slotsLocal.length > 0 && _slotsNeedPick.length > 0 && window.showOpenFilePicker) {
         _dialogShown = true;
