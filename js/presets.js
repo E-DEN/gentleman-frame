@@ -796,14 +796,13 @@ export function renderPresets() {
         }
       }
 
-      // ハンドルはあるが読み込めない場合、権限の再取得に失敗しただけの可能性があるため、
-      // ファイル自体が確実に無い（missing）と判定できた場合のみ自動でダイアログを出す
+      // プリセットクリック時、ハンドル不在または確実な消失（NotFoundError）の場合は
+      // 自動でダイアログを表示する。権限の再取得に失敗しただけ（曖昧なケース）は
+      // 誤爆で毎回開くのを防ぐため対象外とする
       _slotsNeedPick = _slotsLocal.filter(si => {
         if (si === _forceRelinkSlot) return true;
-        const r = _preLoadOk.get(si);
-        if (r?.ok) return false;
-        if (!_idbHandles[si]) return true; // ハンドル自体が無い＝確実に無効
-        return !!r?.missing;
+        if (!_idbHandles[si]) return true;
+        return !!_preLoadOk.get(si)?.missing;
       });
 
       if (_slotsLocal.length > 0 && _slotsNeedPick.length > 0 && window.showOpenFilePicker) {
@@ -895,7 +894,7 @@ export function renderPresets() {
               if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
               _presetStatusMsg(t('preset-file-missing'), false);
             } else if (!_dialogShown) {
-              if (_confirmedMissing) {
+              if (_confirmedMissing || !handle) {
                 if (_mkey && !_missingFiles.has(_mkey)) { _missingFiles.add(_mkey); needsRender = true; }
               } else {
                 // ファイル消失と確定できない失敗（権限の再取得待ちなど）は赤字にせず再試行を促すのみ
