@@ -741,6 +741,8 @@ export function renderPresets() {
     info.addEventListener('click', async e => {
       if (e.target.closest('[contenteditable]:not([contenteditable="false"])')) return;
       const idx = +info.dataset.idx;
+      const _fileLine = e.target.closest('.preset-file-line');
+      const _forceRelinkSlot = _fileLine ? Number(_fileLine.dataset.slot) : null;
       const p = loadPresets()[idx];
       if (!p || p.type === 'folder') return;
       const _gen = ++_presetLoadGen; // 新しいロード開始: 旧ロードを無効化
@@ -792,7 +794,9 @@ export function renderPresets() {
       }
 
       // ハンドルは残っていても、権限切れやファイル移動で読み込めない場合は再選択させる
-      _slotsNeedPick = _slotsLocal.filter(si => !_preLoadOk.get(si));
+      _slotsNeedPick = _slotsLocal.filter(si =>
+        !_preLoadOk.get(si) || si === _forceRelinkSlot
+      );
 
       if (_slotsLocal.length > 0 && _slotsNeedPick.length > 0 && window.showOpenFilePicker) {
         _dialogShown = true;
