@@ -150,6 +150,7 @@
     "file-resolve-ok": "확인",
     "file-resolve-slot-drop": "드롭하거나 클릭하여 선택",
     "file-resolve-folder-btn": "폴더 선택",
+    "file-resolve-others-linked": "다른 프리셋의 파일 {n}개도 다시 연결했습니다",
     "file-resolve-name-warn": "파일 이름이 일치하지 않습니다",
     "file-resolve-mismatch-accept": "이 파일 사용",
     "file-resolve-mismatch-reject": "취소",

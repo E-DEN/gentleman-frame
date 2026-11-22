@@ -390,7 +390,33 @@ async function _tryFromFolder(dirHandle, filename) {
   return null;
 }
 
-function _showFileResolveDialog(slots, slotNames, startHint, preResolvedMap = new Map()) {
+// 選択フォルダから、他プリセットの未リンク/欠損スロットも再リンクする（編集中のプリセットは除く）
+async function _relinkOtherPresetsFromFolder(dirHandle, skipPresetId) {
+  let linked = 0;
+  for (const p of loadPresets()) {
+    const pid = p?.data?.presetId;
+    if (!p || p.type === 'folder' || !pid || pid === skipPresetId) continue;
+    for (const si of [0, 1]) {
+      const name = p.data[`vid${si}Name`];
+      if (!name || p.data[`vid${si}Url`]) continue;
+      const mk = `${pid}_${si}`;
+      const idbKey = `preset_${pid}_${si}`;
+      const broken = _missingFiles.has(mk) || _pendingFiles.has(mk) || !(await _IDB.get(idbKey).catch(() => null));
+      if (!broken) continue;
+      const fh = await _tryFromFolder(dirHandle, name);
+      if (!fh) continue;
+      await _IDB.set(idbKey, fh).catch(() => {});
+      _missingFiles.delete(mk); _pendingFiles.delete(mk); _resolvedFiles.add(mk);
+      linked++;
+    }
+  }
+  if (linked > 0) {
+    renderPresets();
+    _presetStatusMsg(t('file-resolve-others-linked').replace('{n}', linked));
+  }
+}
+
+function _showFileResolveDialog(slots, slotNames, startHint, preResolvedMap = new Map(), currentPresetId = null) {
   return new Promise(resolve => {
     setModalOpen(true);
     const pickedMap = new Map();
@@ -525,6 +551,7 @@ function _showFileResolveDialog(slots, slotNames, startHint, preResolvedMap = ne
             const otherFh = await _tryFromFolder(dirHandle, otherName);
             if (otherFh) { _IDB.set('gf_folder_hint', otherFh).catch(() => {}); _setResolved(otherSi, otherFh, otherName); }
           }
+          await _relinkOtherPresetsFromFolder(dirHandle, currentPresetId);
         } catch {}
       });
       delBtn.addEventListener('click', e => { e.stopPropagation(); _clearResolved(si); });
@@ -818,7 +845,7 @@ export function renderPresets() {
             _preResolved.set(si, { fh: _idbHandles[si], name: _loadedFileName[si] || p.data[`vid${si}Name`] || '' });
           }
         }
-        const _resolvedMap = await _showFileResolveDialog(_slotsLocal, _slotNames, _startHint, _preResolved);
+        const _resolvedMap = await _showFileResolveDialog(_slotsLocal, _slotNames, _startHint, _preResolved, p.data.presetId);
         if (_presetLoadGen !== _gen) return;
         if (_resolvedMap) {
           for (const [si, { fh }] of _resolvedMap) _prePickedHandles.set(si, fh);
