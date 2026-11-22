@@ -1123,12 +1123,19 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     } else if (newShape === 'phone') {
       const cw = canvas.width, ch = canvas.height;
       let newW, newH, newX, newY;
+      const _land = state.phoneLandscape;
       if (_phoneMaskState) {
         newW = _phoneMaskState.w; newH = _phoneMaskState.h;
         newX = _phoneMaskState.x; newY = _phoneMaskState.y;
+        // プリセット読み込み等で向きが変わっていた場合は縦横を入れ替えて中央寄せ
+        if ((newW > newH) !== _land) {
+          [newW, newH] = [newH, newW];
+          newX = Math.round((cw - newW) / 2);
+          newY = Math.round((ch - newH) / 2);
+        }
         _restoreMaskZoom(_phoneMaskState.zoom);
       } else {
-        const targetW = 360, targetH = 780;
+        const targetW = _land ? 780 : 360, targetH = _land ? 360 : 780;
         newW = Math.min(targetW, cw);
         newH = Math.round(newW * targetH / targetW);
         if (newH > ch) { newH = ch; newW = Math.round(newH * targetW / targetH); }
