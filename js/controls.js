@@ -28,7 +28,7 @@ import {
   elProgressFill, elProgressThumb, elTimeLabel, elPlayBtn,
   elMaskZoom, elMaskW, elMaskH, elMaskOffX, elMaskOffY,
   updateSliderFill, _getOffsets,
-  _updateArLockBtn, _updateZoomLockBtn, _updateFgFixedBtn, _syncZoomToMaskScale,
+  _updateArLockBtn, _updateZoomLockBtn, _updateFgFixedBtn, _restoreZoomLockAfterFgFixed, _syncZoomToMaskScale,
   fmtTime, updateProgress,
   _modalOpen, setModalOpen,
   setEffectsHidden, setMaskHidden,
@@ -1025,6 +1025,13 @@ document.querySelectorAll('.offset-btn').forEach(btn => {
 let _phoneMaskState    = null;
 let _nonPhoneMaskState = null;
 
+function _restoreMaskZoom(zoom) {
+  if (zoom == null) return;
+  elMaskZoom.value = zoom;
+  document.getElementById('maskZoomVal').value = zoom % 1 === 0 ? `${Math.round(zoom)}` : zoom.toFixed(2);
+  updateSliderFill(elMaskZoom);
+}
+
 document.querySelectorAll('.shape-btn').forEach(btn => {
   btn.addEventListener('pointerdown', () => {
     if (btn.disabled) return;
@@ -1082,12 +1089,13 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       const saveY = prevShape === 'glasses'
         ? Math.round((canvas.height - saveH) / 2)
         : state.mask.y;
-      _nonPhoneMaskState = { w: saveW, h: saveH, x: saveX, y: saveY };
+      _nonPhoneMaskState = { w: saveW, h: saveH, x: saveX, y: saveY, zoom: parseFloat(elMaskZoom.value) };
     } else if (prevShape === 'phone' && newShape !== 'phone') {
-      _phoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y };
+      _phoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y, zoom: parseFloat(elMaskZoom.value) };
       if (_nonPhoneMaskState) {
         state.mask.w = _nonPhoneMaskState.w; state.mask.h = _nonPhoneMaskState.h;
         state.mask.x = _nonPhoneMaskState.x; state.mask.y = _nonPhoneMaskState.y;
+        _restoreMaskZoom(_nonPhoneMaskState.zoom);
       } else {
         state.mask.w = 400; state.mask.h = 400;
         state.mask.x = Math.round((canvas.width  - 400) / 2);
@@ -1118,6 +1126,7 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       if (_phoneMaskState) {
         newW = _phoneMaskState.w; newH = _phoneMaskState.h;
         newX = _phoneMaskState.x; newY = _phoneMaskState.y;
+        _restoreMaskZoom(_phoneMaskState.zoom);
       } else {
         const targetW = 360, targetH = 780;
         newW = Math.min(targetW, cw);
@@ -1226,11 +1235,7 @@ document.getElementById('fgFixedBtn').addEventListener('click', () => {
       _updateZoomLockBtn();
     }
   } else {
-    if (state.zoomLockBeforeFgFixed !== null) {
-      state.zoomLock = state.zoomLockBeforeFgFixed;
-      state.zoomLockBeforeFgFixed = null;
-      _updateZoomLockBtn();
-    }
+    _restoreZoomLockAfterFgFixed();
   }
   _updateFgFixedBtn();
 });

@@ -611,10 +611,21 @@ document.getElementById('zoomLockBtn').addEventListener('click', () => {
   _updateZoomLockBtn();
 });
 
+// アンカーモード解除時、アンカー ON 前の zoomLock 状態を復元する
+export function _restoreZoomLockAfterFgFixed() {
+  if (state.zoomLockBeforeFgFixed === null) return;
+  state.zoomLock = state.zoomLockBeforeFgFixed;
+  state.zoomLockBeforeFgFixed = null;
+  _updateZoomLockBtn();
+}
+
 export function _updateFgFixedBtn() {
   const isPhone = state.mask.shape === 'phone';
   // phone 以外のときは fgFixed を解除
-  if (!isPhone) state.fgFixed = false;
+  if (!isPhone && state.fgFixed) {
+    state.fgFixed = false;
+    _restoreZoomLockAfterFgFixed();
+  }
   // X/Y スライダーはアンカーモード（fgFixed ON）時のみ表示
   document.getElementById('fgPinXRow').style.display = state.fgFixed ? '' : 'none';
   document.getElementById('fgPinYRow').style.display = state.fgFixed ? '' : 'none';
