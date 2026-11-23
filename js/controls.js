@@ -44,7 +44,7 @@ import {
 } from './render.js';
 import { updateMediaControls, _updateDropLink } from './media.js';
 import { syncPlay, syncPause, syncStop, _applyCompositeT } from './playback.js';
-import { connectAudioElements, setMuteGain, swapGainNodes } from './spectrum.js';
+import { connectAudioElements, setMuteGain, swapGainNodes, setAudioFilter } from './spectrum.js';
 import './drag.js';
 import './lang.js';
 
@@ -1004,6 +1004,92 @@ const _muteVolume = [null, null];
       // vid[i].volume は変更しない（GainNode が 0→1 になるので既存の volume がそのまま適用される）
     }
   });
+});
+
+// --- オーディオフィルター（マスター出力） ---
+// 周波数スライダーは位置 0〜1000 を 20Hz〜20kHz の対数にマップする（テキスト欄は Hz 表示）
+const _AF_MIN_HZ = 20, _AF_MAX_HZ = 20000;
+// スライダー位置は整数刻みなので、周波数は有効数字2桁に丸める（初期値が 998 ではなく 1000 になる）
+const _afHz = pos => {
+  const hz = _AF_MIN_HZ * Math.pow(_AF_MAX_HZ / _AF_MIN_HZ, pos / 1000);
+  const mag = Math.pow(10, Math.floor(Math.log10(hz)) - 1);
+  return Math.round(hz / mag) * mag;
+};
+const _afPos = hz  => 1000 * Math.log(hz / _AF_MIN_HZ) / Math.log(_AF_MAX_HZ / _AF_MIN_HZ);
+const _afFmtHz = hz => hz >= 1000 ? `${(hz / 1000).toFixed(hz >= 10000 ? 0 : 1)}k` : `${Math.round(hz)}`;
+const _afParseHz = s => {
+  const m = String(s).trim().match(/^([\d.]+)\s*(k)?(?:hz)?$/i);
+  return m ? parseFloat(m[1]) * (m[2] ? 1000 : 1) : NaN;
+};
+let _afType = 'off';
+const _elAfFreq = document.getElementById('afFreq');
+const _elAfFreqVal = document.getElementById('afFreqVal');
+const _elAfBw = document.getElementById('afBw');
+// 帯域幅（オクターブ）→ Q。ローパス/ハイパスは Q を固定（バターワース特性 1/√2）
+const _afBwToQ = bw => 1 / (2 * Math.sinh(Math.LN2 / 2 * bw));
+
+function _applyAudioFilter() {
+  const off = _afType === 'off';
+  document.getElementById('afFreqRow').style.display = off ? 'none' : '';
+  document.getElementById('afBwRow').style.display   = _afType === 'bandpass' ? '' : 'none';
+  // AudioContext はユーザー操作内で初期化する（OFF のままなら従来の音声経路を変えない）
+  if (!off) connectAudioElements(vid[0], vid[1]);
+  const q = _afType === 'bandpass' ? _afBwToQ(parseFloat(_elAfBw.value)) : Math.SQRT1_2;
+  setAudioFilter(_afType, _afHz(parseFloat(_elAfFreq.value)), q);
+}
+
+function _setAfType(type) {
+  _afType = type;
+  document.querySelectorAll('#afTypeBtns [data-aftype]').forEach(b =>
+    b.classList.toggle('active', b.dataset.aftype === type));
+  _applyAudioFilter();
+}
+
+document.querySelectorAll('#afTypeBtns [data-aftype]').forEach(btn => {
+  btn.addEventListener('click', () => _setAfType(btn.dataset.aftype));
+});
+
+bindSlider('afBw', 'afBwVal', v => v.toFixed(1), _applyAudioFilter);
+
+_elAfFreq.addEventListener('input', () => {
+  _elAfFreqVal.value = _afFmtHz(_afHz(parseFloat(_elAfFreq.value)));
+  updateSliderFill(_elAfFreq);
+  _applyAudioFilter();
+});
+{
+  const applyFreqText = () => {
+    const hz = _afParseHz(_elAfFreqVal.value);
+    if (isNaN(hz)) { _elAfFreqVal.value = _afFmtHz(_afHz(parseFloat(_elAfFreq.value))); return; }
+    _elAfFreq.value = Math.min(1000, Math.max(0, Math.round(_afPos(Math.min(_AF_MAX_HZ, Math.max(_AF_MIN_HZ, hz))))));
+    _elAfFreq.dispatchEvent(new Event('input'));
+  };
+  _elAfFreqVal.addEventListener('focus', () => _elAfFreqVal.select());
+  _elAfFreqVal.addEventListener('change', applyFreqText);
+  _elAfFreqVal.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { applyFreqText(); _elAfFreqVal.blur(); }
+    if (e.key === 'Escape') { _elAfFreqVal.value = _afFmtHz(_afHz(parseFloat(_elAfFreq.value))); _elAfFreqVal.blur(); }
+  });
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'ctrl-reset-btn';
+  resetBtn.dataset.i18nTitle = 'slider-reset';
+  resetBtn.title = t('slider-reset');
+  resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
+  resetBtn.addEventListener('click', () => {
+    _elAfFreq.value = _elAfFreq.defaultValue;
+    _elAfFreq.dispatchEvent(new Event('input'));
+  });
+  _elAfFreqVal.insertAdjacentElement('afterend', resetBtn);
+  lucide.createIcons({ nodes: [resetBtn] });
+  updateSliderFill(_elAfFreq);
+  _elAfFreqVal.value = _afFmtHz(_afHz(parseFloat(_elAfFreq.value)));
+}
+
+document.getElementById('audioFilterResetBtn').addEventListener('click', () => {
+  _elAfFreq.value = _elAfFreq.defaultValue;
+  _elAfFreq.dispatchEvent(new Event('input'));
+  _elAfBw.value = _elAfBw.defaultValue;
+  _elAfBw.dispatchEvent(new Event('input'));
+  _setAfType('off');
 });
 
 // オフセットステップボタン

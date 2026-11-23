@@ -631,6 +631,32 @@
 
     <div class="panel-sep"></div>
 
+    <!-- オーディオ -->
+    <div class="card" id="audioFilterCard" data-card-id="audio">
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="audio-lines"></i><span data-i18n="af-title">オーディオ</span></span><button class="preset-item-del icon-btn--reset" id="audioFilterResetBtn" data-i18n-title="af-reset-title" title="オーディオをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="ctrl-row" id="afTypeRow">
+        <label data-i18n="af-type">種類</label>
+        <div class="phone-ui-group" id="afTypeBtns">
+          <button class="spec-sym-btn active" data-aftype="off" data-i18n-title="af-off" title="OFF"><i data-lucide="ban"></i></button>
+          <button class="spec-sym-btn" data-aftype="lowpass" data-i18n-title="af-lowpass" title="ローパス"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9c4 0 5 8 9 8"/></svg></button>
+          <button class="spec-sym-btn" data-aftype="highpass" data-i18n-title="af-highpass" title="ハイパス"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16c4 0 5-8 9-8h9"/></svg></button>
+          <button class="spec-sym-btn" data-aftype="bandpass" data-i18n-title="af-bandpass" title="バンドパス"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h3c3 0 3-10 6-10s3 10 6 10h3"/></svg></button>
+        </div>
+      </div>
+      <div class="ctrl-row" id="afFreqRow" style="display:none">
+        <label data-i18n="af-freq">周波数</label>
+        <input type="range" id="afFreq" min="0" max="1000" value="566" step="1">
+        <input type="text" class="ctrl-val" id="afFreqVal" value="1.0k" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row" id="afBwRow" style="display:none">
+        <label data-i18n="af-bw">帯域幅</label>
+        <input type="range" id="afBw" min="0.1" max="4" value="1" step="0.1">
+        <input type="text" class="ctrl-val" id="afBwVal" value="1.0" spellcheck="false" autocomplete="off">
+      </div>
+    </div><!-- /audioFilterCard -->
+
+    <div class="panel-sep"></div>
+
     <!-- プリセット -->
     <div class="card" id="presetCard" data-card-id="preset">
       <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="bookmark"></i><span data-i18n="preset-title">プリセット</span></span><button class="preset-item-del icon-btn--import" id="presetImportToggleBtn" data-i18n-title="import-code" title="コードをインポート" style="width:22px;height:22px;padding:0"><i data-lucide="log-in"></i></button><button class="preset-item-del icon-btn--copy" id="presetCopyAllBtn" data-i18n-title="copy-all-code" title="コードをコピー" style="width:22px;height:22px;padding:0"><i data-lucide="copy"></i></button><button class="preset-item-del icon-btn--dl" id="presetJsonExportBtn" data-i18n-title="export-json" title="JSONファイルで保存" style="width:22px;height:22px;padding:0"><i data-lucide="download"></i></button></div>

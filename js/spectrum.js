@@ -9,6 +9,31 @@ const _gainNodes = [null, null];
 
 const FFT_SIZE = 2048; // 1024 bins
 
+// マスター出力のオーディオフィルター。gain → filter → analyser → destination の順で、
+// スペクトラム表示もフィルター後の音を使う
+let _filter = null;
+const _afParams = { type: 'off', freq: 1000, q: 0.7071 };
+
+function _applyFilterParams(immediate) {
+  if (!_filter) return;
+  // off は allpass で素通し（ノードの付け外しによるクリックノイズを避ける）
+  _filter.type = _afParams.type === 'off' ? 'allpass' : _afParams.type;
+  if (immediate) {
+    _filter.frequency.value = _afParams.freq;
+    _filter.Q.value = _afParams.q;
+  } else {
+    const t = _audioCtx.currentTime;
+    _filter.frequency.setTargetAtTime(_afParams.freq, t, 0.02);
+    _filter.Q.setTargetAtTime(_afParams.q, t, 0.02);
+  }
+}
+
+// type: 'off' | 'lowpass' | 'highpass' | 'bandpass'。未接続なら値だけ保持し、接続時に適用する
+export function setAudioFilter(type, freq, q) {
+  Object.assign(_afParams, { type, freq, q });
+  _applyFilterParams(false);
+}
+
 function _ensureCtx() {
   if (_audioCtx) return;
   _audioCtx = new AudioContext();
@@ -18,6 +43,9 @@ function _ensureCtx() {
   _analyser.minDecibels         = -90;
   _analyser.maxDecibels         = -10;
   _dataArray = new Uint8Array(_analyser.frequencyBinCount);
+  _filter = _audioCtx.createBiquadFilter();
+  _applyFilterParams(true);
+  _filter.connect(_analyser);
   _analyser.connect(_audioCtx.destination);
 }
 
@@ -29,7 +57,7 @@ function _connectVideo(v, i) {
     gain.gain.value = 1.0;
     _gainNodes[i]   = gain;
     source.connect(gain);
-    gain.connect(_analyser);
+    gain.connect(_filter);
     v._specConnected = true;
   } catch (_) {}
 }
