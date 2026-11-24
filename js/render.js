@@ -147,6 +147,42 @@ export function _buildBorderGrad(ctx, m, phase, anim, bright) {
 // setInterval との競合によるティアリングを防ぐ。
 export let _renderIntervalId = null; // 互換用（現在は未使用）
 
+// マスクの外接矩形だけの小さなキャンバスで前景を切り抜き、メインに貼る。
+// 4K 全面（約830万画素）を毎フレーム処理せず、マスクの面積に比例したコストで済む。
+let _maskBoxCvs = null;
+let _maskBoxCtx = null;
+function _drawFgInMaskBox(src, W, H, m, dx, dy, zz, alpha) {
+  let x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
+  if (m.shape === 'spectrum' && m.specRotate) {
+    // 回転すると外接矩形からはみ出すため、対角線を半径とする正方形で覆う
+    const r = Math.hypot(m.w, m.h) / 2;
+    const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+    x0 = cx - r; y0 = cy - r; x1 = cx + r; y1 = cy + r;
+  }
+  x0 = Math.max(0, Math.floor(x0) - 2); y0 = Math.max(0, Math.floor(y0) - 2);
+  x1 = Math.min(W, Math.ceil(x1) + 2);  y1 = Math.min(H, Math.ceil(y1) + 2);
+  const bw = x1 - x0, bh = y1 - y0;
+  if (bw <= 0 || bh <= 0) return;
+  const sw = src.videoWidth || src.naturalWidth || src.width;
+  const sh = src.videoHeight || src.naturalHeight || src.height;
+  if (!sw || !sh) return;
+  if (!_maskBoxCvs) { _maskBoxCvs = document.createElement('canvas'); _maskBoxCtx = _maskBoxCvs.getContext('2d'); }
+  if (_maskBoxCvs.width !== bw || _maskBoxCvs.height !== bh) { _maskBoxCvs.width = bw; _maskBoxCvs.height = bh; }
+  else _maskBoxCtx.clearRect(0, 0, bw, bh);
+  // 前景全体は (dx, dy, W*zz, H*zz) に描かれる。小キャンバスから見た相対位置に全体を描く
+  // （元画像の矩形指定 drawImage は動画フレームで遅い経路に落ちるため使わない。はみ出し部分は描画されない）
+  _maskBoxCtx.drawImage(src, dx - x0, dy - y0, W * zz, H * zz);
+  _maskBoxCtx.save();
+  _maskBoxCtx.globalCompositeOperation = 'destination-in';
+  _maskBoxCtx.translate(-x0, -y0);
+  const gp = buildMaskPath(_maskBoxCtx, m);
+  gp ? _maskBoxCtx.fill(gp) : _maskBoxCtx.fill();
+  _maskBoxCtx.restore();
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.drawImage(_maskBoxCvs, x0, y0);
+  ctx.globalAlpha = 1; ctx.restore();
+}
+
 export function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
   if (state.followMode === 'mask') {
@@ -200,12 +236,13 @@ export function _renderFrame() {
   const fgDraw = fgAlpha * (elFgOpacity ? parseFloat(elFgOpacity.value) / 100 : 1);
   setLastFgAlpha(fgAlpha);
   if (loaded[1] && !visHidden[1]) {
-    offCtx.clearRect(0, 0, W, H);
     const maskZoom = state.fgZoomDisp;
+    // 前景の描画位置・倍率（dx, dy, zz）
+    // Mode 1（OFF）: マスク中央を zoom の基点にする（マスク追従）
+    // Mode 2（ON） : ビデオのアンカー点（fgPinX/Yでパン）がマスク中央に重なるよう描画
+    let dx = 0, dy = 0, zz = 1;
     if (Math.abs(maskZoom - 1) > 0.001 || Math.abs(parseFloat(elMaskZoom.value) - 1) > 0.001 || state.fgFixed) {
-      // Mode 1（OFF）: マスク中央を zoom の基点にする（マスク追従）
-      // Mode 2（ON） : ビデオのアンカー点（fgPinX/Yでパン）がマスク中央に重なるよう描画
-      let dx, dy;
+      zz = maskZoom;
       if (state.fgFixed) {
         const mcx = m.x + m.w / 2;
         const mcy = m.y + m.h / 2;
@@ -219,10 +256,13 @@ export function _renderFrame() {
         dx = cx * (1 - maskZoom);
         dy = cy * (1 - maskZoom);
       }
-      offCtx.drawImage(_getVidSrc(1), dx, dy, W * maskZoom, H * maskZoom);
-    } else {
-      offCtx.drawImage(_getVidSrc(1), 0, 0, W, H);
     }
+    if (!maskHidden && maskBlur <= 0 && pixelAmt < 1) {
+      // ぼかし・ピクセル化なしの通常経路: マスクの外接矩形だけを処理する
+      _drawFgInMaskBox(_getVidSrc(1), W, H, m, dx, dy, zz, fgDraw);
+    } else {
+    offCtx.clearRect(0, 0, W, H);
+    offCtx.drawImage(_getVidSrc(1), dx, dy, W * zz, H * zz);
     // --- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ---
     if (pixelAmt >= 1) {
       const pSize = Math.round(pixelAmt * 4);
@@ -236,6 +276,7 @@ export function _renderFrame() {
       offCtx.imageSmoothingEnabled = true;
     }
 
+    // マスク適用: offCvs にくり抜き（destination-in）してから合成する。
     // ぼかしありの場合は offCvs にマスクを適用しない
     // （端まで画素データを保ったまま blur し、ctx.clip() で切り抜く）
     if (!maskHidden && maskBlur <= 0) {
@@ -259,6 +300,7 @@ export function _renderFrame() {
       ctx.save(); ctx.globalAlpha = fgDraw;
       ctx.drawImage(offCvs, 0, 0);
       ctx.globalAlpha = 1; ctx.restore();
+    }
     }
   } else if (loaded[0] && !visHidden[1] && !maskHidden && _fgFadeStart !== 0) {
     // 前景なし かつ アンカーモード ON → 動画1をアンカー位置で描画
@@ -804,13 +846,67 @@ function _spectrumSkyline(ctx, m) {
   return true;
 }
 
+// --- 小キャンバス描画レイヤー ---
+// Skia Graphite（Chrome 新描画エンジン）では、矩形以外のパス描画のコストが
+// 描く図形の大きさではなくキャンバス全体の大きさに比例し、4K では 1 本の枠線で 10fps 前後まで落ちる。
+// マスク周辺だけの小さなキャンバスにパスを描き、本体キャンバスに貼ることで回避する。
+// 描画コードは絶対座標のまま書けるよう、箱キャンバスに平行移動（と縮小）の変換を掛けて渡す。
+const _BOX_MAX_PX = 2.2e6; // これを超える箱は縮小して描く（約2.3MPを超えると急に遅くなる）
+function _newBoxLayer(target) {
+  return { target, cvs: document.createElement('canvas'), ctx: null, last: null, x: 0, y: 0, dw: 0, dh: 0, sw: 0, sh: 0 };
+}
+// 描画範囲（本体キャンバス座標）を決めて箱キャンバスを用意し、描画用コンテキストを返す
+function _boxBegin(L, x0, y0, x1, y1, W, H) {
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(W, Math.ceil(x1));  y1 = Math.min(H, Math.ceil(y1));
+  const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0);
+  const k = Math.min(1, Math.sqrt(_BOX_MAX_PX / (bw * bh)));
+  const sw = Math.ceil(bw * k), sh = Math.ceil(bh * k);
+  // 大きさの変化のたびに再確保しないよう、足りない時だけ（または大きすぎる時に）64px 単位で確保し直す
+  const need = Math.ceil(sw / 64) * 64, needH = Math.ceil(sh / 64) * 64;
+  if (!L.ctx) L.ctx = L.cvs.getContext('2d');
+  if (L.cvs.width < sw || L.cvs.height < sh || L.cvs.width > need * 2 || L.cvs.height > needH * 2) {
+    L.cvs.width = need; L.cvs.height = needH;
+  }
+  const c = L.ctx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, L.cvs.width, L.cvs.height);
+  c.setTransform(k, 0, 0, k, -x0 * k, -y0 * k);
+  L.x = x0; L.y = y0; L.sw = sw; L.sh = sh; L.dw = sw / k; L.dh = sh / k;
+  // サンプリング等で箱の座標系が必要な描画向け
+  c._bx = x0; c._by = y0; c._bk = k;
+  return c;
+}
+// 前回貼った領域をすべて消してから、今回描いたレイヤーを貼る（レイヤー同士で消し合わないよう消去を先にまとめる）
+function _boxFinish(layers) {
+  for (const [L] of layers) { if (L.last) L.target.clearRect(L.last.x, L.last.y, L.last.w, L.last.h); }
+  for (const [L, opened] of layers) {
+    if (!opened) { L.last = null; continue; }
+    L.target.drawImage(L.cvs, 0, 0, L.sw, L.sh, L.x, L.y, L.dw, L.dh);
+    L.last = { x: L.x, y: L.y, w: Math.ceil(L.dw), h: Math.ceil(L.dh) };
+  }
+}
+// canvas.js との循環インポートのため、モジュール読み込み時には overlayCtx が未初期化。初回描画時に作る
+let _ovLayer = null, _anLayer = null, _retLayer = null;
+
 // → effectsWrap 外側の overlayCanvas に描くため CSS filter 非適用
 export function _drawOverlays() {
-  const dCtx = overlayCtx;
+  if (!_ovLayer) { _ovLayer = _newBoxLayer(overlayCtx); _anLayer = _newBoxLayer(anchorCtx); _retLayer = _newBoxLayer(anchorCtx); }
   const W = canvas.width, H = canvas.height;
-  dCtx.clearRect(0, 0, W, H);
   const m = state.mask;
   const bufScale = _lastBufScale;
+  // 描画範囲: マスクの周囲（スマホ枠のはみ出し・ハンドル・枠線の太さ分の余白つき）。
+  // 回転したスペクトラムは外接矩形からはみ出すため、対角線を半径とする範囲で覆う。
+  // 実際に描くときだけ箱を開き、描かなかったレイヤーは前回分を消すだけにする
+  const _cx = m.x + m.w / 2, _cy = m.y + m.h / 2;
+  const _pad = 0.3 * Math.max(m.w, m.h) + 48 * bufScale;
+  const _rot = m.shape === 'spectrum' && m.specRotate;
+  const _hx = (_rot ? Math.hypot(m.w, m.h) / 2 : m.w / 2) + _pad;
+  const _hy = (_rot ? Math.hypot(m.w, m.h) / 2 : m.h / 2) + _pad;
+  let _ovOpen = false, _anOpen = false, _retOpen = false;
+  const openD = () => { if (!_ovOpen) { _boxBegin(_ovLayer, _cx - _hx, _cy - _hy, _cx + _hx, _cy + _hy, W, H); _ovOpen = true; } return _ovLayer.ctx; };
+  const openA = () => { if (!_anOpen) { _boxBegin(_anLayer, _cx - _hx, _cy - _hy, _cx + _hx, _cy + _hy, W, H); _anOpen = true; } return _anLayer.ctx; };
+  const openR = (ax, ay, rr) => { if (!_retOpen) { _boxBegin(_retLayer, ax - rr, ay - rr, ax + rr, ay + rr, W, H); _retOpen = true; } return _retLayer.ctx; };
 
   // --- マスク枠 ---
   const bw = parseFloat(elBorderW.value);
@@ -829,6 +925,7 @@ export function _drawOverlays() {
     }
     if (borderFadeA > 0) {
       const anim = elBorderAnim.value;
+      const dCtx = openD();
       dCtx.save();
       dCtx.lineWidth   = bw * 1.5 * bufScale;
       dCtx.globalAlpha = (parseInt(elBorderOpacity.value, 10) / 100) * borderFadeA;
@@ -855,6 +952,7 @@ export function _drawOverlays() {
 
   // --- リサイズハンドル ---
   if ((state.maskHovered || state.drag.active || state.maskTouched) && !maskHidden && !visHidden[1] && state.followMode === 'none' && state.drag.mode !== 'fg-anchor') {
+    const dCtx = openD();
     dCtx.save();
     const accent = _cachedAccent;
     const hSz = Math.max(1, Math.round(HANDLE_SZ * bufScale));
@@ -870,7 +968,7 @@ export function _drawOverlays() {
 
   // --- 前景アンカー（phone + fgFixed ON 時） ---
   // anchorCtx (mix-blend-mode:difference CSS) に描画 → 下の映像とネガポジ反転
-  anchorCtx.clearRect(0, 0, W, H);
+  // （レイヤーを開いたときだけ描き、前回分の消去は _boxFinish がまとめて行う）
 
   // --- borderInvert 枠（anchorCanvas の difference 合成を利用） ---
   if (state.borderInvert && bw > 0 && !maskHidden && !visHidden[1] && state.mask.shape !== 'glasses') {
@@ -882,6 +980,7 @@ export function _drawOverlays() {
     else if (_maskBorderFadeStart > 0) { bfa = Math.min(1, (performance.now() - _maskBorderFadeStart) / 500); }
     else { bfa = 1; }
     if (bfa > 0) {
+      const anchorCtx = openA();
       anchorCtx.save();
       anchorCtx.lineWidth   = bw * 1.5 * bufScale;
       anchorCtx.globalAlpha = (parseInt(elBorderOpacity.value, 10) / 100) * bfa;
@@ -906,6 +1005,7 @@ export function _drawOverlays() {
     const lw  = Math.max(1,  1.2 * bufScale);
     const clw = Math.max(1,  1.0 * bufScale);
     const _anchorAlpha = elFgPinOpacity ? parseFloat(elFgPinOpacity.value) / 100 : 1;
+    const anchorCtx = openR(ax, ay, r + abw + 8 * bufScale);
     anchorCtx.save();
     anchorCtx.globalAlpha = _anchorAlpha;
     // globalCompositeOperation はデフォルト source-over のまま
@@ -934,18 +1034,19 @@ export function _drawOverlays() {
     const phase = (performance.now() * 0.001 * speed) % 1;
     if (state.borderInvert) {
       // UI要素は dCtx に通常描画、本体アウトラインのみ anchorCtx に白で描画
-      _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase, null, true, false, true);   // UI only (skip outline + dot)
-      _drawPhoneFrame(anchorCtx, m, bufScale, 1.0, phase, '#ffffff', false, true); // outline + dot
+      _drawPhoneFrame(openD(), m, bufScale, 1.0, phase, null, true, false, true);   // UI only (skip outline + dot)
+      _drawPhoneFrame(openA(), m, bufScale, 1.0, phase, '#ffffff', false, true); // outline + dot
     } else {
-      _drawPhoneFrame(dCtx, m, bufScale, 1.0, phase);
+      _drawPhoneFrame(openD(), m, bufScale, 1.0, phase);
     }
   }
 
   // --- メガネ枠オーバーレイ ---
   if (!maskHidden && !visHidden[1] && state.mask.shape === 'glasses') {
-    const gfCtx = state.borderInvert ? anchorCtx : dCtx;
+    const gfCtx = state.borderInvert ? openA() : openD();
     _drawGlassesFrame(gfCtx, m, bufScale, state.borderInvert ? '#ffffff' : null);
   }
+  _boxFinish([[_ovLayer, _ovOpen], [_anLayer, _anOpen], [_retLayer, _retOpen]]);
 }
 
 let _fpsLastTime = 0;
@@ -1670,9 +1771,11 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
     const gx = Math.floor(sbCx - glassR);
     const gy = Math.floor(sbCy - glassR);
     const gd = Math.ceil(glassR * 2);
-    const cW = ctx.canvas.width, cH = ctx.canvas.height;
-    const safeGx = Math.max(0, gx);
-    const safeGy = Math.max(0, gy);
+    // 箱レイヤーに描いている場合、キャンバスの原点・縮尺は本体キャンバスとずれている（_boxBegin 参照）
+    const bx0 = ctx._bx || 0, by0 = ctx._by || 0, bk = ctx._bk || 1;
+    const cW = bx0 + ctx.canvas.width / bk, cH = by0 + ctx.canvas.height / bk;
+    const safeGx = Math.max(bx0, gx);
+    const safeGy = Math.max(by0, gy);
     const safeW  = Math.min(gd - (safeGx - gx), cW - safeGx);
     const safeH  = Math.min(gd - (safeGy - gy), cH - safeGy);
     if (safeW > 4 && safeH > 4) {
@@ -1684,7 +1787,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
           _glassSamplerCtx = _glassSamplerCvs.getContext('2d');
         }
         // GPU間コピー（CPU readbackなし）
-        _glassSamplerCtx.drawImage(ctx.canvas, safeGx, safeGy, safeW, safeH, 0, 0, safeW, safeH);
+        _glassSamplerCtx.drawImage(ctx.canvas, (safeGx - bx0) * bk, (safeGy - by0) * bk, safeW * bk, safeH * bk, 0, 0, safeW, safeH);
         // blur を DOM外Canvas で適用（overlayCtxへのfilter設定が強制スタイル再計算を引き起こすため）
         if (!_glassBlurCvs || _glassBlurCvs.width !== safeW || _glassBlurCvs.height !== safeH) {
           _glassBlurCvs = document.createElement('canvas');
