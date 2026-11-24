@@ -37,7 +37,7 @@ import {
   _updateFgFixedBtn, _updateArLockBtn, _updateZoomLockBtn,
 } from './canvas.js';
 import {
-  _applyBorderAnim, _syncAnimColors,
+  _applyBorderAnim, _syncAnimColors, getAudioFilterSettings, applyAudioFilterSettings,
 } from './controls.js';
 import { _setRenderPresets, applyLang } from './lang.js';
 import { showToast } from './toast.js';
@@ -135,6 +135,7 @@ export function collectSettings() {
     phoneShowRec:   state.phoneShowRec,
     phoneShowDot:   state.phoneShowDot,
     filterMaskOnly: { ...state.filterMaskOnly },
+    ...getAudioFilterSettings(),
   };
 }
 
@@ -234,6 +235,7 @@ export function applySettings(d) {
     el.value = vals[id];
     el.dispatchEvent(new Event('input'));
   });
+  applyAudioFilterSettings(d);
   if (d.borderColor) {
     document.getElementById('borderColor').value = d.borderColor;
     document.getElementById('borderColorSwatch').style.background = d.borderColor;

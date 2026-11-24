@@ -1085,12 +1085,25 @@ _elAfFreq.addEventListener('input', () => {
 }
 
 document.getElementById('audioFilterResetBtn').addEventListener('click', () => {
-  _elAfFreq.value = _elAfFreq.defaultValue;
-  _elAfFreq.dispatchEvent(new Event('input'));
-  _elAfBw.value = _elAfBw.defaultValue;
-  _elAfBw.dispatchEvent(new Event('input'));
-  _setAfType('off');
+  resetAudioFilter();
 });
+
+// プリセット用: 現在のオーディオフィルター設定を取得 / 適用する
+const _AF_TYPES = ['off', 'lowpass', 'highpass', 'bandpass'];
+export function getAudioFilterSettings() {
+  return { afType: _afType, afFreq: _elAfFreq.value, afBw: _elAfBw.value };
+}
+// 未設定（古いプリセット等）の項目は初期値（フィルターなし）に戻す
+export function applyAudioFilterSettings(d) {
+  _elAfFreq.value = d.afFreq ?? _elAfFreq.defaultValue;
+  _elAfFreq.dispatchEvent(new Event('input'));
+  _elAfBw.value = d.afBw ?? _elAfBw.defaultValue;
+  _elAfBw.dispatchEvent(new Event('input'));
+  _setAfType(_AF_TYPES.includes(d.afType) ? d.afType : 'off');
+}
+export function resetAudioFilter() {
+  applyAudioFilterSettings({});
+}
 
 // オフセットステップボタン
 document.querySelectorAll('.offset-btn').forEach(btn => {
