@@ -16,7 +16,7 @@ import {
   setCompositeT, setCompositeLastRaf,
   _maskBorderFadeStart, _fgFadeStart,
   elFilterBrightness, elFilterContrast, elFilterSaturation, elFilterHue,
-  elFilterBlur, elFilterHighlight, elFilterShadow, elFilterSharpness,
+  elFilterBlur, BLUR_SIGMA_PER_UNIT, elFilterPixel, elFilterHighlight, elFilterShadow, elFilterSharpness,
   elFilterCA, elFilterVignette, elFilterMatte, elFilterGrain,
   elFilterFlare, elFilterFps, elFilterBars, elFilterBloom,
   elFilterPencil, elFilterEmboss, elFilterChalkboard, elFilterNightVision, elFilterAirbrush,
@@ -25,7 +25,7 @@ import {
   elBorderAnim, elBorderAnimSpeed, elBorderAnimBright,
   elFrameBlur, elFrameTint,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity, elFgOpacity,
-  elMaskZoom, elMaskBlur, elMaskPixel,
+  elMaskZoom,
   elSpecBars, elSpecAmp, elSpecGap, elSpecSmooth,
   _scheduleResync,
   _syncOffsetSliders,
@@ -36,15 +36,53 @@ import { getSpectrumBars, smoothBars } from './spectrum.js';
 import { applyFiltersGL, warmUpFiltersGL } from './gl-filters.js';
 import { perfFrame } from './perf-hud.js';
 
-// --- Canvas CSS フィルター（明るさ / コントラスト / 彩度） ---
+// --- 明るさ / コントラスト / 彩度 / 色相 ---
+// 適用範囲が「全体」のものは CSS フィルター（effectsWrap。雨オーバーレイにも掛かる）、
+// 「マスク内のみ / マスク外のみ」のものは canvas 側（表示用キャンバスへ焼き込み）で掛ける
+// （モジュールの読み込み順の都合で、要素の参照は使うときに行う）
+const _colorFilterDefs = () => [
+  ['brightness', elFilterBrightness, 100, v => `brightness(${v}%)`],
+  ['contrast',   elFilterContrast,   100, v => `contrast(${v}%)`],
+  ['saturation', elFilterSaturation, 100, v => `saturate(${v}%)`],
+  ['hue',        elFilterHue,        0,   v => `hue-rotate(${v}deg)`],
+];
+let _lastCssFilter = '';
+export function _colorFilters() {
+  const g = { all: [], in: [], out: [] };
+  if (!effectsHidden) {
+    for (const [key, el, def, fmt] of _colorFilterDefs()) {
+      const v = parseFloat(el.value);
+      if (v === def) continue;
+      const sc = _maskScope(key);
+      g[sc === 1 ? 'in' : sc === 2 ? 'out' : 'all'].push(fmt(v));
+    }
+  }
+  return { css: g.all.join(' '), inStr: g.in.join(' '), outStr: g.out.join(' ') };
+}
+// スクリーンショット用: 画面に CSS で掛かっている色補正
+export function getCssColorFilter() { return _colorFilters().css; }
 export function updateCanvasFilter() {
-  if (effectsHidden) { effectsWrap.style.filter = ''; return; }
-  const b  = parseFloat(elFilterBrightness.value);
-  const co = parseFloat(elFilterContrast.value);
-  const s  = parseFloat(elFilterSaturation.value);
-  const h  = parseFloat(elFilterHue.value);
-  effectsWrap.style.filter = (b === 100 && co === 100 && s === 100 && h === 0)
-    ? '' : `brightness(${b}%) contrast(${co}%) saturate(${s}%) hue-rotate(${h}deg)`;
+  const css = _colorFilters().css;
+  effectsWrap.style.filter = css;
+  _lastCssFilter = css;
+}
+let _colTmp = null, _colTmpCtx = null;
+function _applyColorScopes(c, W, H, m, cf) {
+  if (cf.outStr) {
+    // 外のみ: 全面に掛けたあと、枠の中だけ元の絵（内のみの色補正があればそれを掛けた絵）で描き直す
+    if (!_colTmp) { _colTmp = document.createElement('canvas'); _colTmpCtx = _colTmp.getContext('2d'); }
+    if (_colTmp.width !== W || _colTmp.height !== H) { _colTmp.width = W; _colTmp.height = H; }
+    else _colTmpCtx.clearRect(0, 0, W, H);
+    _colTmpCtx.drawImage(c.canvas, 0, 0);
+    c.globalCompositeOperation = 'copy';
+    c.filter = cf.outStr;
+    c.drawImage(_colTmp, 0, 0);
+    c.filter = 'none';
+    c.globalCompositeOperation = 'source-over';
+    _drawMaskedRegion(c, _colTmp, W, H, m, cf.inStr, 0);
+  } else {
+    _drawMaskedRegion(c, c.canvas, W, H, m, cf.inStr, 0);
+  }
 }
 
 // シネマバーは effectsWrap（雨オーバーレイを含む）の外側の div で表示
@@ -185,6 +223,115 @@ function _drawFgInMaskBox(src, W, H, m, dx, dy, zz, alpha) {
   ctx.globalAlpha = 1; ctx.restore();
 }
 
+// フィルターの適用範囲（state.filterMaskOnly[key]）: 0 = 全体 / 1 = マスク内のみ / 2 = マスク外のみ。
+// マスクが非表示、または動画が無いときは全体として扱う（他のマスク内のみフィルターと同じ）
+function _maskScope(key) {
+  const v = state.filterMaskOnly[key];
+  if (!v || maskHidden || !(loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0])) return 0;
+  return v === 'out' ? 2 : 1;
+}
+
+// 雨の適用範囲。マスクが変わらない間は雨側がマスク画像を再利用する（key で判定）
+function _rainMask() {
+  const mode = _maskScope('rain');
+  if (!mode) return null;
+  const W = canvas.width, H = canvas.height, m = state.mask;
+  return { mode, key: W + 'x' + H + JSON.stringify(m), get: () => _maskAlphaBox(W, H, m) };
+}
+
+// マスクの内側だけを src から描き直して target に重ねる。filterStr（CSS filter 文字列。空なら無加工）を掛けて描ける。
+// 全体ぼかし・ピクセル化・色補正の適用範囲をマスク内 / 外に分けるために使う。マスク周辺だけの小さなキャンバスで済ませる。
+// pad: 範囲の外へ広げる量（ぼかしの端が枠の中に影響しないよう、3σ ぶん広めに取る）
+let _scopeBoxCvs = null, _scopeBoxCtx = null;
+function _drawMaskedRegion(target, src, W, H, m, filterStr, padExtra, nearest, srcPad = 0) {
+  let x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
+  if (m.shape === 'spectrum' && m.specRotate) {
+    const r = Math.hypot(m.w, m.h) / 2;
+    const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+    x0 = cx - r; y0 = cy - r; x1 = cx + r; y1 = cy + r;
+  }
+  const pad = 2 + padExtra;
+  x0 = Math.max(0, Math.floor(x0) - pad); y0 = Math.max(0, Math.floor(y0) - pad);
+  x1 = Math.min(W, Math.ceil(x1) + pad);  y1 = Math.min(H, Math.ceil(y1) + pad);
+  const bw = x1 - x0, bh = y1 - y0;
+  if (bw <= 0 || bh <= 0) return;
+  if (!_scopeBoxCvs) { _scopeBoxCvs = document.createElement('canvas'); _scopeBoxCtx = _scopeBoxCvs.getContext('2d'); }
+  const needW = Math.ceil(bw / 64) * 64, needH = Math.ceil(bh / 64) * 64;
+  if (_scopeBoxCvs.width < bw || _scopeBoxCvs.height < bh || _scopeBoxCvs.width > needW * 2 || _scopeBoxCvs.height > needH * 2) {
+    _scopeBoxCvs.width = needW; _scopeBoxCvs.height = needH;
+  }
+  const c = _scopeBoxCtx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, _scopeBoxCvs.width, _scopeBoxCvs.height);
+  // 全体を箱の位置に合わせて描く（元画像の矩形指定 drawImage より速い）
+  c.imageSmoothingEnabled = !nearest;
+  if (filterStr) c.filter = filterStr;
+  c.drawImage(src, -x0 - srcPad, -y0 - srcPad, W + srcPad * 2, H + srcPad * 2);
+  c.filter = 'none';
+  c.imageSmoothingEnabled = true;
+  c.setTransform(1, 0, 0, 1, -x0, -y0);
+  c.globalCompositeOperation = 'destination-in';
+  const gp = buildMaskPath(c, m);
+  gp ? c.fill(gp) : c.fill();
+  c.globalCompositeOperation = 'source-over';
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  target.drawImage(_scopeBoxCvs, 0, 0, bw, bh, x0, y0, bw, bh);
+}
+
+// ぼかし用に、画像の外側へ端の画素を複製して広げた画像を作る（p px ぶん）。
+// そのままぼかすと画面の端が透明に薄れたり、端の 1〜2 行だけぼけずに残ったりするのを避ける
+let _extCvs = null, _extCtx = null;
+function _edgeExtended(src, W, H, p) {
+  if (!_extCvs) { _extCvs = document.createElement('canvas'); _extCtx = _extCvs.getContext('2d'); }
+  const EW = W + p * 2, EH = H + p * 2;
+  if (_extCvs.width !== EW || _extCvs.height !== EH) { _extCvs.width = EW; _extCvs.height = EH; }
+  const c = _extCtx;
+  c.globalCompositeOperation = 'copy';
+  c.drawImage(src, p, p);
+  c.globalCompositeOperation = 'source-over';
+  c.imageSmoothingEnabled = false;
+  c.drawImage(src, 0, 0, 1, H, 0, p, p, H);
+  c.drawImage(src, W - 1, 0, 1, H, W + p, p, p, H);
+  c.drawImage(src, 0, 0, W, 1, p, 0, W, p);
+  c.drawImage(src, 0, H - 1, W, 1, p, H + p, W, p);
+  c.drawImage(src, 0, 0, 1, 1, 0, 0, p, p);
+  c.drawImage(src, W - 1, 0, 1, 1, W + p, 0, p, p);
+  c.drawImage(src, 0, H - 1, 1, 1, 0, H + p, p, p);
+  c.drawImage(src, W - 1, H - 1, 1, 1, W + p, H + p, p, p);
+  c.imageSmoothingEnabled = true;
+  return _extCvs;
+}
+
+// ピクセル化（モザイク）。block = 値 × 4 px。適用範囲に応じて、全面 / マスク内のみ / マスク外のみ を target へ copy で描く
+let _pixSmall = null, _pixSmallCtx = null, _pixFull = null, _pixFullCtx = null;
+function _pixelateInto(target, src, W, H, m, amt, scope) {
+  const size = Math.round(amt * 4);
+  const pw = Math.ceil(W / size), ph = Math.ceil(H / size);
+  if (!_pixSmall) { _pixSmall = document.createElement('canvas'); _pixSmallCtx = _pixSmall.getContext('2d'); }
+  if (_pixSmall.width !== pw || _pixSmall.height !== ph) { _pixSmall.width = pw; _pixSmall.height = ph; }
+  else _pixSmallCtx.clearRect(0, 0, pw, ph);
+  _pixSmallCtx.drawImage(src, 0, 0, pw, ph);
+  target.globalCompositeOperation = 'copy';
+  if (scope === 1) {
+    target.drawImage(src, 0, 0);
+    target.globalCompositeOperation = 'source-over';
+    _drawMaskedRegion(target, _pixSmall, W, H, m, '', 0, true);
+  } else {
+    target.imageSmoothingEnabled = false;
+    target.drawImage(_pixSmall, 0, 0, pw, ph, 0, 0, W, H);
+    target.imageSmoothingEnabled = true;
+    target.globalCompositeOperation = 'source-over';
+    if (scope === 2) _drawMaskedRegion(target, src, W, H, m, '', 0, false);
+  }
+}
+// ピクセル化の結果を一時キャンバスに作る（このあとぼかしを重ねるとき用）
+function _pixelateFrame(src, W, H, m, amt, scope) {
+  if (!_pixFull) { _pixFull = document.createElement('canvas'); _pixFullCtx = _pixFull.getContext('2d'); }
+  if (_pixFull.width !== W || _pixFull.height !== H) { _pixFull.width = W; _pixFull.height = H; }
+  _pixelateInto(_pixFullCtx, src, W, H, m, amt, scope);
+  return _pixFull;
+}
+
 export function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
   if (state.followMode === 'mask') {
@@ -228,10 +375,7 @@ export function _renderFrame() {
     ctx.fillRect(0, 0, W, H);
   }
 
-  const maskBlur = parseFloat(elMaskBlur.value);
-  const pixelAmt = parseFloat(elMaskPixel.value);
-
-  // --- 前景 動画/画像をマスクでクリップ（レイヤー 2）、ぼかしオプションあり ---
+  // --- 前景 動画/画像をマスクでクリップ（レイヤー 2） ---
   const fgAlpha = _fgFadeStart < 0 ? 1
     : _fgFadeStart === 0 ? 0
     : Math.min(1, (performance.now() - _fgFadeStart) / 200);
@@ -259,50 +403,16 @@ export function _renderFrame() {
         dy = cy * (1 - maskZoom);
       }
     }
-    if (!maskHidden && maskBlur <= 0 && pixelAmt < 1) {
-      // ぼかし・ピクセル化なしの通常経路: マスクの外接矩形だけを処理する
+    if (!maskHidden) {
+      // マスクの外接矩形だけを処理する
       _drawFgInMaskBox(_getVidSrc(1), W, H, m, dx, dy, zz, fgDraw);
     } else {
-    offCtx.clearRect(0, 0, W, H);
-    offCtx.drawImage(_getVidSrc(1), dx, dy, W * zz, H * zz);
-    // --- Pixelation (マスク適用前に実施してエッジの隙間を防ぐ) ---
-    if (pixelAmt >= 1) {
-      const pSize = Math.round(pixelAmt * 4);
-      const pw = Math.ceil(W / pSize);
-      const ph = Math.ceil(H / pSize);
-      postCtx.clearRect(0, 0, W, H);
-      postCtx.drawImage(offCvs, 0, 0, pw, ph);
+      // マスク非表示: 前景を全面に描く
       offCtx.clearRect(0, 0, W, H);
-      offCtx.imageSmoothingEnabled = false;
-      offCtx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
-      offCtx.imageSmoothingEnabled = true;
-    }
-
-    // マスク適用: offCvs にくり抜き（destination-in）してから合成する。
-    // ぼかしありの場合は offCvs にマスクを適用しない
-    // （端まで画素データを保ったまま blur し、ctx.clip() で切り抜く）
-    if (!maskHidden && maskBlur <= 0) {
-      offCtx.globalCompositeOperation = 'destination-in';
-      const _gp0 = buildMaskPath(offCtx, m);
-      _gp0 ? offCtx.fill(_gp0) : offCtx.fill();
-      offCtx.globalCompositeOperation = 'source-over';
-    }
-
-    if (maskBlur > 0) {
-      const bp = maskBlur * 2;
-      ctx.save();
-      if (!maskHidden) { const _gp1 = buildMaskPath(ctx, m); _gp1 ? ctx.clip(_gp1) : ctx.clip(); }
-      ctx.filter = `blur(${bp}px)`;
-      ctx.globalAlpha = fgDraw;
-      ctx.drawImage(offCvs, 0, 0);
-      ctx.filter = 'none';
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    } else {
+      offCtx.drawImage(_getVidSrc(1), dx, dy, W * zz, H * zz);
       ctx.save(); ctx.globalAlpha = fgDraw;
       ctx.drawImage(offCvs, 0, 0);
       ctx.globalAlpha = 1; ctx.restore();
-    }
     }
   } else if (loaded[0] && !visHidden[1] && !maskHidden && _fgFadeStart !== 0) {
     // 前景なし かつ アンカーモード ON → 動画1をアンカー位置で描画
@@ -316,60 +426,13 @@ export function _renderFrame() {
       const dx  = mcx - ax * maskZoom;
       const dy  = mcy - ay * maskZoom;
       offCtx.drawImage(_getVidSrc(0), dx, dy, W * maskZoom, H * maskZoom);
-      if (pixelAmt >= 1) {
-        const pSize = Math.round(pixelAmt * 4);
-        const pw = Math.ceil(W / pSize);
-        const ph = Math.ceil(H / pSize);
-        postCtx.clearRect(0, 0, W, H);
-        postCtx.drawImage(offCvs, 0, 0, pw, ph);
-        offCtx.clearRect(0, 0, W, H);
-        offCtx.imageSmoothingEnabled = false;
-        offCtx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
-        offCtx.imageSmoothingEnabled = true;
-      }
-      if (maskBlur <= 0) {
-        offCtx.globalCompositeOperation = 'destination-in';
-        const _gp2 = buildMaskPath(offCtx, m);
-        _gp2 ? offCtx.fill(_gp2) : offCtx.fill();
-        offCtx.globalCompositeOperation = 'source-over';
-        ctx.save(); ctx.globalAlpha = fgDraw;
-        ctx.drawImage(offCvs, 0, 0);
-        ctx.globalAlpha = 1; ctx.restore();
-      } else {
-        const bp = maskBlur * 2;
-        ctx.save();
-        const _gp3 = buildMaskPath(ctx, m); _gp3 ? ctx.clip(_gp3) : ctx.clip();
-        ctx.filter = `blur(${bp}px)`;
-        ctx.globalAlpha = fgDraw;
-        ctx.drawImage(offCvs, 0, 0);
-        ctx.filter = 'none'; ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-    // 前景なし かつ アンカーモード OFF → すりガラス風
-    } else if (pixelAmt >= 1 && maskBlur <= 0) {
-      // ピクセル化 — postCvs で縮小→ctx.clip()内でフルサイズ拡大（destination-inのAA縁を回避）
-      const pSize = Math.round(pixelAmt * 4);
-      const pw = Math.ceil(W / pSize);
-      const ph = Math.ceil(H / pSize);
-      postCtx.clearRect(0, 0, W, H);
-      postCtx.drawImage(_getVidSrc(0), 0, 0, pw, ph);
-      ctx.save();
-      const _gp4 = buildMaskPath(ctx, m);
-      _gp4 ? ctx.clip(_gp4) : ctx.clip();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(postCvs, 0, 0, pw, ph, 0, 0, W, H);
-      ctx.imageSmoothingEnabled = true;
-      ctx.restore();
-    } else if (maskBlur > 0) {
-      // ぼかし (端の薄れ防止のためオーバードロー)
-      const bp = maskBlur * 2;
-      ctx.save();
-      const _gp5 = buildMaskPath(ctx, m);
-      _gp5 ? ctx.clip(_gp5) : ctx.clip();
-      ctx.filter = `blur(${bp}px)`;
-      ctx.drawImage(_getVidSrc(0), -bp, -bp, W + bp * 2, H + bp * 2);
-      ctx.filter = 'none';
-      ctx.restore();
+      offCtx.globalCompositeOperation = 'destination-in';
+      const _gp2 = buildMaskPath(offCtx, m);
+      _gp2 ? offCtx.fill(_gp2) : offCtx.fill();
+      offCtx.globalCompositeOperation = 'source-over';
+      ctx.save(); ctx.globalAlpha = fgDraw;
+      ctx.drawImage(offCvs, 0, 0);
+      ctx.globalAlpha = 1; ctx.restore();
     }
   }
 
@@ -389,14 +452,17 @@ let _glWarmed = false;
 function _applyFiltersViaGL(W, H, m, maskClipOk) {
   if (!_filterGLEnabled) return false;
   const v = el => (el ? parseFloat(el.value) : 0);
-  const mo = {};
-  for (const k in state.filterMaskOnly) mo[k] = !!state.filterMaskOnly[k] && maskClipOk;
+  const mo = {}, inv = {};
+  for (const k in state.filterMaskOnly) {
+    mo[k] = !!state.filterMaskOnly[k] && maskClipOk;
+    inv[k] = state.filterMaskOnly[k] === 'out' && maskClipOk;
+  }
   const A = {
     ca: v(elFilterCA), hl: v(elFilterHighlight), sh: v(elFilterShadow), vig: v(elFilterVignette),
     temp: v(elFilterTemp), tint: v(elFilterTint), matte: v(elFilterMatte), grain: v(elFilterGrain),
     bloom: v(elFilterBloom), sharp: v(elFilterSharpness), pencil: v(elFilterPencil),
     emboss: v(elFilterEmboss), chalk: v(elFilterChalkboard), night: v(elFilterNightVision),
-    air: v(elFilterAirbrush), flare: v(elFilterFlare), mo,
+    air: v(elFilterAirbrush), flare: v(elFilterFlare), mo, inv,
   };
   const out = applyFiltersGL(renderCvs, W, H, m, A, {
     grain: () => { _fillGrain(A.grain); return grainCvs; },
@@ -410,6 +476,14 @@ function _applyFiltersViaGL(W, H, m, maskClipOk) {
     ctx.restore();
   }
   return true;
+}
+
+// フィルター適用範囲のクリップ。inverse = true ならマスクの外側だけに適用する（evenodd で全体からマスクを除く）
+function _clipMaskRegion(c, m, inverse, W, H) {
+  const p = buildMaskPath(c, m);
+  if (!inverse) { if (p) c.clip(p); else c.clip(); return; }
+  if (p) { const q = new Path2D(); q.rect(0, 0, W, H); q.addPath(p); c.clip(q, 'evenodd'); }
+  else { c.rect(0, 0, W, H); c.clip('evenodd'); }
 }
 
 // フィルム粒子のノイズ（256×256、毎フレーム作り直す）。2D 版・WebGL 版で共用
@@ -452,7 +526,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- 色収差（放射状、スケールベース） ---
   const caAmt = parseFloat(elFilterCA.value);
   if (caAmt > 0) {
-    const _foCA = state.filterMaskOnly.ca && _maskClipOk;
+    const _foCA = _maskClipOk && state.filterMaskOnly.ca;
     _snapToPost();
     const s = caAmt * 0.002;
     const cx = W / 2, cy = H / 2;
@@ -478,7 +552,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
     _drawCh('blue', 1 - s);
     caCtx.globalCompositeOperation = 'source-over';
     if (_foCA) {
-      ctx.save(); const _fcap = buildMaskPath(ctx, m); if (_fcap) ctx.clip(_fcap); else ctx.clip();
+      ctx.save(); _clipMaskRegion(ctx, m, _foCA === 'out', W, H);
       ctx.drawImage(caCvs, 0, 0);
       ctx.restore();
     } else {
@@ -499,7 +573,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
     const a = 1 - A;
     if (a <= 1e-6) return;
     ctx.save();
-    if (fo) { const _fap = buildMaskPath(ctx, m); if (_fap) ctx.clip(_fap); else ctx.clip(); }
+    if (fo) _clipMaskRegion(ctx, m, fo === 'out', W, H);
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = `rgba(${Math.min(255, r / a * 255)},${Math.min(255, g / a * 255)},${Math.min(255, b / a * 255)},${a})`;
     ctx.fillRect(0, 0, W, H);
@@ -524,14 +598,14 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   };
   const hlAmt = parseFloat(elFilterHighlight.value);
   if (hlAmt !== 0) {
-    const _foHL = state.filterMaskOnly.highlight && _maskClipOk;
+    const _foHL = _maskClipOk && state.filterMaskOnly.highlight;
     const t = Math.abs(hlAmt) / 100;
     if (hlAmt < 0) {
       _affMul(Math.round(255 - t * 55) / 255, _foHL);
     } else {
       _affFlush();
       ctx.save();
-      if (_foHL) { const _fhlp = buildMaskPath(ctx, m); if (_fhlp) ctx.clip(_fhlp); else ctx.clip(); }
+      if (_foHL) _clipMaskRegion(ctx, m, _foHL === 'out', W, H);
       ctx.globalCompositeOperation = 'soft-light';
       ctx.fillStyle = `rgba(255,255,255,${t * 0.60})`;
       ctx.fillRect(0, 0, W, H);
@@ -542,7 +616,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Shadows (暗いトーン域を操作) ---
   const shAmt = parseFloat(elFilterShadow.value);
   if (shAmt !== 0) {
-    const _foSH = state.filterMaskOnly.shadow && _maskClipOk;
+    const _foSH = _maskClipOk && state.filterMaskOnly.shadow;
     const t = Math.abs(shAmt) / 100;
     if (shAmt > 0) {
       // screen（グレー）= 白を不透明度 brightness/255 で通常合成するのと同じ
@@ -550,7 +624,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
     } else {
       _affFlush();
       ctx.save();
-      if (_foSH) { const _fshp = buildMaskPath(ctx, m); if (_fshp) ctx.clip(_fshp); else ctx.clip(); }
+      if (_foSH) _clipMaskRegion(ctx, m, _foSH === 'out', W, H);
       ctx.globalCompositeOperation = 'soft-light';
       ctx.fillStyle = `rgba(0,0,0,${t * 0.60})`;
       ctx.fillRect(0, 0, W, H);
@@ -562,7 +636,9 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   const vigAmt = parseFloat(elFilterVignette.value);
   if (vigAmt > 0) {
     _affFlush();
-    const _foVIG = state.filterMaskOnly.vignette && _maskClipOk;
+    const _moVIG = _maskClipOk && state.filterMaskOnly.vignette;
+    const _foVIG = _moVIG === true;   // マスク内のみ: ビネットの中心・半径もマスクに合わせる
+    const _outVIG = _moVIG === 'out'; // マスク外のみ: ビネットは全体の形のまま、枠内だけ除く
     const cx = W / 2, cy = H / 2;
     const _vigX = _foVIG ? m.x + m.w / 2 : cx;
     const _vigY = _foVIG ? m.y + m.h / 2 : cy;
@@ -572,7 +648,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, `rgba(0,0,0,${(vigAmt / 10) * 0.85})`);
     ctx.save();
-    if (_foVIG) { const _fvp = buildMaskPath(ctx, m); if (_fvp) ctx.clip(_fvp); else ctx.clip(); }
+    if (_moVIG) _clipMaskRegion(ctx, m, _outVIG, W, H);
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
@@ -581,7 +657,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Color Temperature (色温度) ---
   const tempAmt = parseFloat(elFilterTemp.value);
   if (tempAmt !== 0) {
-    const _foTMP = state.filterMaskOnly.temp && _maskClipOk;
+    const _foTMP = _maskClipOk && state.filterMaskOnly.temp;
     const t2 = Math.abs(tempAmt) / 50;
     if (tempAmt > 0) _affOver(0.22 * t2, 1, 140 / 255, 0, _foTMP);
     else _affOver(0.22 * t2, 20 / 255, 80 / 255, 1, _foTMP);
@@ -590,7 +666,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Tint (色かぶり補正: マゼンタ ↔ グリーン) ---
   const tintAmt = parseFloat(elFilterTint.value);
   if (tintAmt !== 0) {
-    const _foTINT = state.filterMaskOnly.tint && _maskClipOk;
+    const _foTINT = _maskClipOk && state.filterMaskOnly.tint;
     const t2 = Math.abs(tintAmt) / 50;
     if (tintAmt > 0) _affOver(0.14 * t2, 0, 210 / 255, 60 / 255, _foTINT);
     else _affOver(0.14 * t2, 1, 0, 200 / 255, _foTINT);
@@ -599,7 +675,7 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Matte (黒浮き + 白浮き) ---
   const matteAmt = parseFloat(elFilterMatte.value);
   if (matteAmt > 0) {
-    const _foMAT = state.filterMaskOnly.matte && _maskClipOk;
+    const _foMAT = _maskClipOk && state.filterMaskOnly.matte;
     const t    = matteAmt / 10;
     const lift  = Math.round(t * 50);
     const crush = Math.round(255 - t * 45);
@@ -611,10 +687,10 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Film Grain (フィルム粒子) ---
   const grainAmt = parseFloat(elFilterGrain.value);
   if (grainAmt > 0) {
-    const _foGR = state.filterMaskOnly.grain && _maskClipOk;
+    const _moGR = _maskClipOk && state.filterMaskOnly.grain;
     _fillGrain(grainAmt);
     ctx.save();
-    if (_foGR) { const _fgrp = buildMaskPath(ctx, m); if (_fgrp) ctx.clip(_fgrp); else ctx.clip(); }
+    if (_moGR) _clipMaskRegion(ctx, m, _moGR === 'out', W, H);
     ctx.globalCompositeOperation = 'overlay';
     ctx.drawImage(grainCvs, 0, 0, W, H);
     ctx.restore();
@@ -623,8 +699,8 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Bloom / にじみ ---
   const waterAmt = elFilterBloom ? parseFloat(elFilterBloom.value) : 0;
   if (waterAmt > 0) {
-    const _foW = state.filterMaskOnly.bloom && _maskClipOk;
-    if (_foW) { ctx.save(); const _fwp = buildMaskPath(ctx, m); if (_fwp) ctx.clip(_fwp); else ctx.clip(); }
+    const _foW = _maskClipOk && state.filterMaskOnly.bloom;
+    if (_foW) { ctx.save(); _clipMaskRegion(ctx, m, _foW === 'out', W, H); }
     const t = waterAmt / 10;
     // ぼかしは低周波なので、4K 級では半解像度で処理して拡大する。
     // 全面のぼかしコピーを 2 回重ねると 4K では急に重くなりコマ落ちが散発するが、
@@ -659,10 +735,10 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Sharpness (オーバーレイ unsharp mask) ---
   const sharpAmt = parseFloat(elFilterSharpness.value);
   if (sharpAmt > 0) {
-    const _foSHP = state.filterMaskOnly.sharpness && _maskClipOk;
+    const _foSHP = _maskClipOk && state.filterMaskOnly.sharpness;
     _snapToPost();
     ctx.save();
-    if (_foSHP) { const _fshpp = buildMaskPath(ctx, m); if (_fshpp) ctx.clip(_fshpp); else ctx.clip(); }
+    if (_foSHP) _clipMaskRegion(ctx, m, _foSHP === 'out', W, H);
     ctx.globalCompositeOperation = 'overlay';
     ctx.globalAlpha = Math.min(sharpAmt * 0.09, 0.85);
     ctx.drawImage(postCvs, 0, 0);
@@ -672,8 +748,8 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Pencil (鉛筆スケッチ) ---
   const pencilAmt = elFilterPencil ? parseFloat(elFilterPencil.value) : 0;
   if (pencilAmt > 0) {
-    const _foP = state.filterMaskOnly.pencil && _maskClipOk;
-    if (_foP) { ctx.save(); const _fpp = buildMaskPath(ctx, m); if (_fpp) ctx.clip(_fpp); else ctx.clip(); }
+    const _foP = _maskClipOk && state.filterMaskOnly.pencil;
+    if (_foP) { ctx.save(); _clipMaskRegion(ctx, m, _foP === 'out', W, H); }
     const t = pencilAmt / 10;
     const offset = Math.max(1, Math.round(1 + t * 3));
     // 差分でエッジ検出（エッジ部分が明るくなる）
@@ -698,8 +774,8 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Emboss (エンボス) ---
   const embossAmt = elFilterEmboss ? parseFloat(elFilterEmboss.value) : 0;
   if (embossAmt > 0) {
-    const _foE = state.filterMaskOnly.emboss && _maskClipOk;
-    if (_foE) { ctx.save(); const _fep = buildMaskPath(ctx, m); if (_fep) ctx.clip(_fep); else ctx.clip(); }
+    const _foE = _maskClipOk && state.filterMaskOnly.emboss;
+    if (_foE) { ctx.save(); _clipMaskRegion(ctx, m, _foE === 'out', W, H); }
     const t = embossAmt / 10;
     const offset = Math.round(1 + t * 2);
     _snapToPost();
@@ -722,8 +798,8 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Chalkboard (黒板) ---
   const chalkAmt = elFilterChalkboard ? parseFloat(elFilterChalkboard.value) : 0;
   if (chalkAmt > 0) {
-    const _foC = state.filterMaskOnly.chalkboard && _maskClipOk;
-    if (_foC) { ctx.save(); const _fcp = buildMaskPath(ctx, m); if (_fcp) ctx.clip(_fcp); else ctx.clip(); }
+    const _foC = _maskClipOk && state.filterMaskOnly.chalkboard;
+    if (_foC) { ctx.save(); _clipMaskRegion(ctx, m, _foC === 'out', W, H); }
     const t = chalkAmt / 10;
     const offset = Math.round(1 + t * 2);
     _snapToPost();
@@ -744,8 +820,8 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Night Vision (暗視) ---
   const nightVisionAmt = elFilterNightVision ? parseFloat(elFilterNightVision.value) : 0;
   if (nightVisionAmt > 0) {
-    const _foN = state.filterMaskOnly.nightvision && _maskClipOk;
-    if (_foN) { ctx.save(); const _fnp = buildMaskPath(ctx, m); if (_fnp) ctx.clip(_fnp); else ctx.clip(); }
+    const _foN = _maskClipOk && state.filterMaskOnly.nightvision;
+    if (_foN) { ctx.save(); _clipMaskRegion(ctx, m, _foN === 'out', W, H); }
     const t = nightVisionAmt / 10;
     postCtx.clearRect(0, 0, W, H);
     postCtx.filter = `grayscale(1) brightness(${1.2 + t * 0.4}) contrast(${1 + t * 0.5})`;
@@ -770,8 +846,8 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Airbrush (エアブラシ) ---
   const airbrushAmt = elFilterAirbrush ? parseFloat(elFilterAirbrush.value) : 0;
   if (airbrushAmt > 0) {
-    const _foA = state.filterMaskOnly.airbrush && _maskClipOk;
-    if (_foA) { ctx.save(); const _fap = buildMaskPath(ctx, m); if (_fap) ctx.clip(_fap); else ctx.clip(); }
+    const _foA = _maskClipOk && state.filterMaskOnly.airbrush;
+    if (_foA) { ctx.save(); _clipMaskRegion(ctx, m, _foA === 'out', W, H); }
     const t = airbrushAmt / 10;
     postCtx.clearRect(0, 0, W, H);
     postCtx.filter = `brightness(${1 + t * 0.5}) saturate(${1 + t * 20}) blur(${t * 8}px) contrast(${1 + t * 3})`;
@@ -788,10 +864,10 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   // --- Color Flare (カラーフレア) ---
   const flareAmt = parseFloat(elFilterFlare.value);
   if (flareAmt > 0) {
-    const _foFL = state.filterMaskOnly.flare && _maskClipOk;
+    const _foFL = _maskClipOk && state.filterMaskOnly.flare;
     const alpha = (flareAmt / 10) * 0.35;
     ctx.save();
-    if (_foFL) { const _fflp = buildMaskPath(ctx, m); if (_fflp) ctx.clip(_fflp); else ctx.clip(); }
+    if (_foFL) _clipMaskRegion(ctx, m, _foFL === 'out', W, H);
     const grad = ctx.createLinearGradient(0, 0, W, H);
     grad.addColorStop(0,    `rgba(255,0,80,${alpha})`);
     grad.addColorStop(0.2,  `rgba(255,120,0,${alpha})`);
@@ -1198,8 +1274,8 @@ function _filterLoad() {
   if (effectsHidden) return 0;
   const on = el => (el && parseFloat(el.value) > 0 ? 1 : 0);
   return 2 * on(elFilterBloom) + 2 * on(elFilterAirbrush) + on(elFilterPencil) + on(elFilterEmboss)
-    + on(elFilterChalkboard) + on(elFilterCA) + on(elFilterNightVision) + on(elFilterBlur)
-    + 0.5 * on(elFilterFlare) + 0.5 * on(elFilterSharpness);
+    + on(elFilterChalkboard) + on(elFilterCA) + on(elFilterNightVision) + on(elFilterBlur) + 0.5 * on(elFilterPixel)
+    + 0.5 * on(elFilterFlare) + 0.5 * on(elFilterSharpness) + (_colorFilters().outStr ? 1 : 0);
 }
 function _canSkipPaint(now) {
   if (now - _lastPaintT > _PAINT_MAX_IDLE_MS) return false;
@@ -1259,7 +1335,7 @@ export function render(now) {
   }
   // filterFps: 0=制限なし、それ以外=fps上限で間引き
   const fpsLimit = parseFloat(elFilterFps.value) || 0;
-  const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value);
+  const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value) * BLUR_SIGMA_PER_UNIT;
   // _blitMblur: _mblurCvs を blur フィルター込みで displayCtx に描画
   // (スキップフレームでも実フレームと同じ blur を適用してチラつきを防ぐ)
   const _blitMblur = (alpha) => {
@@ -1305,7 +1381,7 @@ export function render(now) {
   if (fpsLimit === 0 && _canSkipPaint(now)) {
     // 新しい映像フレームも操作も無い: 前回の描画結果をそのまま表示し、枠などのオーバーレイだけ更新する
     _updateCompositeTime();
-    GFRainEngine.tick(false); // メイン画像は前回から変わっていない（水滴だけ動かす）
+    GFRainEngine.tick(false, _rainMask()); // メイン画像は前回から変わっていない（水滴だけ動かす）
     updateProgress();
     syncMaskDropOverlay();
     _updateCanvasHints();
@@ -1319,7 +1395,7 @@ export function render(now) {
   _notePainted(now);
   _updateCompositeTime();
   if (_isRealFrame) {
-    GFRainEngine.tick(); // 雨は filterFps レートのみ更新
+    GFRainEngine.tick(undefined, _rainMask()); // 雨は filterFps レートのみ更新
     // 映像フレームをキャッシュに保存（FPS 制限時、lerp 補間フレームで再利用）
     const _cW = canvas.width, _cH = canvas.height;
     if (fpsLimit > 0) {
@@ -1342,17 +1418,38 @@ export function render(now) {
     _mblurCtx.clearRect(0, 0, _mblurCvs.width, _mblurCvs.height);
     _mblurCtx.drawImage(renderCvs, 0, 0);
   }
-  // 全体ぼかし: copyモードでblit→透明画素も完全置換され残留しない
-  displayCtx.globalCompositeOperation = 'copy';
-  if (gb > 0) {
-    svgGblurEl.setAttribute('stdDeviation', gb);
-    displayCtx.filter = 'url(#gblur)';
-    displayCtx.drawImage(renderCvs, 0, 0);
-    displayCtx.filter = 'none';
+  // 最終段: ピクセル → ぼかし の順に、適用範囲（全体 / マスク内のみ / マスク外のみ）つきで表示用キャンバスへ描く。
+  // copyモードでblit→透明画素も完全置換され残留しない
+  // 内のみ・外のみのときは、マスク周辺の小さなキャンバスで反対側の絵を作って重ねる
+  const fW = canvas.width, fH = canvas.height, fm = state.mask;
+  const pxAmt = effectsHidden ? 0 : parseFloat(elFilterPixel.value);
+  const pxScope = pxAmt >= 1 ? _maskScope('pixel') : 0;
+  if (pxAmt >= 1 && gb <= 0) {
+    // ぼかしが無ければ、ピクセル化の結果を直接表示用キャンバスへ描く（全面コピーを 1 回省ける）
+    _pixelateInto(displayCtx, renderCvs, fW, fH, fm, pxAmt, pxScope);
   } else {
-    displayCtx.drawImage(renderCvs, 0, 0);
+    const frameSrc = pxAmt >= 1 ? _pixelateFrame(renderCvs, fW, fH, fm, pxAmt, pxScope) : renderCvs;
+    const gbScope = gb > 0 ? _maskScope('blur') : 0;
+    if (gb > 0) svgGblurEl.setAttribute('stdDeviation', gb);
+    // ぼかすときは端を外側へ複製した画像を使う（画面の端が薄れたり、端の数行だけぼけずに残るのを防ぐ）
+    const blurPad = gb > 0 ? Math.ceil(gb * 3) + 2 : 0;
+    const blurSrc = gb > 0 ? _edgeExtended(frameSrc, fW, fH, blurPad) : frameSrc;
+    displayCtx.globalCompositeOperation = 'copy';
+    if (gb > 0 && gbScope !== 1) {
+      displayCtx.filter = 'url(#gblur)';
+      displayCtx.drawImage(blurSrc, -blurPad, -blurPad);
+      displayCtx.filter = 'none';
+    } else {
+      displayCtx.drawImage(frameSrc, 0, 0);
+    }
+    displayCtx.globalCompositeOperation = 'source-over';
+    if (gbScope === 1) _drawMaskedRegion(displayCtx, blurSrc, fW, fH, fm, 'url(#gblur)', blurPad - 2, false, blurPad);
+    else if (gbScope === 2) _drawMaskedRegion(displayCtx, frameSrc, fW, fH, fm, '', 0);
   }
-  displayCtx.globalCompositeOperation = 'source-over';
+  // 明るさ・コントラスト・彩度・色相: 全体は CSS（effectsWrap）。内のみ・外のみは、ここで表示用キャンバスに焼き込む
+  const cf = _colorFilters();
+  if (cf.css !== _lastCssFilter) { effectsWrap.style.filter = cf.css; _lastCssFilter = cf.css; }
+  if (cf.inStr || cf.outStr) _applyColorScopes(displayCtx, fW, fH, fm, cf);
   // 枠・ハンドルは overlayCanvas (effectsWrap外) に描画 → filter非適用
   _drawOverlays();
   perfFrame(now, 'paint', _perfInfo);

@@ -12,10 +12,10 @@ import {
   elBorderAnimSpeed, elBorderAnimBright, elFrameBlur, elFrameTint,
   elVol0, elVol1, elOffset0, elOffset1, elFgOpacity,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
-  elFilterBlur, elFilterBrightness, elFilterContrast, elFilterSaturation,
+  elFilterBlur, BLUR_SIGMA_PER_UNIT, elFilterPixel, elFilterBrightness, elFilterContrast, elFilterSaturation,
   elFilterHue, elFilterVignette, elFilterCA, elFilterTemp, elFilterTint,
   elFilterHighlight, elFilterShadow, elFilterSharpness, elFilterMatte,
-  elFilterGrain, elMaskPixel, elMaskBlur, elFilterFlare, elFilterBars,
+  elFilterGrain, elFilterFlare, elFilterBars,
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
   elFilterBloom,
   elFilterPencil, elFilterEmboss, elFilterChalkboard, elFilterNightVision, elFilterAirbrush,
@@ -37,7 +37,7 @@ import {
   _updateFgFixedBtn, _updateArLockBtn, _updateZoomLockBtn,
 } from './canvas.js';
 import {
-  _applyBorderAnim, _syncAnimColors, getAudioFilterSettings, applyAudioFilterSettings,
+  _applyBorderAnim, _syncAnimColors, getAudioFilterSettings, applyAudioFilterSettings, setFilterMaskMode,
 } from './controls.js';
 import { _setRenderPresets, applyLang } from './lang.js';
 import { showToast } from './toast.js';
@@ -80,8 +80,6 @@ export function collectSettings() {
     borderAnimSpeed:  elBorderAnimSpeed.value,
     borderAnimBright: elBorderAnimBright.value,
     borderAnimColors: JSON.stringify(_animColors),
-    maskBlur:    elMaskBlur.value,
-    maskPixel: elMaskPixel.value,
     maskZoom:      elMaskZoom.value,
     fgFixed:       state.fgFixed,
     zoomLock:      state.zoomLock,
@@ -112,6 +110,8 @@ export function collectSettings() {
     filterBars:       elFilterBars.value,
     filterFps:        elFilterFps.value,
     filterBlur:       elFilterBlur.value,
+    filterBlurScale:  BLUR_SIGMA_PER_UNIT,
+    filterPixel:      elFilterPixel.value,
     filterRain:       elFilterRain.value,
     rainSpeed:        elRainSpeed.value,
     rainRefraction:   elRainRefraction.value,
@@ -145,8 +145,8 @@ export function applySettings(d) {
     ['vol1','vol1Val'],['offset1','offset1Val'],
     ['fgOpacity','fgOpacityVal'],
     ['maskW','maskWVal'],['maskH','maskHVal'],
-    ['borderW','borderWVal'],['borderOpacity','borderOpacityVal'],['maskBlur','maskBlurVal'],
-    ['maskPixel','maskPixelVal'],['filterBlur','filterBlurVal'],
+    ['borderW','borderWVal'],['borderOpacity','borderOpacityVal'],
+    ['filterPixel','filterPixelVal'],['filterBlur','filterBlurVal'],
     ['filterBrightness','filterBrightnessVal'],['filterContrast','filterContrastVal'],
     ['filterHighlight','filterHighlightVal'],['filterShadow','filterShadowVal'],
     ['filterSaturation','filterSaturationVal'],['filterHue','filterHueVal'],
@@ -188,8 +188,7 @@ export function applySettings(d) {
     maskH:            d.maskH            ?? '400',
     borderW:          d.borderW          ?? '1',
     borderOpacity:    d.borderOpacity    ?? '100',
-    maskBlur:         d.maskBlur         ?? '0',
-    maskPixel:        d.maskPixel        ?? '0',
+    filterPixel:      d.filterPixel      ?? '0',
     filterBlur:       d.filterBlur       ?? '0',
     filterBrightness: d.filterBrightness ?? '100',
     filterContrast:   d.filterContrast   ?? '100',
@@ -229,6 +228,20 @@ export function applySettings(d) {
     specGap:          d.specGap          ?? '0',
     specSmooth:       d.specSmooth       ?? '0',
   };
+  // ぼかしの強さは、保存時の換算（filterBlurScale: スライダー 1 あたりの σ）で σ に直してから今の換算へ合わせる。
+  // 換算の記録が無い旧プリセットはスライダー値 = σ。旧「マスクぼかし」は σ = 値×2 px で、ぼかし（枠内のみ）へ引き継ぐ。
+  // ぼかしも使っていた場合は合算（σ の二乗和）にして、適用範囲はぼかしの設定のまま（範囲が違うため完全には再現できない）
+  const _saved = (d.filterMaskOnly && typeof d.filterMaskOnly === 'object') ? { ...d.filterMaskOnly } : {};
+  const _oldMB = parseFloat(d.maskBlur) || 0;
+  const _fbSigma = (parseFloat(vals.filterBlur) || 0) * (Number(d.filterBlurScale) || 1);
+  if (_oldMB > 0) {
+    vals.filterBlur = String(Math.round(Math.hypot(_fbSigma, _oldMB * 2) / BLUR_SIGMA_PER_UNIT * 100) / 100);
+    if (_fbSigma <= 0) _saved.blur = true;
+  } else if (Number(d.filterBlurScale) !== BLUR_SIGMA_PER_UNIT) {
+    vals.filterBlur = String(Math.round(_fbSigma / BLUR_SIGMA_PER_UNIT * 100) / 100);
+  }
+  const _oldMP = parseFloat(d.maskPixel) || 0;
+  if (_oldMP >= 1 && d.filterPixel == null) { vals.filterPixel = String(_oldMP); _saved.pixel = true; }
   sliders.forEach(([id]) => {
     if (vals[id] == null) return;
     const el = document.getElementById(id);
@@ -342,32 +355,8 @@ export function applySettings(d) {
     setMaskBorderFadeStart(loaded[1] ? performance.now() : 0);
   }
   if (true) {
-    const _saved = (d.filterMaskOnly && typeof d.filterMaskOnly === 'object') ? d.filterMaskOnly : {};
-    const _moButtons = {
-      highlight:   'filterHighlightMOBtn',
-      shadow:      'filterShadowMOBtn',
-      temp:        'filterTempMOBtn',
-      tint:        'filterTintMOBtn',
-      sharpness:   'filterSharpnessMOBtn',
-      ca:          'filterCAMOBtn',
-      vignette:    'filterVignetteMOBtn',
-      matte:       'filterMatteMOBtn',
-      grain:       'filterGrainMOBtn',
-      bloom:       'filterBloomMOBtn',
-      blur:        'filterBlurMOBtn',
-      flare:       'filterFlareMOBtn',
-      rain:        'filterRainMOBtn',
-      pencil:      'filterPencilMOBtn',
-      emboss:      'filterEmbossMOBtn',
-      chalkboard:  'filterChalkboardMOBtn',
-      nightvision: 'filterNightVisionMOBtn',
-      airbrush:    'filterAirbrushMOBtn',
-    };
-    Object.entries(_moButtons).forEach(([key, btnId]) => {
-      const val = !!_saved[key];
-      state.filterMaskOnly[key] = val;
-      document.getElementById(btnId)?.classList.toggle('active', val);
-    });
+    // 保存値: false / true（マスク内のみ） / 'out'（マスク外のみ。古いプリセットには無く、その場合は全体）
+    Object.keys(state.filterMaskOnly).forEach(key => setFilterMaskMode(key, _saved[key]));
   }
   updateCanvasFilter();
   updateBarsOverlay();

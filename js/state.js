@@ -80,6 +80,10 @@ export const state = {
   },
   borderInvert: false,
   filterMaskOnly: {
+    brightness:  false,
+    contrast:    false,
+    saturation:  false,
+    hue:         false,
     highlight:   false,
     shadow:      false,
     temp:        false,
@@ -91,6 +95,7 @@ export const state = {
     grain:       false,
     bloom:       false,
     blur:        false,
+    pixel:       false,
     flare:       false,
     rain:        false,
     pencil:      false,

@@ -175,6 +175,20 @@
     'uniform float u_brightness;',
     'uniform float u_alphaMultiply;',
     'uniform float u_alphaSubtract;',
+    // 適用範囲: 0 = 全体 / 1 = マスク内のみ / 2 = マスク外のみ（マスクは小さなアルファ画像）
+    'uniform sampler2D u_mask;',
+    'uniform vec4 u_maskRect;',
+    'uniform vec2 u_maskUV;',
+    'uniform int u_maskMode;',
+
+    'float maskCoverage() {',
+    '  if (u_maskMode == 0) return 1.0;',
+    '  vec2 p = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);',
+    '  vec2 r = (p - u_maskRect.xy) / u_maskRect.zw;',
+    '  float mk = 0.0;',
+    '  if (r.x >= 0.0 && r.y >= 0.0 && r.x < 1.0 && r.y < 1.0) mk = texture2D(u_mask, r * u_maskUV).a;',
+    '  return u_maskMode == 2 ? 1.0 - mk : mk;',
+    '}',
 
     'vec4 blend(vec4 bg, vec4 fg) {',
     '  vec3 bgm = bg.rgb * bg.a;',
@@ -257,6 +271,7 @@
     '  float srcBright = dot(tex.rgb, vec3(0.333, 0.333, 0.333));',
     '  fg.rgb = fg.rgb + vec3(0.12, 0.15, 0.20) * a * (1.0 - srcBright);',
     '  /* Only output the drop/refraction; transparent where no drops */',
+    '  fg.a *= maskCoverage();',
     '  gl_FragColor = fg;',
     '}'
   ].join('\n');
@@ -328,15 +343,38 @@
       });
       gl.createUniform('1i', 'textureBg', 2);
 
+      // テクスチャスロット 3: 適用範囲のマスク（使うときだけ _draw で更新）
+      gl.createTexture(blankCanvas, 3);
+      gl.createUniform('1i', 'mask', 3);
+      this._maskKey = null;
+      this._maskU = null;
+
       this._draw(true);
     },
 
     // mainChanged が false のとき、メイン画像（4K の転送）を省く。水滴だけ動かしたいフレーム用
-    _draw: function (mainChanged) {
+    // mask: { mode: 1|2, key, get() } — key が変わったときだけ get() でマスク画像を作り直して転送する
+    _draw: function (mainChanged, mask) {
       if (this._stopped) return;
       var gl = this.gl;
       gl.useProgram(gl.program);
       gl.createUniform('2f', 'parallax', 0, 0);
+
+      if (mask && mask.mode) {
+        if (mask.key !== this._maskKey) {
+          var info = mask.get();
+          gl.activeTexture(3);
+          gl.updateTexture(info.cvs);
+          this._maskU = [info.x, info.y, info.dw, info.dh, info.sw / info.cvs.width, info.sh / info.cvs.height];
+          this._maskKey = mask.key;
+        }
+        var u = this._maskU;
+        gl.createUniform('4f', 'maskRect', u[0], u[1], u[2], u[3]);
+        gl.createUniform('2f', 'maskUV', u[4], u[5]);
+        gl.createUniform('1i', 'maskMode', mask.mode);
+      } else {
+        gl.createUniform('1i', 'maskMode', 0);
+      }
 
       // Raindrops キャンバスからウォーターマップを更新
       gl.activeTexture(0);
@@ -779,10 +817,10 @@
 
     // メインレンダーループから呼び出す。FPS制限に連動して雨フレームレートを制御する。
     // mainChanged: false のとき、メイン画像が前回から変わっていないので、その転送を省く
-    tick: function (mainChanged) {
+    tick: function (mainChanged, mask) {
       if (!_state) return;
       _state.raindrops._update();
-      _state.renderer._draw(mainChanged);
+      _state.renderer._draw(mainChanged, mask);
     },
 
     // 雨オーバーレイを停止・クリアする

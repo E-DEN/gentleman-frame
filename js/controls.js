@@ -18,10 +18,10 @@ import {
   elPhoneUiBtnRoT, elPhoneUiBtnRec, elPhoneUiBtnDot, elPhoneUiBtnRot90,
   elVol0, elVol1, elOffset0, elOffset1,
   elFgPinX, elFgPinY, elFgPinLerp, elFgPinOpacity,
-  elFilterBlur, elFilterBrightness, elFilterContrast, elFilterSaturation,
+  elFilterBlur, BLUR_SIGMA_PER_UNIT, elFilterBrightness, elFilterContrast, elFilterSaturation,
   elFilterHue, elFilterVignette, elFilterCA, elFilterTemp, elFilterTint,
   elFilterHighlight, elFilterShadow, elFilterSharpness, elFilterMatte,
-  elFilterGrain, elMaskPixel, elMaskBlur, elFilterFlare, elFilterBars,
+  elFilterGrain, elFilterFlare, elFilterBars,
   elFilterBloom,
   elFilterPencil, elFilterEmboss, elFilterChalkboard, elFilterNightVision, elFilterAirbrush,
   elFilterFps, elFilterRain, elRainSpeed, elRainRefraction, elRainShadow,
@@ -171,6 +171,10 @@ export function bindSlider(id, valId, fmt, onChange) {
   resetBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
   // スライダーID → filterMaskOnly キー + MOBtn ID のマッピング
   const _SLIDER_MO_MAP = {
+    filterBrightness:  { key: 'brightness',  btnId: 'filterBrightnessMOBtn'  },
+    filterContrast:    { key: 'contrast',    btnId: 'filterContrastMOBtn'    },
+    filterSaturation:  { key: 'saturation',  btnId: 'filterSaturationMOBtn'  },
+    filterHue:         { key: 'hue',         btnId: 'filterHueMOBtn'         },
     filterHighlight:   { key: 'highlight',   btnId: 'filterHighlightMOBtn'   },
     filterShadow:      { key: 'shadow',      btnId: 'filterShadowMOBtn'      },
     filterTemp:        { key: 'temp',        btnId: 'filterTempMOBtn'        },
@@ -182,6 +186,7 @@ export function bindSlider(id, valId, fmt, onChange) {
     filterGrain:       { key: 'grain',       btnId: 'filterGrainMOBtn'       },
     filterBloom:       { key: 'bloom',       btnId: 'filterBloomMOBtn'       },
     filterBlur:        { key: 'blur',        btnId: 'filterBlurMOBtn'        },
+    filterPixel:       { key: 'pixel',       btnId: 'filterPixelMOBtn'       },
     filterFlare:       { key: 'flare',       btnId: 'filterFlareMOBtn'       },
     filterRain:        { key: 'rain',        btnId: 'filterRainMOBtn'        },
     filterPencil:      { key: 'pencil',      btnId: 'filterPencilMOBtn'      },
@@ -216,10 +221,7 @@ export function bindSlider(id, valId, fmt, onChange) {
     el.dispatchEvent(new Event('input'));
     // 対応する「マスク内のみ」ボタンも解除する
     const _mo = _SLIDER_MO_MAP[id];
-    if (_mo) {
-      state.filterMaskOnly[_mo.key] = false;
-      document.getElementById(_mo.btnId)?.classList.remove('active');
-    }
+    if (_mo) setFilterMaskMode(_mo.key, false);
   });
   vl.insertAdjacentElement('afterend', resetBtn);
   lucide.createIcons({ nodes: [resetBtn] });
@@ -351,8 +353,6 @@ bindSlider('fgPinX',   'fgPinXVal',   v => `${Math.round(v)}`, null);
 bindSlider('fgPinY',   'fgPinYVal',   v => `${Math.round(v)}`, null);
 bindSlider('fgPinLerp','fgPinLerpVal',v => `${Math.round(v)}`, null);
 bindSlider('fgPinOpacity','fgPinOpacityVal',v => `${Math.round(v)}`, null);
-bindSlider('maskBlur', 'maskBlurVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
-bindSlider('maskPixel','maskPixelVal',v => `${Math.round(v)}`, null);
 bindSlider('borderOpacity', 'borderOpacityVal', v => `${Math.round(v)}`, null);
 bindSlider('borderAnimSpeed', 'borderAnimSpeedVal', v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('borderAnimBright', 'borderAnimBrightVal', v => `${Math.round(v)}`, null);
@@ -727,6 +727,7 @@ bindSlider('filterNightVision', 'filterNightVisionVal', v => v % 1 === 0 ? `${Ma
 bindSlider('filterAirbrush',    'filterAirbrushVal',    v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
 bindSlider('filterFlare',      'filterFlareVal',      v => `${parseFloat(v) % 1 === 0 ? parseInt(v) : parseFloat(v).toFixed(1)}`, null);
 bindSlider('filterBlur',       'filterBlurVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), null);
+bindSlider('filterPixel',      'filterPixelVal',      v => `${Math.round(v)}`, null);
 bindSlider('filterBars',       'filterBarsVal',       v => v % 1 === 0 ? `${Math.round(v)}` : v.toFixed(1), updateBarsOverlay);
 bindSlider('filterFps',        'filterFpsVal',        v => v === 0 ? 'OFF' : `${v}`, null);
 bindSlider('filterRain',       'filterRainVal',       v => `${Math.round(v)}`, v => {
@@ -763,85 +764,99 @@ document.getElementById('filterVisBtn').addEventListener('click', () => {
 });
 
 document.getElementById('filterResetBtn').addEventListener('click', () => {
-  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterBloom', 'filterPencil', 'filterEmboss', 'filterChalkboard', 'filterNightVision', 'filterAirbrush', 'filterFlare', 'filterBlur', 'filterBars', 'filterFps', 'maskBlur', 'maskPixel', 'filterRain'].forEach(id => {
+  ['filterBrightness', 'filterContrast', 'filterHighlight', 'filterShadow', 'filterSaturation', 'filterHue', 'filterTemp', 'filterTint', 'filterSharpness', 'filterCA', 'filterVignette', 'filterMatte', 'filterGrain', 'filterBloom', 'filterPencil', 'filterEmboss', 'filterChalkboard', 'filterNightVision', 'filterAirbrush', 'filterFlare', 'filterBlur', 'filterPixel', 'filterBars', 'filterFps', 'filterRain'].forEach(id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
     el.dispatchEvent(new Event('input'));
   });
-  [
-    { key: 'sharpness',  btnId: 'filterSharpnessMOBtn'  },
-    { key: 'ca',         btnId: 'filterCAMOBtn'          },
-    { key: 'matte',      btnId: 'filterMatteMOBtn'       },
-    { key: 'bloom',      btnId: 'filterBloomMOBtn'       },
-    { key: 'flare',      btnId: 'filterFlareMOBtn'       },
-    { key: 'pencil',     btnId: 'filterPencilMOBtn'      },
-    { key: 'emboss',     btnId: 'filterEmbossMOBtn'      },
-    { key: 'chalkboard', btnId: 'filterChalkboardMOBtn'  },
-    { key: 'nightvision',btnId: 'filterNightVisionMOBtn' },
-    { key: 'airbrush',   btnId: 'filterAirbrushMOBtn'    },
-  ].forEach(({ key, btnId }) => {
-    state.filterMaskOnly[key] = false;
-    document.getElementById(btnId)?.classList.remove('active');
-  });
+  Object.keys(state.filterMaskOnly).forEach(key => setFilterMaskMode(key, false));
 });
 
-// --- クイックフィルタープリセット ---
-[
-  { key: 'sharpness',  btnId: 'filterSharpnessMOBtn'  },
-  { key: 'ca',         btnId: 'filterCAMOBtn'          },
-  { key: 'matte',      btnId: 'filterMatteMOBtn'       },
-  { key: 'bloom',      btnId: 'filterBloomMOBtn'       },
-  { key: 'flare',      btnId: 'filterFlareMOBtn'       },
-  { key: 'pencil',     btnId: 'filterPencilMOBtn'      },
-  { key: 'emboss',     btnId: 'filterEmbossMOBtn'      },
-  { key: 'chalkboard', btnId: 'filterChalkboardMOBtn'  },
-  { key: 'nightvision',btnId: 'filterNightVisionMOBtn' },
-  { key: 'airbrush',   btnId: 'filterAirbrushMOBtn'    },
-].forEach(({ key, btnId }) => {
-  document.getElementById(btnId).addEventListener('click', () => {
-    state.filterMaskOnly[key] = !state.filterMaskOnly[key];
-    document.getElementById(btnId).classList.toggle('active', state.filterMaskOnly[key]);
+// --- フィルターの適用範囲（全体 / マスク内のみ / マスク外のみ） ---
+// state.filterMaskOnly[key]: false = 全体, true = マスク内のみ, 'out' = マスク外のみ
+const _MASK_BTN_IDS = {
+  brightness: 'filterBrightnessMOBtn', contrast: 'filterContrastMOBtn', saturation: 'filterSaturationMOBtn', hue: 'filterHueMOBtn',
+  highlight: 'filterHighlightMOBtn', shadow: 'filterShadowMOBtn', temp: 'filterTempMOBtn', tint: 'filterTintMOBtn',
+  sharpness: 'filterSharpnessMOBtn', ca: 'filterCAMOBtn', matte: 'filterMatteMOBtn', bloom: 'filterBloomMOBtn',
+  flare: 'filterFlareMOBtn', pencil: 'filterPencilMOBtn', emboss: 'filterEmbossMOBtn', chalkboard: 'filterChalkboardMOBtn',
+  nightvision: 'filterNightVisionMOBtn', airbrush: 'filterAirbrushMOBtn',
+  blur: 'filterBlurMOBtn', pixel: 'filterPixelMOBtn', vignette: 'filterVignetteMOBtn', grain: 'filterGrainMOBtn', rain: 'filterRainMOBtn',
+};
+export function setFilterMaskMode(key, mode) {
+  const v = mode === 'out' ? 'out' : !!mode;
+  state.filterMaskOnly[key] = v;
+  const btn = document.getElementById(_MASK_BTN_IDS[key] || '');
+  if (!btn) return;
+  btn.classList.toggle('active', v === true);
+  btn.classList.toggle('out', v === 'out');
+  const tk = v === 'out' ? 'filter-mask-out' : v ? 'filter-mask-in' : 'filter-mask-off';
+  btn.dataset.i18nTitle = tk;
+  btn.title = t(tk);
+}
+
+// ヘッダーのボタン: マスク内のフィルターはマスク外へ、マスク外はマスク内へ入れ替える（全体のものはそのまま）
+document.getElementById('filterScopeSwapBtn').addEventListener('click', () => {
+  Object.keys(state.filterMaskOnly).forEach(key => {
+    const cur = state.filterMaskOnly[key];
+    if (cur) setFilterMaskMode(key, cur === 'out' ? true : 'out');
+  });
+});
+Object.entries(_MASK_BTN_IDS).forEach(([key, btnId]) => {
+  document.getElementById(btnId).addEventListener('click', e => {
+    const cur = state.filterMaskOnly[key];
+    // 全体 → マスク内 → マスク外 → 全体（Shift を押しながらだと逆順: 全体 → マスク外 → マスク内 → 全体）。Ctrl / Cmd を押しながらだと全体に戻す
+    const next = (e.ctrlKey || e.metaKey) ? false
+      : e.shiftKey
+        ? (cur === true ? false : cur === 'out' ? true : 'out')
+        : (cur === 'out' ? false : cur ? 'out' : true);
+    setFilterMaskMode(key, next);
   });
 });
 
 const _FQP = {
-  //            bright  cont   hl     sh     sat    hue    temp   tint   sharp  ca     vig    matte  grain  bloom  pencil emboss chalk  nv     air    flare  blur   bars   fps    mblur  pixel
-  cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 5,   filterFps: 24, maskBlur: 0, maskPixel: 0 },
-  retro:   { filterBrightness: 105, filterContrast: 88,  filterHighlight: -20, filterShadow: +25, filterSaturation: 58,  filterHue: 0, filterTemp: +22, filterTint:  -8, filterSharpness: 0,   filterCA: 0,   filterVignette: 5,   filterMatte: 7,   filterGrain: 2.5, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 1.5, filterBlur: 0, filterBars: 0,   filterFps: 18, maskBlur: 0, maskPixel: 0 },
-  insta:   { filterBrightness: 112, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 128, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 1.5, filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  pastel:  { filterBrightness: 130, filterContrast: 90,  filterHighlight:   0, filterShadow: +30, filterSaturation: 80,  filterHue: 0, filterTemp:   0, filterTint:  +5, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  neon:    { filterBrightness: 88,  filterContrast: 138, filterHighlight: +20, filterShadow:   0, filterSaturation: 175, filterHue: 0, filterTemp: -18, filterTint: -10, filterSharpness: 0,   filterCA: 1.8, filterVignette: 7,   filterMatte: 0,   filterGrain: 0.5, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 3.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  sunset:  { filterBrightness: 108, filterContrast: 112, filterHighlight:   0, filterShadow:   0, filterSaturation: 135, filterHue: 0, filterTemp: +38, filterTint:  -5, filterSharpness: 1,   filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 4.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  cool:    { filterBrightness: 100, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 78,  filterHue: 0, filterTemp: -28, filterTint:   0, filterSharpness: 1.5, filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  dreamy:  { filterBrightness: 120, filterContrast: 78,  filterHighlight: +15, filterShadow: +10, filterSaturation: 110, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 2,   filterMatte: 4,   filterGrain: 0,   filterBloom: 7, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 3,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  glitch:  { filterBrightness: 100, filterContrast: 122, filterHighlight:   0, filterShadow:   0, filterSaturation: 120, filterHue: 0, filterTemp:   0, filterTint:   0, filterSharpness: 0,   filterCA: 4.5, filterVignette: 2,   filterMatte: 0,   filterGrain: 2,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  noir:    { filterBrightness: 90,  filterContrast: 148, filterHighlight: -30, filterShadow: -20, filterSaturation: 12,  filterHue: 0, filterTemp:  -5, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 8,   filterMatte: 3,   filterGrain: 1.2, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 3,   filterFps: 24, maskBlur: 0, maskPixel: 0 },
-  horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 1.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 2,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
-  prism:   { filterBrightness: 90,  filterContrast: 180, filterHighlight:  +4, filterShadow: +40, filterSaturation: 122, filterHue: 0, filterTemp: -12, filterTint:  -2, filterSharpness: 0,   filterCA: 3,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 3,   filterBlur: 0, filterBars: 0,   filterFps: 0,  maskBlur: 0, maskPixel: 0 },
+  //            bright  cont   hl     sh     sat    hue    temp   tint   sharp  ca     vig    matte  grain  bloom  pencil emboss chalk  nv     air    flare  blur   bars   fps    pixel
+  cinema:  { filterBrightness: 95,  filterContrast: 122, filterHighlight: -15, filterShadow: +10, filterSaturation: 80,  filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 1.5, filterCA: 0.5, filterVignette: 4,   filterMatte: 5,   filterGrain: 0.8, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 5,   filterFps: 24, filterPixel: 0 },
+  retro:   { filterBrightness: 105, filterContrast: 88,  filterHighlight: -20, filterShadow: +25, filterSaturation: 58,  filterHue: 0, filterTemp: +22, filterTint:  -8, filterSharpness: 0,   filterCA: 0,   filterVignette: 5,   filterMatte: 7,   filterGrain: 2.5, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 1.5, filterBlur: 0, filterBars: 0,   filterFps: 18, filterPixel: 0 },
+  insta:   { filterBrightness: 112, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 128, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 1.5, filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  pastel:  { filterBrightness: 130, filterContrast: 90,  filterHighlight:   0, filterShadow: +30, filterSaturation: 80,  filterHue: 0, filterTemp:   0, filterTint:  +5, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  neon:    { filterBrightness: 88,  filterContrast: 138, filterHighlight: +20, filterShadow:   0, filterSaturation: 175, filterHue: 0, filterTemp: -18, filterTint: -10, filterSharpness: 0,   filterCA: 1.8, filterVignette: 7,   filterMatte: 0,   filterGrain: 0.5, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 3.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  sunset:  { filterBrightness: 108, filterContrast: 112, filterHighlight:   0, filterShadow:   0, filterSaturation: 135, filterHue: 0, filterTemp: +38, filterTint:  -5, filterSharpness: 1,   filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 4.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  cool:    { filterBrightness: 100, filterContrast: 108, filterHighlight:   0, filterShadow:   0, filterSaturation: 78,  filterHue: 0, filterTemp: -28, filterTint:   0, filterSharpness: 1.5, filterCA: 0,   filterVignette: 3,   filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  dreamy:  { filterBrightness: 120, filterContrast: 78,  filterHighlight: +15, filterShadow: +10, filterSaturation: 110, filterHue: 0, filterTemp: +10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 2,   filterMatte: 4,   filterGrain: 0,   filterBloom: 7, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 3,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  glitch:  { filterBrightness: 100, filterContrast: 122, filterHighlight:   0, filterShadow:   0, filterSaturation: 120, filterHue: 0, filterTemp:   0, filterTint:   0, filterSharpness: 0,   filterCA: 4.5, filterVignette: 2,   filterMatte: 0,   filterGrain: 2,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  noir:    { filterBrightness: 90,  filterContrast: 148, filterHighlight: -30, filterShadow: -20, filterSaturation: 12,  filterHue: 0, filterTemp:  -5, filterTint:   0, filterSharpness: 2,   filterCA: 0,   filterVignette: 8,   filterMatte: 3,   filterGrain: 1.2, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 3,   filterFps: 24, filterPixel: 0 },
+  horror:  { filterBrightness: 83,  filterContrast: 130, filterHighlight:   0, filterShadow: -15, filterSaturation: 30,  filterHue: 0, filterTemp:  -8, filterTint:  -8, filterSharpness: 0,   filterCA: 0.5, filterVignette: 9,   filterMatte: 0,   filterGrain: 3.5, filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 0,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  modern:  { filterBrightness: 95,  filterContrast: 120, filterHighlight:   0, filterShadow:   0, filterSaturation: 110, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 2,   filterCA: 2,   filterVignette: 0,   filterMatte: 0,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 1.5, filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  trend:   { filterBrightness: 90,  filterContrast: 150, filterHighlight:   0, filterShadow:   0, filterSaturation: 180, filterHue: 0, filterTemp: -10, filterTint:   0, filterSharpness: 0,   filterCA: 0,   filterVignette: 0,   filterMatte: 5,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 2,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
+  prism:   { filterBrightness: 90,  filterContrast: 180, filterHighlight:  +4, filterShadow: +40, filterSaturation: 122, filterHue: 0, filterTemp: -12, filterTint:  -2, filterSharpness: 0,   filterCA: 3,   filterVignette: 0,   filterMatte: 6,   filterGrain: 0,   filterBloom: 0, filterPencil: 0, filterEmboss: 0, filterChalkboard: 0, filterNightVision: 0, filterAirbrush: 0, filterFlare: 3,   filterBlur: 0, filterBars: 0,   filterFps: 0,  filterPixel: 0 },
 };
 const _FQP_FILTER_KEYS = [
   'filterBrightness','filterContrast','filterHighlight','filterShadow',
   'filterSaturation','filterHue','filterTemp','filterTint',
   'filterSharpness','filterCA','filterVignette','filterMatte',
   'filterGrain','filterBloom','filterPencil','filterEmboss','filterChalkboard','filterNightVision','filterAirbrush',
-  'filterFlare','filterBlur','filterBars','filterFps','maskBlur','maskPixel','filterRain',
+  'filterFlare','filterBlur','filterPixel','filterBars','filterFps','filterRain',
   'rainSpeed','rainRefraction','rainShadow'
 ];
 const _FQP_CUSTOM_KEY = 'gf-fqp-custom';
 
 export function _collectFilterParams() {
-  return Object.fromEntries(_FQP_FILTER_KEYS.map(id => [id, parseFloat(document.getElementById(id)?.value ?? 0)]));
+  return {
+    ...Object.fromEntries(_FQP_FILTER_KEYS.map(id => [id, parseFloat(document.getElementById(id)?.value ?? 0)])),
+    filterBlurScale: BLUR_SIGMA_PER_UNIT,
+  };
 }
 function _loadCustomFQP()        { try { return JSON.parse(localStorage.getItem(_FQP_CUSTOM_KEY) || '[]'); } catch { return []; } }
 function _saveCustomFQPList(lst) { localStorage.setItem(_FQP_CUSTOM_KEY, JSON.stringify(lst)); }
 
 function _applyFQPParams(params) {
+  // ぼかしの換算が記録されていない（旧）クイックプリセットは、スライダー値 = σ
+  const blurScale = Number(params.filterBlurScale) || 1;
   Object.entries(params).forEach(([id, val]) => {
+    if (id === 'filterBlurScale') return;
     const el = document.getElementById(id);
     if (!el) return;
-    el.value = val;
+    el.value = id === 'filterBlur' ? Math.round(val * blurScale / BLUR_SIGMA_PER_UNIT * 100) / 100 : val;
     el.dispatchEvent(new Event('input'));
   });
 }
@@ -1426,7 +1441,7 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
     el.dispatchEvent(new Event('input'));
   };
   _syncMaskSliders();
-  ['maskOffX', 'maskOffY', 'maskBlur', 'maskPixel', 'maskZoom', 'borderW', 'borderOpacity', 'borderAnimSpeed', 'borderAnimBright', 'frameBlur', 'frameTint',
+  ['maskOffX', 'maskOffY', 'maskZoom', 'borderW', 'borderOpacity', 'borderAnimSpeed', 'borderAnimBright', 'frameBlur', 'frameTint',
    'specBars', 'specAmp', 'specGap', 'specSmooth', 'specRotate'].forEach(resetSlider);
   lucide.createIcons();
 });

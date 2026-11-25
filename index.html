@@ -354,16 +354,6 @@
       </div>
       <div class="ctrl-mini-sep"></div>
       <div class="ctrl-row">
-        <label data-i18n="mask-blur">ぼかし</label>
-        <input type="range" id="maskBlur" min="0" max="10" value="0" step="0.1">
-        <input type="text" class="ctrl-val" id="maskBlurVal" value="0" spellcheck="false" autocomplete="off">
-      </div>
-      <div class="ctrl-row">
-        <label data-i18n="mask-pixel">ピクセル化</label>
-        <input type="range" id="maskPixel" min="0" max="10" value="0" step="1">
-        <input type="text" class="ctrl-val" id="maskPixelVal" value="0" spellcheck="false" autocomplete="off">
-      </div>
-      <div class="ctrl-row">
         <label><span data-i18n="mask-zoom">ズーム</span><span id="zoomLockBtn" class="ar-lock-icon" title="ズームをマスクサイズに追従させる"><i data-lucide="lock-open"></i></span></label>
         <input type="range" id="maskZoom" min="0.1" max="5" value="1" step="0.01">
         <input type="text" class="ctrl-val" id="maskZoomVal" value="1.0" spellcheck="false" autocomplete="off">
@@ -456,7 +446,7 @@
 
     <!-- カラーグレード / フィルター -->
     <div class="card" id="filterCard" data-card-id="filter">
-      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="sparkles"></i><span data-i18n="filter-title">フィルター</span></span><button class="preset-item-del icon-btn--vis" id="filterVisBtn" data-i18n-title="filter-vis-title" title="フィルターを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="filterResetBtn" data-i18n-title="filter-reset-title" title="フィルターをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
+      <div class="card-title"><span class="card-title-label"><span class="card-toggle"><i data-lucide="chevron-down"></i></span><i data-lucide="sparkles"></i><span data-i18n="filter-title">フィルター</span></span><button class="preset-item-del icon-btn--vis" id="filterScopeSwapBtn" data-i18n-title="filter-scope-swap-title" title="適用範囲を入れ替え" style="width:22px;height:22px;padding:0"><i data-lucide="scan"></i></button><button class="preset-item-del icon-btn--vis" id="filterVisBtn" data-i18n-title="filter-vis-title" title="フィルターを表示/非表示" style="width:22px;height:22px;padding:0"><i data-lucide="eye"></i></button><button class="preset-item-del icon-btn--reset" id="filterResetBtn" data-i18n-title="filter-reset-title" title="フィルターをリセット" style="width:22px;height:22px;padding:0"><i data-lucide="rotate-ccw"></i></button></div>
       <div id="filterQuickPresets" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
         <button class="fqp-btn" data-fqp="cinema" data-i18n="fqp-cinema">シネマ</button>
         <button class="fqp-btn" data-fqp="retro" data-i18n="fqp-retro">レトロ</button>
@@ -484,120 +474,125 @@
       <div class="ctrl-mini-sep"></div>
       <!-- 露出・明るさ -->
       <div class="ctrl-row">
-        <label data-i18n="brightness">明るさ</label>
+        <label><span data-i18n="brightness">明るさ</span><button class="mo-btn mo-tri" id="filterBrightnessMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterBrightness" min="0" max="200" value="100" step="1">
         <input type="text" class="ctrl-val" id="filterBrightnessVal" value="100" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="contrast">コントラスト</label>
+        <label><span data-i18n="contrast">コントラスト</span><button class="mo-btn mo-tri" id="filterContrastMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterContrast" min="0" max="200" value="100" step="1">
         <input type="text" class="ctrl-val" id="filterContrastVal" value="100" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-highlight">ハイライト</label>
+        <label><span data-i18n="filter-highlight">ハイライト</span><button class="mo-btn mo-tri" id="filterHighlightMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterHighlight" min="-100" max="100" value="0" step="1">
         <input type="text" class="ctrl-val" id="filterHighlightVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-shadow">シャドウ</label>
+        <label><span data-i18n="filter-shadow">シャドウ</span><button class="mo-btn mo-tri" id="filterShadowMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterShadow" min="-100" max="100" value="0" step="1">
         <input type="text" class="ctrl-val" id="filterShadowVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-mini-sep"></div>
       <!-- 色調整 -->
       <div class="ctrl-row">
-        <label data-i18n="saturation">彩度</label>
+        <label><span data-i18n="saturation">彩度</span><button class="mo-btn mo-tri" id="filterSaturationMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterSaturation" min="0" max="200" value="100" step="1">
         <input type="text" class="ctrl-val" id="filterSaturationVal" value="100" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-hue">色相</label>
+        <label><span data-i18n="filter-hue">色相</span><button class="mo-btn mo-tri" id="filterHueMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterHue" min="-180" max="180" value="0" step="1">
         <input type="text" class="ctrl-val" id="filterHueVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-temp">色温度</label>
+        <label><span data-i18n="filter-temp">色温度</span><button class="mo-btn mo-tri" id="filterTempMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterTemp" min="-50" max="50" value="0" step="1">
         <input type="text" class="ctrl-val" id="filterTempVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-tint">色かぶり補正</label>
+        <label><span data-i18n="filter-tint">色かぶり補正</span><button class="mo-btn mo-tri" id="filterTintMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterTint" min="-50" max="50" value="0" step="1">
         <input type="text" class="ctrl-val" id="filterTintVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-mini-sep"></div>
       <!-- ルック・仕上げ -->
       <div class="ctrl-row">
-        <label><span data-i18n="filter-sharpness">シャープネス</span><button class="mo-btn" id="filterSharpnessMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-sharpness">シャープネス</span><button class="mo-btn mo-tri" id="filterSharpnessMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterSharpness" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterSharpnessVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-bloom">にじみ</span><button class="mo-btn" id="filterBloomMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-bloom">にじみ</span><button class="mo-btn mo-tri" id="filterBloomMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterBloom" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterBloomVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-matte">マット</span><button class="mo-btn" id="filterMatteMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-matte">マット</span><button class="mo-btn mo-tri" id="filterMatteMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterMatte" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterMatteVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="ca">色収差</span><button class="mo-btn" id="filterCAMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="ca">色収差</span><button class="mo-btn mo-tri" id="filterCAMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterCA" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterCAVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-flare">カラーフレア</span><button class="mo-btn" id="filterFlareMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-flare">カラーフレア</span><button class="mo-btn mo-tri" id="filterFlareMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterFlare" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterFlareVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-mini-sep"></div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-pencil">鉛筆</span><button class="mo-btn" id="filterPencilMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-pencil">鉛筆</span><button class="mo-btn mo-tri" id="filterPencilMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterPencil" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterPencilVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-emboss">エンボス</span><button class="mo-btn" id="filterEmbossMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-emboss">エンボス</span><button class="mo-btn mo-tri" id="filterEmbossMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterEmboss" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterEmbossVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-chalkboard">黒板</span><button class="mo-btn" id="filterChalkboardMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-chalkboard">黒板</span><button class="mo-btn mo-tri" id="filterChalkboardMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterChalkboard" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterChalkboardVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-nightvision">暗視</span><button class="mo-btn" id="filterNightVisionMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-nightvision">暗視</span><button class="mo-btn mo-tri" id="filterNightVisionMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterNightVision" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterNightVisionVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label><span data-i18n="filter-airbrush">エアブラシ</span><button class="mo-btn" id="filterAirbrushMOBtn" title="マスク内のみ"><i data-lucide="scan"></i></button></label>
+        <label><span data-i18n="filter-airbrush">エアブラシ</span><button class="mo-btn mo-tri" id="filterAirbrushMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterAirbrush" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterAirbrushVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-mini-sep"></div>
       <!-- グローバルエフェクト -->
       <div class="ctrl-row">
-        <label data-i18n="filter-blur">ぼかし</label>
+        <label><span data-i18n="filter-blur">ぼかし</span><button class="mo-btn mo-tri" id="filterBlurMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterBlur" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterBlurVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="vignette">ビネット</label>
+        <label><span data-i18n="filter-pixel">ピクセル化</span><button class="mo-btn mo-tri" id="filterPixelMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
+        <input type="range" id="filterPixel" min="0" max="10" value="0" step="1">
+        <input type="text" class="ctrl-val" id="filterPixelVal" value="0" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="ctrl-row">
+        <label><span data-i18n="vignette">ビネット</span><button class="mo-btn mo-tri" id="filterVignetteMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterVignette" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterVignetteVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-row">
-        <label data-i18n="filter-grain">ノイズ</label>
+        <label><span data-i18n="filter-grain">ノイズ</span><button class="mo-btn mo-tri" id="filterGrainMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterGrain" min="0" max="10" value="0" step="0.1">
         <input type="text" class="ctrl-val" id="filterGrainVal" value="0" spellcheck="false" autocomplete="off">
       </div>
       <div class="ctrl-mini-sep"></div>
       <div class="ctrl-row">
-        <label data-i18n="filter-rain">雨</label>
+        <label><span data-i18n="filter-rain">雨</span><button class="mo-btn mo-tri" id="filterRainMOBtn" data-i18n-title="filter-mask-off" title="適用範囲: 全体"><i data-lucide="scan"></i></button></label>
         <input type="range" id="filterRain" min="0" max="10" value="0" step="1">
         <input type="text" class="ctrl-val" id="filterRainVal" value="0" spellcheck="false" autocomplete="off">
       </div>

@@ -42,6 +42,7 @@ uniform int   uFirst;
 uniform int   uEnd;
 uniform int   uOn;
 uniform int   uMO;
+uniform int   uInv;
 uniform bool  uFlip;
 uniform vec4  uMaskRect;
 uniform vec2  uMaskUV;
@@ -96,7 +97,8 @@ void main() {
   vec3 c = s.rgb;
   float mk = uMO != 0 ? maskAt(p) : 0.0;
   vec3 r;
-  #define APPLY(k) c = ((uMO >> (k)) & 1) == 1 ? mix(c, r, mk) : r
+  // マスク内のみ: 枠の中だけ r を反映。マスク外のみ(uInv)ではその反対
+  #define APPLY(k) c = ((uMO >> (k)) & 1) == 1 ? mix(c, r, ((uInv >> (k)) & 1) == 1 ? 1.0 - mk : mk) : r
 
   // --- 近傍を読む処理（パスの先頭のみ） ---
   if (uFirst == 0 && on(0)) {
@@ -437,7 +439,7 @@ function _blur(gl, srcTex, srcW, srcH, dw, dh, sigma, slotA, slotB, opt = {}) {
 
 // --- パラメータ（2D 版と同じ式） ---
 function _params(A, W, H, m) {
-  const P = { on: 0, mo: 0 };
+  const P = { on: 0, mo: 0, inv: 0 };
   const set = (k, v) => { if (v) P.on |= 1 << k; };
   set(OP.CA, A.ca > 0); P.caS = A.ca * 0.002;
   if (A.hl !== 0) {
@@ -452,7 +454,8 @@ function _params(A, W, H, m) {
   }
   if (A.vig > 0) {
     set(OP.VIG, true);
-    const fo = A.mo.vignette;
+    // マスク内のみのときはビネットの中心・半径もマスクに合わせる。マスク外のみなら全体の形のまま枠内を除く
+    const fo = A.mo.vignette && !A.inv.vignette;
     const cx = W / 2, cy = H / 2;
     P.vig = [
       fo ? m.x + m.w / 2 : cx,
@@ -510,7 +513,10 @@ function _params(A, W, H, m) {
   if (A.air > 0) { set(OP.AIR, true); P.air = A.air / 10; }
   if (A.flare > 0) { set(OP.FLARE, true); P.flareA = (A.flare / 10) * 0.35; }
   for (let k = 0; k < MASK_ONLY_KEYS.length; k++) {
-    if ((P.on >> k) & 1 && A.mo[MASK_ONLY_KEYS[k]]) P.mo |= 1 << k;
+    if ((P.on >> k) & 1 && A.mo[MASK_ONLY_KEYS[k]]) {
+      P.mo |= 1 << k;
+      if (A.inv[MASK_ONLY_KEYS[k]]) P.inv |= 1 << k;
+    }
   }
   return P;
 }
@@ -603,6 +609,7 @@ export function applyFiltersGL(srcCvs, W, H, m, A, hooks) {
       gl.uniform1i(u.uEnd, end);
       gl.uniform1i(u.uOn, P.on);
       gl.uniform1i(u.uMO, P.mo);
+      gl.uniform1i(u.uInv, P.inv);
       gl.uniform1i(u.uFlip, last ? 1 : 0);
       if (maskInfo) {
         gl.uniform4f(u.uMaskRect, maskInfo.x, maskInfo.y, maskInfo.dw, maskInfo.dh);

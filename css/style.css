@@ -1928,6 +1928,8 @@
     }
     .mo-btn:hover { opacity: 0.85; }
     .mo-btn.active { opacity: 1; color: var(--accent); border-color: var(--accent); }
+    /* 3 状態ボタン（全体 / 枠内のみ / 枠外のみ）。枠外のみは塗りつぶしで区別する */
+    .mo-btn.out { opacity: 1; color: var(--bg, #1a1a1a); background: var(--accent); border-color: var(--accent); }
     .mo-btn svg.lucide { width: 10px; height: 10px; }
 
     /* Canvas drag-over highlight */
