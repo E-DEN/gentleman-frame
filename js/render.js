@@ -1285,7 +1285,8 @@ export function render(now) {
         Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002 ||
         state.followMode !== 'none';
       if (!_lerpActive) {
-        _blitMblur(0.35);
+        // 前回の実フレームは displayCtx に表示済みで、ここで同じ内容を薄く重ね直しても内側の見た目は変わらない
+        // （全体ぼかし有りだと外周の透明度だけがじわじわ変わる）。4K のぼかし描画を毎回行うのは無駄なので省く
         _drawOverlays();
         perfFrame(now, 'idle', _perfInfo);
         requestAnimationFrame(render);
@@ -1304,7 +1305,7 @@ export function render(now) {
   if (fpsLimit === 0 && _canSkipPaint(now)) {
     // 新しい映像フレームも操作も無い: 前回の描画結果をそのまま表示し、枠などのオーバーレイだけ更新する
     _updateCompositeTime();
-    GFRainEngine.tick();
+    GFRainEngine.tick(false); // メイン画像は前回から変わっていない（水滴だけ動かす）
     updateProgress();
     syncMaskDropOverlay();
     _updateCanvasHints();
@@ -1710,6 +1711,58 @@ let _glassSamplerCtx  = null;
 let _glassBlurCvs     = null; // blur済みキャッシュ（DOM外 → overlayCtxへのfilter設定を避ける）
 let _glassBlurCtx     = null;
 
+// 枠（メガネ・スマホのベゼル）の背面に重ねる「ぼかし + ティント」を、枠の形に切り抜いて destination-over で合成する。
+// 4K 全面で行うとぼかし・パス塗りが毎フレーム 4K 分かかって重いため、枠の周辺だけの小さなキャンバスで処理する。
+// ぼかしは低周波なので、強いときは縮小した上でかける（見た目の差はほぼ無い）。
+let _bdCvs = null, _bdCtx = null;
+function _drawFrameBackdrop(ctx, rect, shape, opacity, fb, ft, s) {
+  const W = renderCvs.width, H = renderCvs.height;
+  const sigma = fb * s;
+  const pad = fb > 0 ? Math.ceil(sigma * 3) : 0;
+  const x0 = Math.max(0, Math.floor(rect.x - 2 - pad)), y0 = Math.max(0, Math.floor(rect.y - 2 - pad));
+  const x1 = Math.min(W, Math.ceil(rect.x + rect.w + 2 + pad)), y1 = Math.min(H, Math.ceil(rect.y + rect.h + 2 + pad));
+  const bw = x1 - x0, bh = y1 - y0;
+  if (bw <= 0 || bh <= 0) return;
+  let k = fb > 0 ? (sigma >= 16 ? 0.25 : sigma >= 8 ? 0.5 : 1) : 1;
+  k = Math.min(k, Math.sqrt(_BOX_MAX_PX / (bw * bh)));
+  const sw = Math.max(1, Math.ceil(bw * k)), sh = Math.max(1, Math.ceil(bh * k));
+  if (!_bdCvs) { _bdCvs = document.createElement('canvas'); _bdCtx = _bdCvs.getContext('2d'); }
+  // 大きさの変化のたびに再確保しないよう、64px 単位で確保する
+  const needW = Math.ceil(sw / 64) * 64, needH = Math.ceil(sh / 64) * 64;
+  if (_bdCvs.width < sw || _bdCvs.height < sh || _bdCvs.width > needW * 2 || _bdCvs.height > needH * 2) {
+    _bdCvs.width = needW; _bdCvs.height = needH;
+  }
+  const c = _bdCtx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+  c.clearRect(0, 0, _bdCvs.width, _bdCvs.height);
+  // 背景: 全体を縮小して左上を箱の位置に合わせて描く（部分指定の drawImage より速い）
+  if (fb > 0) c.filter = `blur(${sigma * k}px)`;
+  c.drawImage(renderCvs, -x0 * k, -y0 * k, W * k, H * k);
+  c.filter = 'none';
+  // 以降は 4K の絶対座標のまま描ける
+  c.setTransform(k, 0, 0, k, -x0 * k, -y0 * k);
+  if (ft !== 0) {
+    const animKey = elBorderAnim.value;
+    const speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
+    const phase = (performance.now() * 0.001 * speed) % 1;
+    c.globalAlpha = Math.abs(ft) / 100;
+    c.fillStyle = ft > 0 ? _buildTintFill(c, { width: W, height: H }, animKey, phase) : '#000000';
+    c.fillRect(x0, y0, bw, bh);
+    c.globalAlpha = 1;
+  }
+  c.globalCompositeOperation = 'destination-in';
+  c.fill(shape, 'evenodd');
+  c.globalCompositeOperation = 'source-over';
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.drawImage(_bdCvs, 0, 0, sw, sh, x0, y0, sw / k, sh / k);
+  ctx.restore();
+}
+
 export function _drawGlassesFrame(ctx, m, bufScale, overrideColor = null) {
   const bw = parseFloat(elBorderW.value);
   const idx = (state.mask.glassesStyle || 0) % _GLASSES_STYLES.length;
@@ -1760,33 +1813,7 @@ export function _drawGlassesFrame(ctx, m, bufScale, overrideColor = null) {
   if (!overrideColor) {
     const _fb = parseFloat(elFrameBlur.value);
     const _ft = parseInt(elFrameTint.value, 10);
-    if (_fb > 0 || _ft !== 0) {
-      postCtx.clearRect(0, 0, postCvs.width, postCvs.height);
-      if (_fb > 0) {
-        postCtx.filter = `blur(${_fb * s}px)`;
-        postCtx.drawImage(renderCvs, 0, 0);
-        postCtx.filter = 'none';
-      } else {
-        postCtx.drawImage(renderCvs, 0, 0);
-      }
-      if (_ft !== 0) {
-        const _animKey = elBorderAnim.value;
-        const _speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
-        const _phase = (performance.now() * 0.001 * _speed) % 1;
-        postCtx.globalAlpha = Math.abs(_ft) / 100;
-        postCtx.fillStyle = _ft > 0 ? _buildTintFill(postCtx, postCvs, _animKey, _phase) : '#000000';
-        postCtx.fillRect(0, 0, postCvs.width, postCvs.height);
-        postCtx.globalAlpha = 1;
-      }
-      postCtx.globalCompositeOperation = 'destination-in';
-      postCtx.fill(pFull, 'evenodd');
-      postCtx.globalCompositeOperation = 'source-over';
-      ctx.save();
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = 'destination-over';
-      ctx.drawImage(postCvs, 0, 0);
-      ctx.restore();
-    }
+    if (_fb > 0 || _ft !== 0) _drawFrameBackdrop(ctx, m, pFull, opacity, _fb, _ft, s);
   }
 }
 
@@ -2104,31 +2131,7 @@ export function _drawPhoneFrame(ctx, m, bufScale, opacity, phase, overrideColor 
       const bezelPath = new Path2D();
       bezelPath.roundRect(bx, by, bw, bh, bodyR);
       bezelPath.roundRect(scrX, scrY, scrW, scrH, scrRb);
-      postCtx.clearRect(0, 0, postCvs.width, postCvs.height);
-      if (_fb > 0) {
-        postCtx.filter = `blur(${_fb * s}px)`;
-        postCtx.drawImage(renderCvs, 0, 0);
-        postCtx.filter = 'none';
-      } else {
-        postCtx.drawImage(renderCvs, 0, 0);
-      }
-      if (_ft !== 0) {
-        const _animKey = elBorderAnim.value;
-        const _speed = parseFloat(elBorderAnimSpeed.value) * 0.1;
-        const _phase = (performance.now() * 0.001 * _speed) % 1;
-        postCtx.globalAlpha = Math.abs(_ft) / 100;
-        postCtx.fillStyle = _ft > 0 ? _buildTintFill(postCtx, postCvs, _animKey, _phase) : '#000000';
-        postCtx.fillRect(0, 0, postCvs.width, postCvs.height);
-        postCtx.globalAlpha = 1;
-      }
-      postCtx.globalCompositeOperation = 'destination-in';
-      postCtx.fill(bezelPath, 'evenodd');
-      postCtx.globalCompositeOperation = 'source-over';
-      ctx.save();
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = 'destination-over';
-      ctx.drawImage(postCvs, 0, 0);
-      ctx.restore();
+      _drawFrameBackdrop(ctx, { x: bx, y: by, w: bw, h: bh }, bezelPath, opacity, _fb, _ft, s);
     }
   }
 }

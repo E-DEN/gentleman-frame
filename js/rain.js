@@ -315,22 +315,24 @@
       gl.createUniform('1i', 'waterMap', 0);
 
       // テクスチャスロット 1: シャイン（未使用 — 2×2 の空白）
+      // テクスチャスロット 2: メイン画像。前景と背景は同じ画像なので、1 枚のテクスチャを共有する（転送が 1 回で済む）
       var blankCanvas = createCanvas(2, 2);
       this._textures = [
         { name: 'textureShine', img: blankCanvas },
-        { name: 'textureFg',    img: this.imageFg },
-        { name: 'textureBg',    img: this.imageBg }
+        { name: 'textureFg',    img: this.imageFg }
       ];
       var self = this;
       this._textures.forEach(function (t, i) {
         gl.createTexture(t.img, i + 1);
         gl.createUniform('1i', t.name, i + 1);
       });
+      gl.createUniform('1i', 'textureBg', 2);
 
-      this._draw();
+      this._draw(true);
     },
 
-    _draw: function () {
+    // mainChanged が false のとき、メイン画像（4K の転送）を省く。水滴だけ動かしたいフレーム用
+    _draw: function (mainChanged) {
       if (this._stopped) return;
       var gl = this.gl;
       gl.useProgram(gl.program);
@@ -340,13 +342,11 @@
       gl.activeTexture(0);
       gl.updateTexture(this.canvasLiquid);
 
-      // ライブな mainCanvas から FG/BG を更新（スロット 0 のシャインは静的なのでスキップ）
-      var self = this;
-      this._textures.forEach(function (t, i) {
-        if (i === 0) return; // shine is static blank
-        self.gl.activeTexture(i + 1);
-        self.gl.updateTexture(t.img);
-      });
+      // ライブな mainCanvas から FG/BG を更新
+      if (mainChanged !== false) {
+        gl.activeTexture(2);
+        gl.updateTexture(this.imageFg);
+      }
 
       gl.draw();
     },
@@ -419,7 +419,7 @@
     lastRender: null,
 
     get deltaR()        { return this.options.maxR - this.options.minR; },
-    get area()          { return (this.width * this.height) / this.scale; },
+    get area()          { return (this.width / this.scale) * (this.height / this.scale); },
     get areaMultiplier(){ return Math.sqrt(this.area / (1024 * 768)); },
 
     _init: function () {
@@ -748,9 +748,12 @@
         overlayCanvas.width  = mainCanvas.width;
         overlayCanvas.height = mainCanvas.height;
 
+        // 水滴マップ（Raindrops のキャンバス）は 4K 級では半分の解像度で描く。水滴の座標・数は変わらず
+        // （scale = 0.5 で論理座標を半分のキャンバスに写す）、毎フレームの描き込みと転送が約 1/4 になる
+        var q = mainCanvas.width * mainCanvas.height > 2.2e6 ? 0.5 : 1;
         var raindrops = new Raindrops(
-          mainCanvas.width, mainCanvas.height,
-          1,                          // scale
+          Math.round(mainCanvas.width * q), Math.round(mainCanvas.height * q),
+          q,                          // scale
           imgs.dropAlpha, imgs.dropColor,
           opts
         );
@@ -775,10 +778,11 @@
     },
 
     // メインレンダーループから呼び出す。FPS制限に連動して雨フレームレートを制御する。
-    tick: function () {
+    // mainChanged: false のとき、メイン画像が前回から変わっていないので、その転送を省く
+    tick: function (mainChanged) {
       if (!_state) return;
       _state.raindrops._update();
-      _state.renderer._draw();
+      _state.renderer._draw(mainChanged);
     },
 
     // 雨オーバーレイを停止・クリアする
