@@ -1121,8 +1121,60 @@ document.querySelectorAll('.offset-btn').forEach(btn => {
 });
 
 // --- シェイプボタン ---
-let _phoneMaskState    = null;
-let _nonPhoneMaskState = null;
+let _phoneEntry        = null; // スマホに入る前のサイズ {w,h} と、入った時点の長辺 long
+let _phoneZoom         = null; // スマホ側 / それ以外側のズーム値（切り替えで入れ替える）
+let _nonPhoneZoom      = null;
+let _glassesEntry      = null; // メガネに入る前のサイズ {w,h} と、入った時点のメガネ幅 gw
+
+// 各形状の初期サイズ（マスクのリセットボタンと同じ値）
+function _initMaskBox(shape) {
+  const cw = canvas.width, ch = canvas.height;
+  if (shape === 'glasses') return _glassesInitSize(cw, ch);
+  if (shape === 'phone') {
+    const targetW = 360, targetH = 780;
+    let dw, dh;
+    if (state.phoneLandscape) {
+      dw = Math.min(targetH, cw);
+      dh = Math.round(dw * targetW / targetH);
+      if (dh > ch) { dh = Math.min(targetW, ch); dw = Math.round(dh * targetH / targetW); }
+    } else {
+      dw = Math.min(targetW, cw);
+      dh = Math.round(dw * targetH / targetW);
+      if (dh > ch) { dh = Math.min(targetH, ch); dw = Math.round(dh * targetW / targetH); }
+    }
+    return { w: dw, h: dh };
+  }
+  return { w: 400, h: 400 };
+}
+
+// 通常形状（四角・円形・ハートなど）の枠が、初期サイズ(400×400)の何倍の大きさか（面積の平方根）
+function _maskScaleFromInit(m) {
+  const b = _initMaskBox('rect');
+  return Math.sqrt((m.w * m.h) / (b.w * b.h));
+}
+
+// 形状の初期サイズを scale 倍した枠（キャンバスに収まる範囲に制限）
+function _scaledInitBox(shape, scale) {
+  const b = _initMaskBox(shape);
+  const s = Math.max(0.01, Math.min(scale, canvas.width / b.w, canvas.height / b.h));
+  return { w: Math.max(1, Math.round(b.w * s)), h: Math.max(1, Math.round(b.h * s)) };
+}
+
+// メガネを出るときの枠: 入る前のサイズ × メガネ内での倍率、中心はメガネの現在位置
+// （プリセット読み込み等で入る前の記憶が無い場合は h×h の正方形）
+function _glassesExitBox() {
+  const m = state.mask;
+  const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+  let w, h;
+  if (_glassesEntry && _glassesEntry.gw > 0) {
+    const f = m.w / _glassesEntry.gw;
+    w = Math.max(1, Math.round(_glassesEntry.w * f));
+    h = Math.max(1, Math.round(_glassesEntry.h * f));
+  } else {
+    w = h = m.h;
+  }
+  return { w, h, x: Math.round(cx - w / 2), y: Math.round(cy - h / 2) };
+}
 
 function _restoreMaskZoom(zoom) {
   if (zoom == null) return;
@@ -1177,36 +1229,29 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
     }
     _updateFgFixedBtn();
 
-    if (prevShape !== 'phone' && newShape === 'phone') {
-      // メガネからの遷移: 横長サイズがそのまま残らないよう h×h に正規化して保存
-      const saveW = prevShape === 'glasses' ? state.mask.h : state.mask.w;
-      const saveH = state.mask.h;
-      // メガネ幅はマスクサイズが変わるので x/y を保存せず、保存サイズに合わせて再中央寄せする
-      const saveX = prevShape === 'glasses'
-        ? Math.round((canvas.width  - saveW) / 2)
-        : state.mask.x;
-      const saveY = prevShape === 'glasses'
-        ? Math.round((canvas.height - saveH) / 2)
-        : state.mask.y;
-      _nonPhoneMaskState = { w: saveW, h: saveH, x: saveX, y: saveY, zoom: parseFloat(elMaskZoom.value) };
-    } else if (prevShape === 'phone' && newShape !== 'phone') {
-      _phoneMaskState = { w: state.mask.w, h: state.mask.h, x: state.mask.x, y: state.mask.y, zoom: parseFloat(elMaskZoom.value) };
-      if (_nonPhoneMaskState) {
-        state.mask.w = _nonPhoneMaskState.w; state.mask.h = _nonPhoneMaskState.h;
-        state.mask.x = _nonPhoneMaskState.x; state.mask.y = _nonPhoneMaskState.y;
-        _restoreMaskZoom(_nonPhoneMaskState.zoom);
+    if (prevShape === 'phone' && newShape !== 'phone') {
+      // スマホから出る: 入る前のサイズに、スマホ内での拡大縮小の倍率を反映して戻す
+      _phoneZoom = parseFloat(elMaskZoom.value);
+      const m = state.mask;
+      if (_phoneEntry) {
+        const f = Math.max(m.w, m.h) / _phoneEntry.long;
+        const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+        const w = Math.max(1, Math.round(_phoneEntry.w * f)), h = Math.max(1, Math.round(_phoneEntry.h * f));
+        m.w = w; m.h = h;
+        m.x = Math.round(cx - w / 2); m.y = Math.round(cy - h / 2);
+        _restoreMaskZoom(_nonPhoneZoom);
       } else {
-        state.mask.w = 400; state.mask.h = 400;
-        state.mask.x = Math.round((canvas.width  - 400) / 2);
-        state.mask.y = Math.round((canvas.height - 400) / 2);
+        m.w = 400; m.h = 400;
+        m.x = Math.round((canvas.width  - 400) / 2);
+        m.y = Math.round((canvas.height - 400) / 2);
       }
+      _phoneEntry = null;
     }
 
-    // メガネからの遷移: h×h の正方形に正規化（全遷移先に適用）
-    if (prevShape === 'glasses' && newShape !== 'glasses' && newShape !== 'phone') {
-      const side = state.mask.h;
-      state.mask.w = side;
-      state.mask.x = Math.round((canvas.width - side) / 2);
+    // メガネから出る: 入る前のサイズに、メガネ内での拡大縮小の倍率を反映して戻す
+    if (prevShape === 'glasses' && newShape !== 'glasses') {
+      Object.assign(state.mask, _glassesExitBox());
+      _glassesEntry = null;
     }
 
     if (newShape === 'heart') {
@@ -1220,36 +1265,30 @@ document.querySelectorAll('.shape-btn').forEach(btn => {
       });
       if (!state.arLock) { state.arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'phone') {
-      const cw = canvas.width, ch = canvas.height;
-      let newW, newH, newX, newY;
-      const _land = state.phoneLandscape;
-      if (_phoneMaskState) {
-        newW = _phoneMaskState.w; newH = _phoneMaskState.h;
-        newX = _phoneMaskState.x; newY = _phoneMaskState.y;
-        // プリセット読み込み等で向きが変わっていた場合は縦横を入れ替えて中央寄せ
-        if ((newW > newH) !== _land) {
-          [newW, newH] = [newH, newW];
-          newX = Math.round((cw - newW) / 2);
-          newY = Math.round((ch - newH) / 2);
-        }
-        _restoreMaskZoom(_phoneMaskState.zoom);
-      } else {
-        const targetW = _land ? 780 : 360, targetH = _land ? 360 : 780;
-        newW = Math.min(targetW, cw);
-        newH = Math.round(newW * targetH / targetW);
-        if (newH > ch) { newH = ch; newW = Math.round(newH * targetW / targetH); }
-        newX = Math.round((cw - newW) / 2);
-        newY = Math.round((ch - newH) / 2);
+      // サイズ感を引き継ぐ: 直前の枠の「初期サイズに対する倍率」をスマホの初期サイズに掛ける（中心は維持）。
+      // 出るときに元のサイズへ戻せるよう、入る前のサイズと入った時点の長辺を覚えておく
+      if (prevShape !== 'phone') {
+        const m = state.mask;
+        const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+        const b = _scaledInitBox('phone', _maskScaleFromInit(m));
+        _phoneEntry = { w: m.w, h: m.h, long: Math.max(b.w, b.h) };
+        _nonPhoneZoom = parseFloat(elMaskZoom.value);
+        m.w = b.w; m.h = b.h;
+        m.x = Math.round(cx - m.w / 2); m.y = Math.round(cy - m.h / 2);
+        _restoreMaskZoom(_phoneZoom);
       }
-      state.mask.w = newW; state.mask.h = newH;
-      state.mask.x = newX; state.mask.y = newY;
       if (!state.arLock) { state.arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'glasses') {
-      const cw = canvas.width, ch = canvas.height;
-      const _gs = _glassesInitSize(cw, ch);
-      state.mask.w = _gs.w; state.mask.h = _gs.h;
-      state.mask.x = Math.round((cw - _gs.w) / 2);
-      state.mask.y = Math.round((ch - _gs.h) / 2);
+      // サイズ感を引き継ぐ: 直前の枠の「初期サイズに対する倍率」をメガネの初期サイズに掛ける（中心は維持）。
+      // 出るときに元の形状サイズへ戻せるよう、入る前のサイズと入った幅を覚えておく
+      if (prevShape !== 'glasses') {
+        const m = state.mask;
+        const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+        const b = _scaledInitBox('glasses', _maskScaleFromInit(m));
+        _glassesEntry = { w: m.w, h: m.h, gw: b.w };
+        m.w = b.w; m.h = b.h;
+        m.x = Math.round(cx - m.w / 2); m.y = Math.round(cy - m.h / 2);
+      }
       if (!state.arLock) { state.arLockBeforeAutoLock = false; state.arLock = true; _updateArLockBtn(); }
     } else if (newShape === 'spectrum') {
       connectAudioElements(vid[0], vid[1]);
@@ -1300,11 +1339,7 @@ elGlassesStyleBtns.forEach(btn => {
     const idx = parseInt(btn.dataset.gstyle);
     state.mask.glassesStyle = idx;
     elGlassesStyleBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.gstyle) === idx));
-    const cw = canvas.width, ch = canvas.height;
-    const _gs = _glassesInitSize(cw, ch);
-    state.mask.w = _gs.w; state.mask.h = _gs.h;
-    state.mask.x = Math.round((cw - _gs.w) / 2);
-    state.mask.y = Math.round((ch - _gs.h) / 2);
+    // サイズはスタイル間で共有する
     if (!state.arLock) { state.arLock = true; _updateArLockBtn(); }
     _syncMaskSliders();
   });
@@ -1382,9 +1417,9 @@ document.getElementById('maskResetBtn').addEventListener('click', () => {
   state.mask.y = Math.round((canvas.height - dh) / 2);
   state.arLock = (state.mask.shape === 'phone' || state.mask.shape === 'heart' || state.mask.shape === 'glasses' || state.mask.shape === 'spectrum');
   _updateArLockBtn();
-  if (state.mask.shape === 'phone') {
-    _phoneMaskState = { w: dw, h: dh, x: state.mask.x, y: state.mask.y };
-  }
+  // リセット後の大きさを「入った時点の基準」に取り直す（出るときに入る前のサイズへ戻せる）
+  if (state.mask.shape === 'glasses' && _glassesEntry) _glassesEntry.gw = dw;
+  if (state.mask.shape === 'phone' && _phoneEntry) _phoneEntry.long = Math.max(dw, dh);
   const resetSlider = id => {
     const el = document.getElementById(id);
     el.value = el.defaultValue;
