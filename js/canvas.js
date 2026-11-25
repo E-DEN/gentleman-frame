@@ -80,6 +80,8 @@ export function _stopBitmapCapture(i) {
 // ドラッグ中に Chrome が compositor を占有すると rVFC が停止するため、
 // 閾値を超えた場合は vid[i] への直接描画にフォールバックして凍結を防ぐ。
 const _RVFC_STALE_MS = 100;
+// rVFC が最後に取り込んだフレームの時刻。描画スキップの判定（新フレームが来たか）に使う
+export function getVidFrameTs(i) { return _vidFrameTs[i]; }
 export function getMediaSrc(i) {
   if (mediaType[i] === 'image') return img[i];
   if (_vidFrameReady[i] && (performance.now() - _vidFrameTs[i]) < _RVFC_STALE_MS) {

@@ -8,7 +8,7 @@ import {
   _mblurCvs, _mblurCtx, grainCvs, grainCtx,
   effectsWrap, svgGblurEl,
   vid, img, mediaType, loaded, visHidden, maskHidden, effectsHidden,
-  getMediaSrc, getHandles, HANDLE_SZ,
+  getMediaSrc, getVidFrameTs, getHandles, HANDLE_SZ,
   _dispH, _cachedAccent, _cachedBg,
   _lastBufScale, _lastFgAlpha,
   setLastBufScale, setLastFgAlpha,
@@ -544,24 +544,32 @@ export function _renderFrame() {
     const _foW = state.filterMaskOnly.bloom && _maskClipOk;
     if (_foW) { ctx.save(); const _fwp = buildMaskPath(ctx, m); if (_fwp) ctx.clip(_fwp); else ctx.clip(); }
     const t = waterAmt / 10;
+    // ぼかしは低周波なので、4K 級では半解像度で処理して拡大する。
+    // 全面のぼかしコピーを 2 回重ねると 4K では急に重くなりコマ落ちが散発するが、
+    // 半解像度なら見た目の差は平均 0.5/255 程度に収まる。1080p 以下は従来どおり等倍
+    const k = W * H > 2.2e6 ? 0.5 : 1;
+    const sw = Math.ceil(W * k), sh = Math.ceil(H * k);
+    if (!_bloomCvs) { _bloomCvs = document.createElement('canvas'); _bloomCtx = _bloomCvs.getContext('2d'); }
+    if (_bloomCvs.width !== sw || _bloomCvs.height !== sh) { _bloomCvs.width = sw; _bloomCvs.height = sh; }
+    const bc = _bloomCtx;
     // 1. 滲み: ぼかし+彩度ブースト済みコピーをノーマル合成
-    postCtx.clearRect(0, 0, W, H);
-    postCtx.filter = `blur(${t * 4}px) saturate(${100 + t * 70}%)`;
-    postCtx.drawImage(renderCvs, 0, 0);
-    postCtx.filter = 'none';
+    bc.clearRect(0, 0, sw, sh);
+    bc.filter = `blur(${t * 4 * k}px) saturate(${100 + t * 70}%)`;
+    bc.drawImage(renderCvs, 0, 0, sw, sh);
+    bc.filter = 'none';
     ctx.save();
     ctx.globalAlpha = t * 0.55;
-    ctx.drawImage(postCvs, 0, 0);
+    ctx.drawImage(_bloomCvs, 0, 0, W, H);
     ctx.restore();
     // 2. エッジ濃縮: 軽いぼかしコピーを multiply で暗化
-    chCtx.clearRect(0, 0, W, H);
-    chCtx.filter = `blur(${t * 2}px)`;
-    chCtx.drawImage(renderCvs, 0, 0);
-    chCtx.filter = 'none';
+    bc.clearRect(0, 0, sw, sh);
+    bc.filter = `blur(${t * 2 * k}px)`;
+    bc.drawImage(renderCvs, 0, 0, sw, sh);
+    bc.filter = 'none';
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
     ctx.globalAlpha = t * 0.30;
-    ctx.drawImage(chCvs, 0, 0);
+    ctx.drawImage(_bloomCvs, 0, 0, W, H);
     ctx.restore();
     if (_foW) ctx.restore();
   }
@@ -572,10 +580,6 @@ export function _renderFrame() {
     const _foSHP = state.filterMaskOnly.sharpness && _maskClipOk;
     postCtx.clearRect(0, 0, W, H);
     postCtx.drawImage(renderCvs, 0, 0);
-    chCtx.clearRect(0, 0, W, H);
-    chCtx.filter = `blur(${1 + sharpAmt * 0.25}px)`;
-    chCtx.drawImage(postCvs, 0, 0);
-    chCtx.filter = 'none';
     ctx.save();
     if (_foSHP) { const _fshpp = buildMaskPath(ctx, m); if (_fshpp) ctx.clip(_fshpp); else ctx.clip(); }
     ctx.globalCompositeOperation = 'overlay';
@@ -726,8 +730,11 @@ export function _renderFrame() {
   // --- Cinematic Bars: barsOverlay div (effectsWrap 外側) で描画— updateBarsOverlay() 制御 ---
 
   } // end !effectsHidden
+}
 
-  // --- コンポジット時刻 ---
+// --- コンポジット時刻 ---
+// 描画をスキップするフレームでも進める必要があるため、_renderFrame とは分けて毎 rAF 呼ぶ
+function _updateCompositeTime() {
   const _rafNow = performance.now();
   if (state.playing && !_compositeSeekPending) {
     const [o1, o2] = _getOffsets();
@@ -845,6 +852,9 @@ function _spectrumSkyline(ctx, m) {
   if (specRotate !== 0) ctx.restore();
   return true;
 }
+
+// にじみ（ブルーム）用の作業キャンバス（4K 級では半解像度）
+let _bloomCvs = null, _bloomCtx = null;
 
 // --- 小キャンバス描画レイヤー ---
 // Skia Graphite（Chrome 新描画エンジン）では、矩形以外のパス描画のコストが
@@ -1064,7 +1074,59 @@ function _getVidSrc(i) {
   return (_vidFreezeMode && _vidFreezeReady[i]) ? _fpsVidCvs[i] : getMediaSrc(i);
 }
 
+// --- 描画スキップ（同じ映像フレームの再描画を避ける） ---
+// リフレッシュレートが映像の fps より高い（例: 144Hz に 60fps の映像）と、rAF ごとに
+// 同じ内容を全面再描画することになり、4K では GPU の無駄が大きく、フィルターを重ねるとコマ落ちの原因になる。
+// 新しい映像フレームが届かず、操作・アニメーションも無いときだけ _renderFrame と表示用ブリットを省く。
+// 判定漏れがあっても _PAINT_MAX_IDLE_MS ごとに必ず再描画する。
+const _PAINT_MAX_IDLE_MS = 250;
+const _DIRTY_HOLD_MS = 400;
+let _dirtyUntil = 0;
+let _lastPaintT = 0;
+let _paintedSig = '';
+const _paintedTs = [-1, -1];
+let _dirtyHooked = false;
+function _markDirty() { _dirtyUntil = performance.now() + _DIRTY_HOLD_MS; }
+function _hookDirtyEvents() {
+  if (_dirtyHooked) return;
+  _dirtyHooked = true;
+  ['pointerdown', 'pointerup', 'pointermove', 'keydown', 'keyup', 'wheel', 'input', 'change', 'click',
+   'drop', 'dragover', 'touchstart', 'touchmove', 'touchend', 'contextmenu']
+    .forEach(t => window.addEventListener(t, _markDirty, { capture: true, passive: true }));
+  window.addEventListener('resize', _markDirty);
+  vid.forEach(v => ['loadeddata', 'seeking', 'seeked', 'emptied', 'play', 'pause']
+    .forEach(t => v.addEventListener(t, _markDirty)));
+}
+function _paintSig() {
+  return `${loaded[0]}${mediaType[0]}${visHidden[0]}|${loaded[1]}${mediaType[1]}${visHidden[1]}|${canvas.width}x${canvas.height}`;
+}
+function _canSkipPaint(now) {
+  if (now < _dirtyUntil || now - _lastPaintT > _PAINT_MAX_IDLE_MS) return false;
+  if (state.drag.active || state.followMode !== 'none' || state.mask.shape === 'spectrum') return false;
+  if (_fgFadeStart === 0 || (_fgFadeStart > 0 && now - _fgFadeStart < 400)) return false;
+  if (Math.abs(parseFloat(elFgPinX.value)   - state.fgPinDispX) > 0.05 ||
+      Math.abs(parseFloat(elFgPinY.value)   - state.fgPinDispY) > 0.05 ||
+      Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002) return false;
+  for (let i = 0; i < 2; i++) {
+    if (!loaded[i]) continue;
+    // 動く可能性のある画像（GIF 等）は判定できないので常に描画する
+    if (mediaType[i] === 'image') return false;
+    const ts = getVidFrameTs(i);
+    if (ts !== _paintedTs[i]) return false;
+    // 再生中なのにフレーム取り込みが途絶えている場合は直接描画経路に落ちているため描画を続ける
+    if (!vid[i].paused && now - ts > 100) return false;
+  }
+  return _paintSig() === _paintedSig;
+}
+function _notePainted(now) {
+  _lastPaintT = now;
+  _paintedSig = _paintSig();
+  _paintedTs[0] = getVidFrameTs(0);
+  _paintedTs[1] = getVidFrameTs(1);
+}
+
 export function render(now) {
+  _hookDirtyEvents();
   // filterFps: 0=制限なし、それ以外=fps上限で間引き
   const fpsLimit = parseFloat(elFilterFps.value) || 0;
   const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value);
@@ -1108,19 +1170,34 @@ export function render(now) {
       _vidFreezeMode = false;
     }
   }
+  if (fpsLimit === 0 && _canSkipPaint(now)) {
+    // 新しい映像フレームも操作も無い: 前回の描画結果をそのまま表示し、枠などのオーバーレイだけ更新する
+    _updateCompositeTime();
+    GFRainEngine.tick();
+    updateProgress();
+    syncMaskDropOverlay();
+    _updateCanvasHints();
+    _drawOverlays();
+    requestAnimationFrame(render);
+    return;
+  }
   _renderFrame();
   _vidFreezeMode = false;
+  _notePainted(now);
+  _updateCompositeTime();
   if (_isRealFrame) {
     GFRainEngine.tick(); // 雨は filterFps レートのみ更新
-    // 映像フレームをキャッシュに保存（lerp 補間フレームで再利用）
+    // 映像フレームをキャッシュに保存（FPS 制限時、lerp 補間フレームで再利用）
     const _cW = canvas.width, _cH = canvas.height;
-    if (_fpsVidCvs[0].width !== _cW || _fpsVidCvs[0].height !== _cH) {
-      _fpsVidCvs.forEach(c => { c.width = _cW; c.height = _cH; });
-    }
-    for (let _vi = 0; _vi < 2; _vi++) {
-      if (loaded[_vi] && !visHidden[_vi] && mediaType[_vi] !== 'image') {
-        _fpsVidCtx[_vi].clearRect(0, 0, _cW, _cH);
-        try { _fpsVidCtx[_vi].drawImage(getMediaSrc(_vi), 0, 0, _cW, _cH); _vidFreezeReady[_vi] = true; } catch (_) {}
+    if (fpsLimit > 0) {
+      if (_fpsVidCvs[0].width !== _cW || _fpsVidCvs[0].height !== _cH) {
+        _fpsVidCvs.forEach(c => { c.width = _cW; c.height = _cH; });
+      }
+      for (let _vi = 0; _vi < 2; _vi++) {
+        if (loaded[_vi] && !visHidden[_vi] && mediaType[_vi] !== 'image') {
+          _fpsVidCtx[_vi].clearRect(0, 0, _cW, _cH);
+          try { _fpsVidCtx[_vi].drawImage(getMediaSrc(_vi), 0, 0, _cW, _cH); _vidFreezeReady[_vi] = true; } catch (_) {}
+        }
       }
     }
   }
