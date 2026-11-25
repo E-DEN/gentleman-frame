@@ -33,6 +33,8 @@ import {
   updateProgress, syncMaskDropOverlay,
 } from './canvas.js';
 import { getSpectrumBars, smoothBars } from './spectrum.js';
+import { applyFiltersGL, warmUpFiltersGL } from './gl-filters.js';
+import { perfFrame } from './perf-hud.js';
 
 // --- Canvas CSS フィルター（明るさ / コントラスト / 彩度） ---
 export function updateCanvasFilter() {
@@ -371,9 +373,83 @@ export function _renderFrame() {
     }
   }
 
-  // --- 色収差（放射状、スケールベース） ---
+  // --- フィルター（色収差〜カラーフレア） ---
   if (!effectsHidden) {
-  const _maskClipOk = !maskHidden && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0]);
+    const _maskClipOk = !maskHidden && (loaded[1] ? !visHidden[1] : loaded[0] && !visHidden[0]);
+    if (_applyFiltersViaGL(W, H, m, _maskClipOk)) { _lastFilterPath = 'WebGL'; }
+    else { _lastFilterPath = '2D（WebGL 不使用）'; _applyFilters2D(W, H, m, _maskClipOk); }
+  }
+}
+
+// --- フィルター（WebGL 版） ---
+// 使えない環境・描画に失敗した場合は false を返し、2D 版で描く。
+// URL に ?gl=0 を付けると 2D 版に固定できる（見た目の比較・不具合時の切り分け用）
+const _filterGLEnabled = new URLSearchParams(location.search).get('gl') !== '0';
+let _glWarmed = false;
+function _applyFiltersViaGL(W, H, m, maskClipOk) {
+  if (!_filterGLEnabled) return false;
+  const v = el => (el ? parseFloat(el.value) : 0);
+  const mo = {};
+  for (const k in state.filterMaskOnly) mo[k] = !!state.filterMaskOnly[k] && maskClipOk;
+  const A = {
+    ca: v(elFilterCA), hl: v(elFilterHighlight), sh: v(elFilterShadow), vig: v(elFilterVignette),
+    temp: v(elFilterTemp), tint: v(elFilterTint), matte: v(elFilterMatte), grain: v(elFilterGrain),
+    bloom: v(elFilterBloom), sharp: v(elFilterSharpness), pencil: v(elFilterPencil),
+    emboss: v(elFilterEmboss), chalk: v(elFilterChalkboard), night: v(elFilterNightVision),
+    air: v(elFilterAirbrush), flare: v(elFilterFlare), mo,
+  };
+  const out = applyFiltersGL(renderCvs, W, H, m, A, {
+    grain: () => { _fillGrain(A.grain); return grainCvs; },
+    mask: () => _maskAlphaBox(W, H, m),
+  });
+  if (out === false) return false;
+  if (out) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'copy';
+    ctx.drawImage(out, 0, 0);
+    ctx.restore();
+  }
+  return true;
+}
+
+// フィルム粒子のノイズ（256×256、毎フレーム作り直す）。2D 版・WebGL 版で共用
+function _fillGrain(grainAmt) {
+  const gSize = 256;
+  const idata = grainCtx.createImageData(gSize, gSize);
+  const gd = idata.data;
+  const strength = (grainAmt / 10) * 110;
+  for (let i = 0; i < gd.length; i += 4) {
+    const v = Math.min(255, Math.max(0, 128 + (Math.random() - 0.5) * strength));
+    gd[i] = gd[i+1] = gd[i+2] = v;
+    gd[i+3] = 255;
+  }
+  grainCtx.putImageData(idata, 0, 0);
+}
+
+// マスク内限定フィルター用のマスク形状（WebGL 版で使う）。
+// 4K 全面にパスを描くと遅いため、マスク周辺だけの箱キャンバスに白で塗って渡す
+let _moLayer = null;
+function _maskAlphaBox(W, H, m) {
+  if (!_moLayer) _moLayer = _newBoxLayer(null);
+  let x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
+  if (m.shape === 'spectrum' && m.specRotate) {
+    const r = Math.hypot(m.w, m.h) / 2;
+    const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+    x0 = cx - r; y0 = cy - r; x1 = cx + r; y1 = cy + r;
+  }
+  const c = _boxBegin(_moLayer, x0 - 2, y0 - 2, x1 + 2, y1 + 2, W, H);
+  c.fillStyle = '#fff';
+  const p = buildMaskPath(c, m);
+  p ? c.fill(p) : c.fill();
+  const L = _moLayer;
+  return { cvs: L.cvs, x: L.x, y: L.y, dw: L.dw, dh: L.dh, sw: L.sw, sh: L.sh };
+}
+
+// --- フィルター（2D Canvas 版） ---
+// WebGL が使えないとき・WebGL 版が対応しない設定のときの描画経路。
+// WebGL 版（gl-filters.js）はこの関数と同じ順序・同じ計算で、結果が一致するように作ってある
+function _applyFilters2D(W, H, m, _maskClipOk) {
+  // --- 色収差（放射状、スケールベース） ---
   const caAmt = parseFloat(elFilterCA.value);
   if (caAmt > 0) {
     const _foCA = state.filterMaskOnly.ca && _maskClipOk;
@@ -536,16 +612,7 @@ export function _renderFrame() {
   const grainAmt = parseFloat(elFilterGrain.value);
   if (grainAmt > 0) {
     const _foGR = state.filterMaskOnly.grain && _maskClipOk;
-    const gSize = 256;
-    const idata = grainCtx.createImageData(gSize, gSize);
-    const gd = idata.data;
-    const strength = (grainAmt / 10) * 110;
-    for (let i = 0; i < gd.length; i += 4) {
-      const v = Math.min(255, Math.max(0, 128 + (Math.random() - 0.5) * strength));
-      gd[i] = gd[i+1] = gd[i+2] = v;
-      gd[i+3] = 255;
-    }
-    grainCtx.putImageData(idata, 0, 0);
+    _fillGrain(grainAmt);
     ctx.save();
     if (_foGR) { const _fgrp = buildMaskPath(ctx, m); if (_fgrp) ctx.clip(_fgrp); else ctx.clip(); }
     ctx.globalCompositeOperation = 'overlay';
@@ -740,7 +807,6 @@ export function _renderFrame() {
 
   // --- Cinematic Bars: barsOverlay div (effectsWrap 外側) で描画— updateBarsOverlay() 制御 ---
 
-  } // end !effectsHidden
 }
 
 // --- コンポジット時刻 ---
@@ -1097,13 +1163,22 @@ function _getVidSrc(i) {
 // 同じ内容を全面再描画することになり、4K では GPU の無駄が大きく、フィルターを重ねるとコマ落ちの原因になる。
 // 新しい映像フレームが届かず、操作・アニメーションも無いときだけ _renderFrame と表示用ブリットを省く。
 // 判定漏れがあっても _PAINT_MAX_IDLE_MS ごとに必ず再描画する。
+//
+// 重いフィルターを重ねているときは、新しい動画フレームや、枠のドラッグなど操作・アニメーション由来の再描画を
+// 約 75 回/秒までに間引く（全面を描き直すたびに数 ms の GPU 時間がかかり、それ以上では GPU が飽和してコマ落ちになるため）。
+// 枠線・ハンドルなどのオーバーレイは毎回更新するので、操作の追従感は保たれる。
 const _PAINT_MAX_IDLE_MS = 250;
 const _DIRTY_HOLD_MS = 400;
+const _HEAVY_LOAD = 3;
+const _HEAVY_MIN_INTERVAL_MS = 13;
 let _dirtyUntil = 0;
 let _lastPaintT = 0;
 let _paintedSig = '';
 const _paintedTs = [-1, -1];
 let _dirtyHooked = false;
+let _paintOwed = false;
+let _skipKind = 'idle';
+let _lastFilterPath = '2D';
 function _markDirty() { _dirtyUntil = performance.now() + _DIRTY_HOLD_MS; }
 function _hookDirtyEvents() {
   if (_dirtyHooked) return;
@@ -1118,33 +1193,70 @@ function _hookDirtyEvents() {
 function _paintSig() {
   return `${loaded[0]}${mediaType[0]}${visHidden[0]}|${loaded[1]}${mediaType[1]}${visHidden[1]}|${canvas.width}x${canvas.height}`;
 }
+// フィルターの重さの目安（4K での全面処理の回数に近い値）。にじみ・エアブラシは 2 回分
+function _filterLoad() {
+  if (effectsHidden) return 0;
+  const on = el => (el && parseFloat(el.value) > 0 ? 1 : 0);
+  return 2 * on(elFilterBloom) + 2 * on(elFilterAirbrush) + on(elFilterPencil) + on(elFilterEmboss)
+    + on(elFilterChalkboard) + on(elFilterCA) + on(elFilterNightVision) + on(elFilterBlur)
+    + 0.5 * on(elFilterFlare) + 0.5 * on(elFilterSharpness);
+}
 function _canSkipPaint(now) {
-  if (now < _dirtyUntil || now - _lastPaintT > _PAINT_MAX_IDLE_MS) return false;
-  if (state.drag.active || state.followMode !== 'none' || state.mask.shape === 'spectrum') return false;
+  if (now - _lastPaintT > _PAINT_MAX_IDLE_MS) return false;
+  // 操作に関係なく、すぐ描き直す必要がある場合
+  if (state.mask.shape === 'spectrum') return false;
   if (_fgFadeStart === 0 || (_fgFadeStart > 0 && now - _fgFadeStart < 400)) return false;
-  if (Math.abs(parseFloat(elFgPinX.value)   - state.fgPinDispX) > 0.05 ||
-      Math.abs(parseFloat(elFgPinY.value)   - state.fgPinDispY) > 0.05 ||
-      Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002) return false;
+  let newFrame = false;
   for (let i = 0; i < 2; i++) {
     if (!loaded[i]) continue;
     // 動く可能性のある画像（GIF 等）は判定できないので常に描画する
     if (mediaType[i] === 'image') return false;
     const ts = getVidFrameTs(i);
-    if (ts !== _paintedTs[i]) return false;
+    if (ts !== _paintedTs[i]) newFrame = true;
     // 再生中なのにフレーム取り込みが途絶えている場合は直接描画経路に落ちているため描画を続ける
     if (!vid[i].paused && now - ts > 100) return false;
   }
-  return _paintSig() === _paintedSig;
+  if (_paintSig() !== _paintedSig) return false;
+  // 操作・アニメーション中か
+  const interactive = now < _dirtyUntil || state.drag.active || state.followMode !== 'none' ||
+    Math.abs(parseFloat(elFgPinX.value)   - state.fgPinDispX) > 0.05 ||
+    Math.abs(parseFloat(elFgPinY.value)   - state.fgPinDispY) > 0.05 ||
+    Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002;
+  if (!interactive && !newFrame) {
+    // 間引いて描けなかった最後の変更があれば、操作が終わったあとに必ず描く
+    _skipKind = 'idle';
+    return !_paintOwed;
+  }
+  // 描き直す理由はあるが、重いフィルターのときは回数を絞る。
+  // 前景と背景の動画は新しいフレームが届く位相がずれており、どちらかが届くたびに描くと 60 回/秒を大きく超えるため
+  if (now - _lastPaintT < _HEAVY_MIN_INTERVAL_MS && _filterLoad() >= _HEAVY_LOAD) {
+    _paintOwed = true;
+    _skipKind = 'throttle';
+    return true;
+  }
+  return false;
 }
 function _notePainted(now) {
   _lastPaintT = now;
+  _paintOwed = false;
   _paintedSig = _paintSig();
   _paintedTs[0] = getVidFrameTs(0);
   _paintedTs[1] = getVidFrameTs(1);
 }
+const _perfInfo = {
+  dropped: () => vid.reduce((s, v) => s + (v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality().droppedVideoFrames : 0), 0),
+  load: _filterLoad,
+  size: () => `${canvas.width}x${canvas.height}`,
+  path: () => _lastFilterPath,
+};
 
 export function render(now) {
   _hookDirtyEvents();
+  // 動画・画像が読み込まれたら、アイドル時に WebGL フィルターのシェーダーを準備しておく
+  if (!_glWarmed && _filterGLEnabled && (loaded[0] || loaded[1])) {
+    _glWarmed = true;
+    (window.requestIdleCallback || (cb => setTimeout(cb, 500)))(() => warmUpFiltersGL());
+  }
   // filterFps: 0=制限なし、それ以外=fps上限で間引き
   const fpsLimit = parseFloat(elFilterFps.value) || 0;
   const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value);
@@ -1175,6 +1287,7 @@ export function render(now) {
       if (!_lerpActive) {
         _blitMblur(0.35);
         _drawOverlays();
+        perfFrame(now, 'idle', _perfInfo);
         requestAnimationFrame(render);
         return;
       }
@@ -1196,6 +1309,7 @@ export function render(now) {
     syncMaskDropOverlay();
     _updateCanvasHints();
     _drawOverlays();
+    perfFrame(now, _skipKind, _perfInfo);
     requestAnimationFrame(render);
     return;
   }
@@ -1240,6 +1354,7 @@ export function render(now) {
   displayCtx.globalCompositeOperation = 'source-over';
   // 枠・ハンドルは overlayCanvas (effectsWrap外) に描画 → filter非適用
   _drawOverlays();
+  perfFrame(now, 'paint', _perfInfo);
   requestAnimationFrame(render);
 }
 

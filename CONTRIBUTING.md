@@ -13,9 +13,11 @@ gentleman-frame/
 │   ├── config.js       # window.GF_CONFIG（proxyLocal / proxyProd）
 │   ├── controls.js     # スライダー・ボタン・FQPプリセット・シェイプ・スワップ
 │   ├── drag.js         # マスクドラッグ・ヒットテスト・追従モード
+│   ├── gl-filters.js   # フィルター（色収差〜カラーフレア）の WebGL2 版（使えない環境では render.js の 2D 版）
 │   ├── i18n.js         # 多言語対応（ja / en / zh）
 │   ├── lang.js         # 言語切り替え・テーマ（applyLang / rebuildLangDialog）
 │   ├── media.js        # 動画ロード・プロキシURL
+│   ├── perf-hud.js     # 診断表示（URL に ?perf=1 を付けたときだけ）
 │   ├── playback.js     # 再生/停止/シーク（syncPlay / syncPause / syncStop）
 │   ├── presets.js      # プリセット CRUD・エクスポート/インポート
 │   ├── rain.js         # WebGL 雨エフェクト（Codrops ベース IIFE）
