@@ -188,8 +188,8 @@
     '  vec2 r = (p - u_maskRect.xy) / u_maskRect.zw;',
     '  float mk = 0.0;',
     '  if (r.x >= 0.0 && r.y >= 0.0 && r.x < 1.0 && r.y < 1.0) mk = texture2D(u_mask, r * u_maskUV).a;',
-    // 垂れ: 枠が抜けた跡は、濡れ具合（u_wet）が上から順に増えるまで雨を出さない
-    '  if (u_maskMode == 4) return (1.0 - mk) * texture2D(u_wet, p / u_resolution).r;',
+    // 垂れ: 枠が抜けた跡は、濡れ具合（u_wet）が 0.5 を超えた所から雨を出す（フェードではなく、境目がくっきり下へ進む）
+    '  if (u_maskMode == 4) return (1.0 - mk) * smoothstep(0.42, 0.58, texture2D(u_wet, p / u_resolution).r);',
     '  return u_maskMode == 2 ? 1.0 - mk : mk;',
     '}',
 

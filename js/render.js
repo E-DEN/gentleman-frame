@@ -247,10 +247,9 @@ function _rainMask() {
 
 // 雨の「垂れ」: マスク外のみのとき、枠（ガラスを拭いた所）が抜けた跡は乾いた状態から始まり、上と横の濡れた所から順に濡れ戻る。
 // 画面を粗いマス目（192×108）にした濡れ具合 0〜1 を持ち、枠の中は 0 に戻す。
-// 濡れが隣へ移る速さは _RAIN_DRIP_SPEED で決まり、列ごとに速さを変えて筋状に流れ落ちるようにする
-// 濡れが隣へ移る速さ（マス/秒）と、1 マスが濡れきるまでの速さ（/秒）。小さいほどゆっくり垂れてフェードインする
-const _RAIN_DRIP_SPEED = 8;
-const _RAIN_DRIP_RISE = 0.9;
+// 濡れが隣のマスへ移る速さと、1 マスが濡れるまでの速さ。濡れが 0.5 を超えた所から雨が出て、境目はくっきり下へ進む
+// （境目の進む速さは 2 × 下の値 × 列の係数 マス/秒）
+const _RAIN_DRIP_RISE = 4;
 const _WET_W = 192, _WET_H = 108;
 let _wet = null, _wetU8 = null, _wetCol = null, _wetCtx = null, _wetT = 0, _wetActive = false;
 function _stepWet(m, W, H) {
@@ -280,32 +279,19 @@ function _stepWet(m, W, H) {
   const p = buildMaskPath(c, m);
   p ? c.fill(p) : c.fill();
   const a = c.getImageData(0, 0, _WET_W, _WET_H).data;
-  const rise = _RAIN_DRIP_RISE; // 濡れが 0 → 1 になる速さ（/秒）。列の係数を掛ける
-  const speed = _RAIN_DRIP_SPEED;
+  const rise = _RAIN_DRIP_RISE;
   for (let y = 0; y < _WET_H; y++) {
     for (let x = 0; x < _WET_W; x++) {
       const i = y * _WET_W + x;
       if (a[i * 4 + 3] > 250) { _wet[i] = 0; continue; }
       const col = _wetCol[x];
-      const thr = Math.min(0.9, Math.max(0.02, rise * col / speed));
+      // 上のマスが濡れた（0.5 以上）ら、このマスも濡れ始める。横からは少し遅れて
       const up = y === 0 ? 1 : _wet[i - _WET_W];
       const side = Math.max(x > 0 ? _wet[i - 1] : 0, x < _WET_W - 1 ? _wet[i + 1] : 0) * 0.6;
-      if (Math.max(up, side) >= thr) _wet[i] = Math.min(1, _wet[i] + rise * col * dt);
+      if (Math.max(up, side) >= 0.5) _wet[i] = Math.min(1, _wet[i] + rise * col * dt);
     }
   }
-  // 転送用。枠の中のマスは、縁の補間で外側が薄まらないよう隣の濡れ具合を借りる（中は雨側のマスクで消える）
-  for (let y = 0; y < _WET_H; y++) {
-    for (let x = 0; x < _WET_W; x++) {
-      const i = y * _WET_W + x;
-      let v = _wet[i];
-      if (a[i * 4 + 3] > 250) {
-        v = Math.max(y > 0 ? _wet[i - _WET_W] : 0, y < _WET_H - 1 ? _wet[i + _WET_W] : 0,
-                     x > 0 ? _wet[i - 1] : 0, x < _WET_W - 1 ? _wet[i + 1] : 0);
-      }
-      // 二乗して、濡れ始めは薄く（ゆっくりフェードイン）
-      _wetU8[i] = Math.round(v * v * 255);
-    }
-  }
+  for (let i = 0; i < N; i++) _wetU8[i] = Math.round(_wet[i] * 255);
   return { data: _wetU8, w: _WET_W, h: _WET_H };
 }
 
