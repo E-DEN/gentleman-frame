@@ -231,12 +231,82 @@ function _maskScope(key) {
   return v === 'out' ? 2 : 1;
 }
 
-// 雨の適用範囲。マスクが変わらない間は雨側がマスク画像を再利用する（key で判定）
+// 雨の適用範囲。マスクが変わらない間は雨側がマスク画像を再利用する（key で判定）。
+// スペクトラムは位置・サイズが同じでも形が音で変わり続けるため、毎回作り直す
+let _rainMaskSeq = 0;
 function _rainMask() {
+  if (!(parseInt(elFilterRain.value, 10) > 0)) { _wetActive = false; return null; }
   const mode = _maskScope('rain');
-  if (!mode) return null;
+  if (!mode) { _wetActive = false; return null; }
   const W = canvas.width, H = canvas.height, m = state.mask;
-  return { mode, key: W + 'x' + H + JSON.stringify(m), get: () => _maskAlphaBox(W, H, m) };
+  const key = m.shape === 'spectrum' ? 'spectrum#' + (++_rainMaskSeq) : W + 'x' + H + JSON.stringify(m);
+  if (mode === 2) return { mode: 4, key, get: () => _maskAlphaBox(W, H, m), wet: _stepWet(m, W, H) };
+  _wetActive = false;
+  return { mode, key, get: () => _maskAlphaBox(W, H, m) };
+}
+
+// 雨の「垂れ」: マスク外のみのとき、枠（ガラスを拭いた所）が抜けた跡は乾いた状態から始まり、上と横の濡れた所から順に濡れ戻る。
+// 画面を粗いマス目（192×108）にした濡れ具合 0〜1 を持ち、枠の中は 0 に戻す。
+// 濡れが隣へ移る速さは _RAIN_DRIP_SPEED で決まり、列ごとに速さを変えて筋状に流れ落ちるようにする
+// 濡れが隣へ移る速さ（マス/秒）と、1 マスが濡れきるまでの速さ（/秒）。小さいほどゆっくり垂れてフェードインする
+const _RAIN_DRIP_SPEED = 8;
+const _RAIN_DRIP_RISE = 0.9;
+const _WET_W = 192, _WET_H = 108;
+let _wet = null, _wetU8 = null, _wetCol = null, _wetCtx = null, _wetT = 0, _wetActive = false;
+function _stepWet(m, W, H) {
+  const N = _WET_W * _WET_H;
+  if (!_wet) {
+    _wet = new Float32Array(N);
+    _wetU8 = new Uint8Array(N);
+    const r = Array.from({ length: _WET_W }, Math.random);
+    _wetCol = new Float32Array(_WET_W);
+    for (let x = 0; x < _WET_W; x++) {
+      _wetCol[x] = 0.5 + (r[Math.max(0, x - 1)] + 2 * r[x] + r[Math.min(_WET_W - 1, x + 1)]) / 4;
+    }
+    const cv = document.createElement('canvas');
+    cv.width = _WET_W; cv.height = _WET_H;
+    _wetCtx = cv.getContext('2d', { willReadFrequently: true });
+  }
+  const now = performance.now();
+  if (!_wetActive) { _wet.fill(1); _wetActive = true; _wetT = now; }
+  const dt = Math.min(0.1, Math.max(0, (now - _wetT) / 1000));
+  _wetT = now;
+  // 枠をこの解像度に描いて、完全に枠の中のマスを判定する（縁のマスは外側として濡れさせ、細かい境界は雨側のマスクで切る）
+  const c = _wetCtx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, _WET_W, _WET_H);
+  c.setTransform(_WET_W / W, 0, 0, _WET_H / H, 0, 0);
+  c.fillStyle = '#fff';
+  const p = buildMaskPath(c, m);
+  p ? c.fill(p) : c.fill();
+  const a = c.getImageData(0, 0, _WET_W, _WET_H).data;
+  const rise = _RAIN_DRIP_RISE; // 濡れが 0 → 1 になる速さ（/秒）。列の係数を掛ける
+  const speed = _RAIN_DRIP_SPEED;
+  for (let y = 0; y < _WET_H; y++) {
+    for (let x = 0; x < _WET_W; x++) {
+      const i = y * _WET_W + x;
+      if (a[i * 4 + 3] > 250) { _wet[i] = 0; continue; }
+      const col = _wetCol[x];
+      const thr = Math.min(0.9, Math.max(0.02, rise * col / speed));
+      const up = y === 0 ? 1 : _wet[i - _WET_W];
+      const side = Math.max(x > 0 ? _wet[i - 1] : 0, x < _WET_W - 1 ? _wet[i + 1] : 0) * 0.6;
+      if (Math.max(up, side) >= thr) _wet[i] = Math.min(1, _wet[i] + rise * col * dt);
+    }
+  }
+  // 転送用。枠の中のマスは、縁の補間で外側が薄まらないよう隣の濡れ具合を借りる（中は雨側のマスクで消える）
+  for (let y = 0; y < _WET_H; y++) {
+    for (let x = 0; x < _WET_W; x++) {
+      const i = y * _WET_W + x;
+      let v = _wet[i];
+      if (a[i * 4 + 3] > 250) {
+        v = Math.max(y > 0 ? _wet[i - _WET_W] : 0, y < _WET_H - 1 ? _wet[i + _WET_W] : 0,
+                     x > 0 ? _wet[i - 1] : 0, x < _WET_W - 1 ? _wet[i + 1] : 0);
+      }
+      // 二乗して、濡れ始めは薄く（ゆっくりフェードイン）
+      _wetU8[i] = Math.round(v * v * 255);
+    }
+  }
+  return { data: _wetU8, w: _WET_W, h: _WET_H };
 }
 
 // マスクの内側だけを src から描き直して target に重ねる。filterStr（CSS filter 文字列。空なら無加工）を掛けて描ける。

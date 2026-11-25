@@ -175,8 +175,9 @@
     'uniform float u_brightness;',
     'uniform float u_alphaMultiply;',
     'uniform float u_alphaSubtract;',
-    // 適用範囲: 0 = 全体 / 1 = マスク内のみ / 2 = マスク外のみ（マスクは小さなアルファ画像）
+    // 適用範囲: 0 = 全体 / 1 = マスク内のみ / 2 = マスク外のみ / 4 = マスク外のみ＋垂れ（マスクは小さなアルファ画像）
     'uniform sampler2D u_mask;',
+    'uniform sampler2D u_wet;',
     'uniform vec4 u_maskRect;',
     'uniform vec2 u_maskUV;',
     'uniform int u_maskMode;',
@@ -187,6 +188,8 @@
     '  vec2 r = (p - u_maskRect.xy) / u_maskRect.zw;',
     '  float mk = 0.0;',
     '  if (r.x >= 0.0 && r.y >= 0.0 && r.x < 1.0 && r.y < 1.0) mk = texture2D(u_mask, r * u_maskUV).a;',
+    // 垂れ: 枠が抜けた跡は、濡れ具合（u_wet）が上から順に増えるまで雨を出さない
+    '  if (u_maskMode == 4) return (1.0 - mk) * texture2D(u_wet, p / u_resolution).r;',
     '  return u_maskMode == 2 ? 1.0 - mk : mk;',
     '}',
 
@@ -346,6 +349,12 @@
       // テクスチャスロット 3: 適用範囲のマスク（使うときだけ _draw で更新）
       gl.createTexture(blankCanvas, 3);
       gl.createUniform('1i', 'mask', 3);
+      // テクスチャスロット 4: 濡れ具合（垂れ。1 チャンネル。まだ無いときは 1×1 の全面ウェット）
+      gl.createTexture(null, 4);
+      var rg = gl.gl;
+      rg.pixelStorei(rg.UNPACK_ALIGNMENT, 1);
+      rg.texImage2D(rg.TEXTURE_2D, 0, rg.LUMINANCE, 1, 1, 0, rg.LUMINANCE, rg.UNSIGNED_BYTE, new Uint8Array([255]));
+      gl.createUniform('1i', 'wet', 4);
       this._maskKey = null;
       this._maskU = null;
 
@@ -353,7 +362,8 @@
     },
 
     // mainChanged が false のとき、メイン画像（4K の転送）を省く。水滴だけ動かしたいフレーム用
-    // mask: { mode: 1|2, key, get() } — key が変わったときだけ get() でマスク画像を作り直して転送する
+    // mask: { mode: 1|2|4, key, get(), wet? } — key が変わったときだけ get() でマスク画像を作り直して転送する。
+    // mode 4（垂れ）では wet: { data: Uint8Array, w, h } を毎回転送する
     _draw: function (mainChanged, mask) {
       if (this._stopped) return;
       var gl = this.gl;
@@ -371,6 +381,11 @@
         var u = this._maskU;
         gl.createUniform('4f', 'maskRect', u[0], u[1], u[2], u[3]);
         gl.createUniform('2f', 'maskUV', u[4], u[5]);
+        if (mask.mode === 4 && mask.wet) {
+          var rg = gl.gl;
+          gl.activeTexture(4);
+          rg.texImage2D(rg.TEXTURE_2D, 0, rg.LUMINANCE, mask.wet.w, mask.wet.h, 0, rg.LUMINANCE, rg.UNSIGNED_BYTE, mask.wet.data);
+        }
         gl.createUniform('1i', 'maskMode', mask.mode);
       } else {
         gl.createUniform('1i', 'maskMode', 0);
