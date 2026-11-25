@@ -377,8 +377,7 @@ export function _renderFrame() {
   const caAmt = parseFloat(elFilterCA.value);
   if (caAmt > 0) {
     const _foCA = state.filterMaskOnly.ca && _maskClipOk;
-    postCtx.clearRect(0, 0, W, H);
-    postCtx.drawImage(renderCvs, 0, 0);
+    _snapToPost();
     const s = caAmt * 0.002;
     const cx = W / 2, cy = H / 2;
     const _drawCh = (color, scale) => {
@@ -413,22 +412,55 @@ export function _renderFrame() {
   }
 
   // --- Highlights (明るいトーン域を操作) ---
+  // 色温度・色合い・マット・ハイライト(暗く)・シャドウ(明るく)は、いずれも「チャンネルごとの 1 次式 c' = c*A + B」で、
+  // 連続するものは 1 回の塗りに合成できる（全面の塗りを 1 回減らすごとに 4K では約 1ms 軽くなる）。
+  // soft-light・グラデーションなど 1 次式で表せない処理の前に _affFlush() で吐き出して順序を保つ
+  let _aff = null;
+  const _affFlush = () => {
+    if (!_aff) return;
+    const { A, r, g, b, fo } = _aff;
+    _aff = null;
+    const a = 1 - A;
+    if (a <= 1e-6) return;
+    ctx.save();
+    if (fo) { const _fap = buildMaskPath(ctx, m); if (_fap) ctx.clip(_fap); else ctx.clip(); }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = `rgba(${Math.min(255, r / a * 255)},${Math.min(255, g / a * 255)},${Math.min(255, b / a * 255)},${a})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  };
+  const _affStart = fo => {
+    if (_aff && _aff.fo !== fo) _affFlush();
+    if (!_aff) _aff = { A: 1, r: 0, g: 0, b: 0, fo };
+  };
+  // 定数色 (r,g,b: 0〜1) を不透明度 a で通常合成
+  const _affOver = (a, r, g, b, fo) => {
+    _affStart(fo);
+    _aff.A *= 1 - a;
+    _aff.r = _aff.r * (1 - a) + r * a;
+    _aff.g = _aff.g * (1 - a) + g * a;
+    _aff.b = _aff.b * (1 - a) + b * a;
+  };
+  // グレー (0〜1) を乗算
+  const _affMul = (gray, fo) => {
+    _affStart(fo);
+    _aff.A *= gray; _aff.r *= gray; _aff.g *= gray; _aff.b *= gray;
+  };
   const hlAmt = parseFloat(elFilterHighlight.value);
   if (hlAmt !== 0) {
     const _foHL = state.filterMaskOnly.highlight && _maskClipOk;
     const t = Math.abs(hlAmt) / 100;
-    ctx.save();
-    if (_foHL) { const _fhlp = buildMaskPath(ctx, m); if (_fhlp) ctx.clip(_fhlp); else ctx.clip(); }
-    if (hlAmt > 0) {
+    if (hlAmt < 0) {
+      _affMul(Math.round(255 - t * 55) / 255, _foHL);
+    } else {
+      _affFlush();
+      ctx.save();
+      if (_foHL) { const _fhlp = buildMaskPath(ctx, m); if (_fhlp) ctx.clip(_fhlp); else ctx.clip(); }
       ctx.globalCompositeOperation = 'soft-light';
       ctx.fillStyle = `rgba(255,255,255,${t * 0.60})`;
-    } else {
-      ctx.globalCompositeOperation = 'multiply';
-      const l = Math.round(255 - t * 55);
-      ctx.fillStyle = `rgb(${l},${l},${l})`;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
     }
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
   }
 
   // --- Shadows (暗いトーン域を操作) ---
@@ -436,23 +468,24 @@ export function _renderFrame() {
   if (shAmt !== 0) {
     const _foSH = state.filterMaskOnly.shadow && _maskClipOk;
     const t = Math.abs(shAmt) / 100;
-    ctx.save();
-    if (_foSH) { const _fshp = buildMaskPath(ctx, m); if (_fshp) ctx.clip(_fshp); else ctx.clip(); }
     if (shAmt > 0) {
-      ctx.globalCompositeOperation = 'screen';
-      const brightness = Math.round(t * 72);
-      ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+      // screen（グレー）= 白を不透明度 brightness/255 で通常合成するのと同じ
+      _affOver(Math.round(t * 72) / 255, 1, 1, 1, _foSH);
     } else {
+      _affFlush();
+      ctx.save();
+      if (_foSH) { const _fshp = buildMaskPath(ctx, m); if (_fshp) ctx.clip(_fshp); else ctx.clip(); }
       ctx.globalCompositeOperation = 'soft-light';
       ctx.fillStyle = `rgba(0,0,0,${t * 0.60})`;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
     }
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
   }
 
   // --- ビネット ---
   const vigAmt = parseFloat(elFilterVignette.value);
   if (vigAmt > 0) {
+    _affFlush();
     const _foVIG = state.filterMaskOnly.vignette && _maskClipOk;
     const cx = W / 2, cy = H / 2;
     const _vigX = _foVIG ? m.x + m.w / 2 : cx;
@@ -474,14 +507,8 @@ export function _renderFrame() {
   if (tempAmt !== 0) {
     const _foTMP = state.filterMaskOnly.temp && _maskClipOk;
     const t2 = Math.abs(tempAmt) / 50;
-    ctx.save();
-    if (_foTMP) { const _ftmp = buildMaskPath(ctx, m); if (_ftmp) ctx.clip(_ftmp); else ctx.clip(); }
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = tempAmt > 0
-      ? `rgba(255,140,0,${0.22 * t2})`
-      : `rgba(20,80,255,${0.22 * t2})`;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+    if (tempAmt > 0) _affOver(0.22 * t2, 1, 140 / 255, 0, _foTMP);
+    else _affOver(0.22 * t2, 20 / 255, 80 / 255, 1, _foTMP);
   }
 
   // --- Tint (色かぶり補正: マゼンタ ↔ グリーン) ---
@@ -489,14 +516,8 @@ export function _renderFrame() {
   if (tintAmt !== 0) {
     const _foTINT = state.filterMaskOnly.tint && _maskClipOk;
     const t2 = Math.abs(tintAmt) / 50;
-    ctx.save();
-    if (_foTINT) { const _ftintp = buildMaskPath(ctx, m); if (_ftintp) ctx.clip(_ftintp); else ctx.clip(); }
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = tintAmt > 0
-      ? `rgba(0,210,60,${0.14 * t2})`
-      : `rgba(255,0,200,${0.14 * t2})`;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+    if (tintAmt > 0) _affOver(0.14 * t2, 0, 210 / 255, 60 / 255, _foTINT);
+    else _affOver(0.14 * t2, 1, 0, 200 / 255, _foTINT);
   }
 
   // --- Matte (黒浮き + 白浮き) ---
@@ -506,16 +527,10 @@ export function _renderFrame() {
     const t    = matteAmt / 10;
     const lift  = Math.round(t * 50);
     const crush = Math.round(255 - t * 45);
-    ctx.save();
-    if (_foMAT) { const _fmatp = buildMaskPath(ctx, m); if (_fmatp) ctx.clip(_fmatp); else ctx.clip(); }
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = `rgb(${lift},${lift},${lift})`;
-    ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = `rgb(${crush},${crush},${crush})`;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+    _affOver(lift / 255, 1, 1, 1, _foMAT); // screen（グレー）= 白の通常合成
+    _affMul(crush / 255, _foMAT);
   }
+  _affFlush();
 
   // --- Film Grain (フィルム粒子) ---
   const grainAmt = parseFloat(elFilterGrain.value);
@@ -578,8 +593,7 @@ export function _renderFrame() {
   const sharpAmt = parseFloat(elFilterSharpness.value);
   if (sharpAmt > 0) {
     const _foSHP = state.filterMaskOnly.sharpness && _maskClipOk;
-    postCtx.clearRect(0, 0, W, H);
-    postCtx.drawImage(renderCvs, 0, 0);
+    _snapToPost();
     ctx.save();
     if (_foSHP) { const _fshpp = buildMaskPath(ctx, m); if (_fshpp) ctx.clip(_fshpp); else ctx.clip(); }
     ctx.globalCompositeOperation = 'overlay';
@@ -596,8 +610,7 @@ export function _renderFrame() {
     const t = pencilAmt / 10;
     const offset = Math.max(1, Math.round(1 + t * 3));
     // 差分でエッジ検出（エッジ部分が明るくなる）
-    postCtx.clearRect(0, 0, W, H);
-    postCtx.drawImage(renderCvs, 0, 0);
+    _snapToPost();
     postCtx.globalCompositeOperation = 'difference';
     postCtx.drawImage(renderCvs, offset, offset);
     postCtx.globalCompositeOperation = 'source-over';
@@ -622,8 +635,7 @@ export function _renderFrame() {
     if (_foE) { ctx.save(); const _fep = buildMaskPath(ctx, m); if (_fep) ctx.clip(_fep); else ctx.clip(); }
     const t = embossAmt / 10;
     const offset = Math.round(1 + t * 2);
-    postCtx.clearRect(0, 0, W, H);
-    postCtx.drawImage(renderCvs, 0, 0);
+    _snapToPost();
     postCtx.globalCompositeOperation = 'screen';
     postCtx.drawImage(renderCvs, offset, offset);
     postCtx.globalCompositeOperation = 'difference';
@@ -647,8 +659,7 @@ export function _renderFrame() {
     if (_foC) { ctx.save(); const _fcp = buildMaskPath(ctx, m); if (_fcp) ctx.clip(_fcp); else ctx.clip(); }
     const t = chalkAmt / 10;
     const offset = Math.round(1 + t * 2);
-    postCtx.clearRect(0, 0, W, H);
-    postCtx.drawImage(renderCvs, 0, 0);
+    _snapToPost();
     postCtx.globalCompositeOperation = 'difference';
     postCtx.drawImage(renderCvs, offset, offset);
     postCtx.globalCompositeOperation = 'source-over';
@@ -855,6 +866,13 @@ function _spectrumSkyline(ctx, m) {
 
 // にじみ（ブルーム）用の作業キャンバス（4K 級では半解像度）
 let _bloomCvs = null, _bloomCtx = null;
+
+// フレーム全面の複製（postCvs へ上書きコピー）。clearRect + 通常合成より、dst を読まない copy の方が軽い
+function _snapToPost() {
+  postCtx.globalCompositeOperation = 'copy';
+  postCtx.drawImage(renderCvs, 0, 0);
+  postCtx.globalCompositeOperation = 'source-over';
+}
 
 // --- 小キャンバス描画レイヤー ---
 // Skia Graphite（Chrome 新描画エンジン）では、矩形以外のパス描画のコストが
