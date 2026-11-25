@@ -146,16 +146,6 @@ export const caCvs = document.createElement('canvas');
 caCvs.width  = canvas.width;
 caCvs.height = canvas.height;
 export const caCtx  = caCvs.getContext('2d');
-// モーションブラー用バッファ
-export let _mblurCvs = document.createElement('canvas');
-_mblurCvs.width  = canvas.width;
-_mblurCvs.height = canvas.height;
-export let _mblurCtx = _mblurCvs.getContext('2d');
-
-// グレイン用オフスクリーンキャンバス（固定 256×256 タイル）
-export const grainCvs = document.createElement('canvas');
-grainCvs.width = 256; grainCvs.height = 256;
-export const grainCtx = grainCvs.getContext('2d');
 
 // Canvas バッファ解像度を CSS 表示サイズに同期してアップスケール時のぼかしを防ぐ
 export let _canvasAR = 1920 / 1080; // 現在のアスペクト比
@@ -188,7 +178,6 @@ export function _syncAllBuffers(w, h) {
   postCvs.width = w; postCvs.height = h;
   chCvs.width   = w; chCvs.height  = h;
   caCvs.width   = w; caCvs.height  = h;
-  if (_mblurCvs) { _mblurCvs.width = w; _mblurCvs.height = h; }
 }
 
 export function _syncMaskSliders() {

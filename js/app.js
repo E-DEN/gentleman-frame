@@ -42,7 +42,7 @@ document.getElementById('screenshotBtn').addEventListener('click', () => {
   const cssFilter = getCssColorFilter();
   if (cssFilter) sCtx.filter = cssFilter;
   sCtx.drawImage(canvas, 0, 0);       // mainCanvas（映像＋blur/vignette 等の canvas エフェクト）
-  sCtx.drawImage(rainOverlay, 0, 0);  // 雨ガラスオーバーレイ（WebGL）
+  sCtx.drawImage(rainOverlay, 0, 0, shot.width, shot.height);  // 雨ガラスオーバーレイ（WebGL。4K 級では半分の解像度なので拡大して重ねる）
   sCtx.filter = 'none';
 
   // シネマバー（barsOverlay の CSS background をキャンバスで再現）

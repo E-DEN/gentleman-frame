@@ -298,16 +298,25 @@
     this.imageFg      = mainCanvas;   // live canvas – updated every frame
     this.imageBg      = mainCanvas;   // same source; used for textureRatio
     this.options      = Object.assign({}, defaultRendererOptions, options || {});
+    this.scale        = this.options.scale || 1; // オーバーレイの解像度（メイン画像に対する比。4K 級では 0.5）
     this._stopped     = false;
     this._rafId       = null;
     this._init();
   }
   RainRenderer.prototype = {
     _init: function () {
-      var W  = this.canvas.width  = this.imageBg.width;
-      var H  = this.canvas.height = this.imageBg.height;
+      var s  = this.scale;
+      var W  = this.canvas.width  = Math.round(this.imageBg.width  * s);
+      var H  = this.canvas.height = Math.round(this.imageBg.height * s);
       this.width  = W;
       this.height = H;
+      // 縮小して描く場合、屈折の元画像も同じ大きさに縮めて転送する（4K の転送を避ける）
+      this._src = null;
+      if (s < 1) {
+        this._src = createCanvas(W, H);
+        this._srcCtx = this._src.getContext('2d');
+        this._srcCtx.drawImage(this.imageFg, 0, 0, W, H);
+      }
 
       this.gl = new GL(
         this.canvas,
@@ -316,17 +325,18 @@
       );
       var gl = this.gl;
 
+      // 屈折・視差の量は画素単位なので、解像度に合わせて縮める（見た目の大きさを保つ）
       gl.createUniform('2f', 'resolution',     W, H);
       gl.createUniform('1f', 'textureRatio',   this.imageBg.width / this.imageBg.height);
       gl.createUniform('1i', 'renderShine',    0);
       gl.createUniform('1i', 'renderShadow',   this.options.renderShadow ? 1 : 0);
-      gl.createUniform('1f', 'minRefraction',  this.options.minRefraction);
-      gl.createUniform('1f', 'refractionDelta',this.options.maxRefraction - this.options.minRefraction);
+      gl.createUniform('1f', 'minRefraction',  this.options.minRefraction * s);
+      gl.createUniform('1f', 'refractionDelta',(this.options.maxRefraction - this.options.minRefraction) * s);
       gl.createUniform('1f', 'brightness',     this.options.brightness);
       gl.createUniform('1f', 'alphaMultiply',  this.options.alphaMultiply);
       gl.createUniform('1f', 'alphaSubtract',  this.options.alphaSubtract);
-      gl.createUniform('1f', 'parallaxBg',     this.options.parallaxBg);
-      gl.createUniform('1f', 'parallaxFg',     this.options.parallaxFg);
+      gl.createUniform('1f', 'parallaxBg',     this.options.parallaxBg * s);
+      gl.createUniform('1f', 'parallaxFg',     this.options.parallaxFg * s);
 
       // テクスチャスロット 0: ウォーターマップ（毎フレーム canvasLiquid から更新）
       gl.createTexture(null, 0);
@@ -337,7 +347,7 @@
       var blankCanvas = createCanvas(2, 2);
       this._textures = [
         { name: 'textureShine', img: blankCanvas },
-        { name: 'textureFg',    img: this.imageFg }
+        { name: 'textureFg',    img: this._src || this.imageFg }
       ];
       var self = this;
       this._textures.forEach(function (t, i) {
@@ -378,8 +388,8 @@
           this._maskU = [info.x, info.y, info.dw, info.dh, info.sw / info.cvs.width, info.sh / info.cvs.height];
           this._maskKey = mask.key;
         }
-        var u = this._maskU;
-        gl.createUniform('4f', 'maskRect', u[0], u[1], u[2], u[3]);
+        var u = this._maskU, ms = this.scale;
+        gl.createUniform('4f', 'maskRect', u[0] * ms, u[1] * ms, u[2] * ms, u[3] * ms);
         gl.createUniform('2f', 'maskUV', u[4], u[5]);
         if (mask.mode === 4 && mask.wet) {
           var rg = gl.gl;
@@ -398,7 +408,8 @@
       // ライブな mainCanvas から FG/BG を更新
       if (mainChanged !== false) {
         gl.activeTexture(2);
-        gl.updateTexture(this.imageFg);
+        if (this._src) this._srcCtx.drawImage(this.imageFg, 0, 0, this.width, this.height);
+        gl.updateTexture(this._src || this.imageFg);
       }
 
       gl.draw();
@@ -797,10 +808,7 @@
           return;
         }
 
-        // オーバーレイキャンバスのサイズを mainCanvas に同期
-        overlayCanvas.width  = mainCanvas.width;
-        overlayCanvas.height = mainCanvas.height;
-
+        // オーバーレイキャンバスのサイズは RainRenderer が決める（4K 級では水滴マップと同じ半分の解像度）
         // 水滴マップ（Raindrops のキャンバス）は 4K 級では半分の解像度で描く。水滴の座標・数は変わらず
         // （scale = 0.5 で論理座標を半分のキャンバスに写す）、毎フレームの描き込みと転送が約 1/4 になる
         var q = mainCanvas.width * mainCanvas.height > 2.2e6 ? 0.5 : 1;
@@ -822,6 +830,7 @@
             brightness:     1.04,
             alphaMultiply:  18,
             alphaSubtract:  3,
+            scale:          q,
             renderShadow:   !!extra.shadow
           }
         );

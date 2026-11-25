@@ -5,7 +5,6 @@ import {
   canvas, displayCtx, renderCvs, ctx,
   overlayCanvas, overlayCtx, anchorCanvas, anchorCtx,
   offCvs, offCtx, postCvs, postCtx, chCvs, chCtx, caCvs, caCtx,
-  _mblurCvs, _mblurCtx, grainCvs, grainCtx,
   effectsWrap, svgGblurEl,
   vid, img, mediaType, loaded, visHidden, maskHidden, effectsHidden,
   getMediaSrc, getVidFrameTs, getHandles, HANDLE_SZ,
@@ -521,7 +520,7 @@ function _applyFiltersViaGL(W, H, m, maskClipOk) {
     air: v(elFilterAirbrush), flare: v(elFilterFlare), mo, inv,
   };
   const out = applyFiltersGL(renderCvs, W, H, m, A, {
-    grain: () => { _fillGrain(A.grain); return grainCvs; },
+    grain: () => _fillGrain(A.grain),
     mask: () => _maskAlphaBox(W, H, m),
   });
   if (out === false) return false;
@@ -542,19 +541,39 @@ function _clipMaskRegion(c, m, inverse, W, H) {
   else { c.rect(0, 0, W, H); c.clip('evenodd'); }
 }
 
-// フィルム粒子のノイズ（256×256、毎フレーム作り直す）。2D 版・WebGL 版で共用
+// フィルム粒子のノイズ（256×256 を何枚か作り置きしてランダムに選ぶ）。2D 版・WebGL 版で共用
 function _fillGrain(grainAmt) {
-  const gSize = 256;
-  const idata = grainCtx.createImageData(gSize, gSize);
-  const gd = idata.data;
+  // 毎フレーム 256×256 の乱数を作り直すと 4K では無視できない時間になるため、粒子画像を何枚か作り置きして
+  // ランダムに選ぶ（見た目はフレームごとに違う粒子のまま）。強さが変わったら作り直す。使う画像（canvas）を返す
   const strength = (grainAmt / 10) * 110;
-  for (let i = 0; i < gd.length; i += 4) {
-    const v = Math.min(255, Math.max(0, 128 + (Math.random() - 0.5) * strength));
-    gd[i] = gd[i+1] = gd[i+2] = v;
-    gd[i+3] = 255;
+  if (strength !== _grainStrength) { _grainPool.length = 0; _grainStrength = strength; _grainLast = -1; }
+  let k;
+  if (_grainPool.length < GRAIN_POOL_SIZE) {
+    const gSize = 256;
+    const cv = document.createElement('canvas');
+    cv.width = gSize; cv.height = gSize;
+    const g = cv.getContext('2d');
+    const idata = g.createImageData(gSize, gSize);
+    const gd = idata.data;
+    for (let i = 0; i < gd.length; i += 4) {
+      const v = Math.min(255, Math.max(0, 128 + (Math.random() - 0.5) * strength));
+      gd[i] = gd[i+1] = gd[i+2] = v;
+      gd[i+3] = 255;
+    }
+    g.putImageData(idata, 0, 0);
+    _grainPool.push(cv);
+    k = _grainPool.length - 1;
+  } else {
+    // 直前と同じ画像が続かないようにする
+    k = Math.floor(Math.random() * (GRAIN_POOL_SIZE - 1));
+    if (k >= _grainLast) k++;
   }
-  grainCtx.putImageData(idata, 0, 0);
+  _grainLast = k;
+  return _grainPool[k];
 }
+const GRAIN_POOL_SIZE = 12;
+const _grainPool = [];
+let _grainStrength = -1, _grainLast = -1;
 
 // マスク内限定フィルター用のマスク形状（WebGL 版で使う）。
 // 4K 全面にパスを描くと遅いため、マスク周辺だけの箱キャンバスに白で塗って渡す
@@ -744,11 +763,11 @@ function _applyFilters2D(W, H, m, _maskClipOk) {
   const grainAmt = parseFloat(elFilterGrain.value);
   if (grainAmt > 0) {
     const _moGR = _maskClipOk && state.filterMaskOnly.grain;
-    _fillGrain(grainAmt);
+    const _grainTile = _fillGrain(grainAmt);
     ctx.save();
     if (_moGR) _clipMaskRegion(ctx, m, _moGR === 'out', W, H);
     ctx.globalCompositeOperation = 'overlay';
-    ctx.drawImage(grainCvs, 0, 0, W, H);
+    ctx.drawImage(_grainTile, 0, 0, W, H);
     ctx.restore();
   }
 
@@ -1325,6 +1344,13 @@ function _hookDirtyEvents() {
 function _paintSig() {
   return `${loaded[0]}${mediaType[0]}${visHidden[0]}|${loaded[1]}${mediaType[1]}${visHidden[1]}|${canvas.width}x${canvas.height}`;
 }
+// アンカー・ズームの補間中、またはマウス追従中か（FPS 制限中でも毎フレーム描き直す必要がある）
+function _lerpIsActive() {
+  return Math.abs(parseFloat(elFgPinX.value)   - state.fgPinDispX) > 0.05 ||
+    Math.abs(parseFloat(elFgPinY.value)   - state.fgPinDispY) > 0.05 ||
+    Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002 ||
+    state.followMode !== 'none';
+}
 // フィルターの重さの目安（4K での全面処理の回数に近い値）。にじみ・エアブラシは 2 回分
 function _filterLoad() {
   if (effectsHidden) return 0;
@@ -1392,18 +1418,6 @@ export function render(now) {
   // filterFps: 0=制限なし、それ以外=fps上限で間引き
   const fpsLimit = parseFloat(elFilterFps.value) || 0;
   const gb = effectsHidden ? 0 : parseFloat(elFilterBlur.value) * BLUR_SIGMA_PER_UNIT;
-  // _blitMblur: _mblurCvs を blur フィルター込みで displayCtx に描画
-  // (スキップフレームでも実フレームと同じ blur を適用してチラつきを防ぐ)
-  const _blitMblur = (alpha) => {
-    if (gb > 0) {
-      svgGblurEl.setAttribute('stdDeviation', gb);
-      displayCtx.filter = 'url(#gblur)';
-    }
-    displayCtx.globalAlpha = alpha;
-    displayCtx.drawImage(_mblurCvs, 0, 0);
-    displayCtx.filter = 'none';
-    displayCtx.globalAlpha = 1;
-  };
   let _isRealFrame = true;
   if (fpsLimit > 0) {
     const interval = 1000 / fpsLimit;
@@ -1411,14 +1425,8 @@ export function render(now) {
       // lerp 収束中・追従モード中はキャッシュ映像でフルレンダリング
       // 映像フレームは _fpsVidCvs（最後の実フレームで取得済み）を再利用するため
       // 映像のFPS間引きは維持しつつ、lerp/描画は毎rAFで更新できる。
-      const _lerpActive =
-        Math.abs(parseFloat(elFgPinX.value)   - state.fgPinDispX) > 0.05 ||
-        Math.abs(parseFloat(elFgPinY.value)   - state.fgPinDispY) > 0.05 ||
-        Math.abs(parseFloat(elMaskZoom.value) - state.fgZoomDisp) > 0.0002 ||
-        state.followMode !== 'none';
-      if (!_lerpActive) {
-        // 前回の実フレームは displayCtx に表示済みで、ここで同じ内容を薄く重ね直しても内側の見た目は変わらない
-        // （全体ぼかし有りだと外周の透明度だけがじわじわ変わる）。4K のぼかし描画を毎回行うのは無駄なので省く
+      if (!_lerpIsActive()) {
+        // 前回の実フレームは displayCtx に表示済み。重ね直さず、枠などのオーバーレイだけ更新する
         _drawOverlays();
         perfFrame(now, 'idle', _perfInfo);
         requestAnimationFrame(render);
@@ -1428,8 +1436,6 @@ export function render(now) {
       _vidFreezeMode = true;
       _isRealFrame = false;
     } else {
-      // 通常の実フレーム: モーションブラーを blit してから描画
-      _blitMblur(0.35);
       _fpsLastTime = now;
       _vidFreezeMode = false;
     }
@@ -1452,9 +1458,10 @@ export function render(now) {
   _updateCompositeTime();
   if (_isRealFrame) {
     GFRainEngine.tick(undefined, _rainMask()); // 雨は filterFps レートのみ更新
-    // 映像フレームをキャッシュに保存（FPS 制限時、lerp 補間フレームで再利用）
+    // 映像フレームをキャッシュに保存（FPS 制限時、lerp 補間フレームで再利用）。
+    // 4K では 2 本ぶんのコピーが毎回かかるため、操作中・lerp 中・追従中だけ行う（それ以外は不要）
     const _cW = canvas.width, _cH = canvas.height;
-    if (fpsLimit > 0) {
+    if (fpsLimit > 0 && (now < _dirtyUntil || _lerpIsActive())) {
       if (_fpsVidCvs[0].width !== _cW || _fpsVidCvs[0].height !== _cH) {
         _fpsVidCvs.forEach(c => { c.width = _cW; c.height = _cH; });
       }
@@ -1464,16 +1471,13 @@ export function render(now) {
           try { _fpsVidCtx[_vi].drawImage(getMediaSrc(_vi), 0, 0, _cW, _cH); _vidFreezeReady[_vi] = true; } catch (_) {}
         }
       }
+    } else if (fpsLimit > 0) {
+      _vidFreezeReady[0] = _vidFreezeReady[1] = false; // 古いキャッシュを使わない
     }
   }
   updateProgress();
   syncMaskDropOverlay();
   _updateCanvasHints();
-  // 今フレームを保存（次フレームのブラー用）— 実フレームのみ更新
-  if (fpsLimit > 0 && _isRealFrame) {
-    _mblurCtx.clearRect(0, 0, _mblurCvs.width, _mblurCvs.height);
-    _mblurCtx.drawImage(renderCvs, 0, 0);
-  }
   // 最終段: ピクセル → ぼかし の順に、適用範囲（全体 / マスク内のみ / マスク外のみ）つきで表示用キャンバスへ描く。
   // copyモードでblit→透明画素も完全置換され残留しない
   // 内のみ・外のみのときは、マスク周辺の小さなキャンバスで反対側の絵を作って重ねる

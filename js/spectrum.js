@@ -84,9 +84,12 @@ export function swapGainNodes() {
 }
 
 // 現在フレームの周波数データを count 本のバー値（0〜1）で返す。未初期化なら null
+// 1 フレームの間に何度も呼ばれる（マスク・枠・雨など）ため、解析（FFT）は 8ms 以内なら使い回す
+let _lastFftT = -1e9;
 export function getSpectrumBars(count) {
   if (!_analyser) return null;
-  _analyser.getByteFrequencyData(_dataArray);
+  const now = performance.now();
+  if (now - _lastFftT > 8) { _analyser.getByteFrequencyData(_dataArray); _lastFftT = now; }
   const bins   = _dataArray.length;
   const result = new Float32Array(count);
   for (let i = 0; i < count; i++) {
