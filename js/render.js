@@ -395,9 +395,10 @@ function _edgeExtended(src, W, H, p) {
   return _extCvs;
 }
 
-// ピクセル化（モザイク）。block = 値 × 4 px。適用範囲に応じて、全面 / マスク内のみ / マスク外のみ を target へ copy で描く
-let _pixSmall = null, _pixSmallCtx = null, _pixFull = null, _pixFullCtx = null;
-function _pixelateInto(target, src, W, H, m, amt, scope) {
+// ピクセル化（モザイク）。block = 値 × 4 px。適用範囲に応じて、全面 / マスク内のみ / マスク外のみ を target へ copy で描く。
+// holeFix: マスク外側のブロックに、枠の中の前景の色が混ざらないよう、枠の中を周囲の色で埋めた絵から作り直す
+let _pixSmall = null, _pixSmallCtx = null, _pixFull = null, _pixFullCtx = null, _pixPatch = null, _pixPatchCtx = null;
+function _pixelateInto(target, src, W, H, m, amt, scope, holeFix) {
   const size = Math.round(amt * 4);
   const pw = Math.ceil(W / size), ph = Math.ceil(H / size);
   if (!_pixSmall) { _pixSmall = document.createElement('canvas'); _pixSmallCtx = _pixSmall.getContext('2d'); }
@@ -412,18 +413,93 @@ function _pixelateInto(target, src, W, H, m, amt, scope) {
   } else {
     target.imageSmoothingEnabled = false;
     target.drawImage(_pixSmall, 0, 0, pw, ph, 0, 0, W, H);
+    if (scope === 2 && holeFix) {
+      // 枠の周囲のブロックだけ、穴埋めした絵から作り直す（ブロックの並びは全面の場合と同じ）
+      const wb = W / pw, hb = H / ph, bb = _maskBounds(m);
+      const i0 = Math.max(0, Math.floor((bb.x0 - size) / wb)), i1 = Math.min(pw, Math.ceil((bb.x1 + size) / wb));
+      const j0 = Math.max(0, Math.floor((bb.y0 - size) / hb)), j1 = Math.min(ph, Math.ceil((bb.y1 + size) / hb));
+      const ni = i1 - i0, nj = j1 - j0;
+      if (ni > 0 && nj > 0) {
+        const sx = Math.round(i0 * wb), sy = Math.round(j0 * hb);
+        const sw = Math.min(W, Math.round(i1 * wb)) - sx, sh = Math.min(H, Math.round(j1 * hb)) - sy;
+        const F = _holeFilled(src, sx, sy, sw, sh, m, -sx, -sy);
+        if (!_pixPatch) { _pixPatch = document.createElement('canvas'); _pixPatchCtx = _pixPatch.getContext('2d'); }
+        if (_pixPatch.width !== ni || _pixPatch.height !== nj) { _pixPatch.width = ni; _pixPatch.height = nj; }
+        else _pixPatchCtx.clearRect(0, 0, ni, nj);
+        _pixPatchCtx.imageSmoothingQuality = 'high'; // 大きく縮める（ブロックの平均を取る）ので、代表点だけを拾わない
+        _pixPatchCtx.drawImage(F, 0, 0, sw, sh, 0, 0, ni, nj);
+        target.globalCompositeOperation = 'source-over'; // copy のままだと、描いた範囲の外が消える
+        target.drawImage(_pixPatch, 0, 0, ni, nj, i0 * wb, j0 * hb, ni * wb, nj * hb);
+      }
+    }
     target.imageSmoothingEnabled = true;
     target.globalCompositeOperation = 'source-over';
     if (scope === 2) _drawMaskedRegion(target, src, W, H, m, '', 0, false);
   }
 }
 // ピクセル化の結果を一時キャンバスに作る（このあとぼかしを重ねるとき用）
-function _pixelateFrame(src, W, H, m, amt, scope) {
+function _pixelateFrame(src, W, H, m, amt, scope, holeFix) {
   if (!_pixFull) { _pixFull = document.createElement('canvas'); _pixFullCtx = _pixFull.getContext('2d'); }
   if (_pixFull.width !== W || _pixFull.height !== H) { _pixFull.width = W; _pixFull.height = H; }
-  _pixelateInto(_pixFullCtx, src, W, H, m, amt, scope);
+  _pixelateInto(_pixFullCtx, src, W, H, m, amt, scope, holeFix);
   return _pixFull;
 }
+
+// マスクの外接矩形（スペクトラムの回転時は対角線を半径とする正方形）
+function _maskBounds(m) {
+  let x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
+  if (m.shape === 'spectrum' && m.specRotate) {
+    const r = Math.hypot(m.w, m.h) / 2;
+    const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+    x0 = cx - r; y0 = cy - r; x1 = cx + r; y1 = cy + r;
+  }
+  return { x0, y0, x1, y1 };
+}
+
+// src の (sx, sy) から bw×bh の領域を切り出し、マスクの内側（前景のある所）を周囲の色で埋めた絵を返す。
+// 「マスク外のみ」のぼかし・ピクセル化で、枠の中の前景の色が外側の縁に混ざらないようにするため。
+// 穴を透明にして、縮小しながら平均を取り（pull）、粗い絵を下に敷き戻して（push）埋める。mx, my: マスク座標 → 切り出し領域の座標
+const _hfLv = [];
+function _hfLevel(k, w, h) {
+  let L = _hfLv[k];
+  if (!L) { const cvs = document.createElement('canvas'); L = _hfLv[k] = { cvs, ctx: cvs.getContext('2d') }; }
+  if (L.cvs.width !== w || L.cvs.height !== h) { L.cvs.width = w; L.cvs.height = h; }
+  else { L.ctx.setTransform(1, 0, 0, 1, 0, 0); L.ctx.globalCompositeOperation = 'source-over'; L.ctx.clearRect(0, 0, w, h); }
+  return L;
+}
+function _holeFilled(src, sx, sy, bw, bh, m, mx, my) {
+  const L0 = _hfLevel(0, bw, bh);
+  const c = L0.ctx;
+  c.drawImage(src, -sx, -sy);
+  c.save();
+  c.translate(mx, my);
+  c.globalCompositeOperation = 'destination-out';
+  c.lineWidth = 6; // 縁のアンチエイリアスで前景が混ざった画素も穴にする（曲線の縁では 1〜2px 残るため広めに）
+  const gp = buildMaskPath(c, m);
+  if (gp) { c.fill(gp); c.stroke(gp); } else { c.fill(); c.stroke(); }
+  c.restore();
+  const lv = [L0];
+  let w = bw, h = bh;
+  while ((w > 2 || h > 2) && lv.length < 14) {
+    w = Math.max(1, Math.ceil(w / 2)); h = Math.max(1, Math.ceil(h / 2));
+    const L = _hfLevel(lv.length, w, h);
+    L.ctx.drawImage(lv[lv.length - 1].cvs, 0, 0, w, h);
+    lv.push(L);
+  }
+  // 一番粗い階層は、穴の割合ぶん半透明のまま。同じ色を重ねて不透明にする（色は変わらず、透明度だけが 1 に近づく）
+  const top = lv[lv.length - 1].ctx;
+  top.globalCompositeOperation = 'destination-over';
+  for (let r = 0; r < 7; r++) top.drawImage(lv[lv.length - 1].cvs, 0, 0);
+  top.globalCompositeOperation = 'source-over';
+  for (let k = lv.length - 2; k >= 0; k--) {
+    const c2 = lv[k].ctx;
+    c2.globalCompositeOperation = 'destination-over';
+    c2.drawImage(lv[k + 1].cvs, 0, 0, lv[k].cvs.width, lv[k].cvs.height);
+    c2.globalCompositeOperation = 'source-over';
+  }
+  return L0.cvs;
+}
+let _hfBlurCvs = null, _hfBlurCtx = null;
 
 export function _renderFrame() {
   // マスク追従モード: lerp でなめらかにカーソルへ追従
@@ -497,12 +573,14 @@ export function _renderFrame() {
       }
     }
     if (!maskHidden) {
-      // マスクの外接矩形だけを処理する。ぼかし / ピクセル化がマスク内のみなら、ここで前景だけに掛ける
+      // マスクの外接矩形だけを処理する。ぼかし / ピクセル化は、枠の中だけ前景そのものに掛ける
+      // （範囲が「全体」でも、枠の中は前景だけをぼかす。合成後の絵に掛けると背景の色が縁の内側に混ざるため。
+      //  枠の外側は最終段で合成した絵に掛ける）
       const fxBlur = effectsHidden ? 0 : parseFloat(elFilterBlur.value) * BLUR_SIGMA_PER_UNIT;
       const fxPix = effectsHidden ? 0 : parseFloat(elFilterPixel.value);
       const fx = {
-        sigma: fxBlur > 0 && _maskScope('blur') === 1 ? fxBlur : 0,
-        px: fxPix >= 1 && _maskScope('pixel') === 1 ? Math.round(fxPix * 4) : 0,
+        sigma: fxBlur > 0 && _maskScope('blur') !== 2 ? fxBlur : 0,
+        px: fxPix >= 1 && _maskScope('pixel') !== 2 ? Math.round(fxPix * 4) : 0,
       };
       _drawFgInMaskBox(_getVidSrc(1), W, H, m, dx, dy, zz, fgDraw, fx);
     } else {
@@ -1526,23 +1604,24 @@ export function render(now) {
   // copyモードでblit→透明画素も完全置換され残留しない
   // 内のみ・外のみのときは、マスク周辺の小さなキャンバスで反対側の絵を作って重ねる
   const fW = canvas.width, fH = canvas.height, fm = state.mask;
-  // 前景があるときの「マスク内のみ」は、前景を切り抜く時点で掛けてある（_drawFgInMaskBox）ので、ここでは掛けない
+  // 前景があるときは、枠の中（範囲が「全体」「マスク内のみ」）は前景を切り抜く時点で掛けてある（_drawFgInMaskBox）。
+  // ここで掛けるのは枠の外だけ（「全体」は 外のみ と同じ扱い。枠の中は掛け済みの絵をそのまま戻す）
   const fgStage = loaded[1] && !visHidden[1] && !maskHidden;
   let pxAmt = effectsHidden ? 0 : parseFloat(elFilterPixel.value);
   let pxScope = pxAmt >= 1 ? _maskScope('pixel') : 0;
-  if (pxScope === 1 && fgStage) { pxAmt = 0; pxScope = 0; }
+  if (fgStage && pxAmt >= 1) { if (pxScope === 1) { pxAmt = 0; pxScope = 0; } else if (pxScope === 0) pxScope = 2; }
   let gbF = gb;
   let gbScope = gbF > 0 ? _maskScope('blur') : 0;
-  if (gbScope === 1 && fgStage) { gbF = 0; gbScope = 0; }
+  if (fgStage && gbF > 0) { if (gbScope === 1) { gbF = 0; gbScope = 0; } else if (gbScope === 0) gbScope = 2; }
   if (pxAmt >= 1 && gbF <= 0) {
     // ぼかしが無ければ、ピクセル化の結果を直接表示用キャンバスへ描く（全面コピーを 1 回省ける）
-    _pixelateInto(displayCtx, renderCvs, fW, fH, fm, pxAmt, pxScope);
+    _pixelateInto(displayCtx, renderCvs, fW, fH, fm, pxAmt, pxScope, fgStage);
   } else if (gbF <= 0) {
     displayCtx.globalCompositeOperation = 'copy';
     displayCtx.drawImage(renderCvs, 0, 0);
     displayCtx.globalCompositeOperation = 'source-over';
   } else {
-    const frameSrc = pxAmt >= 1 ? _pixelateFrame(renderCvs, fW, fH, fm, pxAmt, pxScope) : renderCvs;
+    const frameSrc = pxAmt >= 1 ? _pixelateFrame(renderCvs, fW, fH, fm, pxAmt, pxScope, fgStage) : renderCvs;
     svgGblurEl.setAttribute('stdDeviation', gbF);
     // ぼかすときは端を外側へ複製した画像を使う（画面の端が薄れたり、端の数行だけぼけずに残るのを防ぐ）
     const blurPad = Math.ceil(gbF * 3) + 2;
@@ -1557,7 +1636,29 @@ export function render(now) {
     }
     displayCtx.globalCompositeOperation = 'source-over';
     if (gbScope === 1) _drawMaskedRegion(displayCtx, blurSrc, fW, fH, fm, 'url(#gblur)', blurPad - 2, false, blurPad);
-    else if (gbScope === 2) _drawMaskedRegion(displayCtx, frameSrc, fW, fH, fm, '', 0);
+    else if (gbScope === 2) {
+      if (fgStage) {
+        // 枠の周囲だけ、枠の中を周囲の色で埋めた絵をぼかして上書きする（枠の中の前景の色が外側の縁に混ざらないように）
+        const bb = _maskBounds(fm), s3 = Math.ceil(gbF * 3);
+        const ax0 = Math.max(0, Math.floor(bb.x0) - s3 - 2), ay0 = Math.max(0, Math.floor(bb.y0) - s3 - 2);
+        const ax1 = Math.min(fW, Math.ceil(bb.x1) + s3 + 2), ay1 = Math.min(fH, Math.ceil(bb.y1) + s3 + 2);
+        const EW = fW + blurPad * 2, EH = fH + blurPad * 2;
+        const x0e = Math.max(0, ax0 - s3 - 2 + blurPad), y0e = Math.max(0, ay0 - s3 - 2 + blurPad);
+        const x1e = Math.min(EW, ax1 + s3 + 2 + blurPad), y1e = Math.min(EH, ay1 + s3 + 2 + blurPad);
+        const bw = x1e - x0e, bh = y1e - y0e;
+        if (ax1 > ax0 && ay1 > ay0 && bw > 0 && bh > 0) {
+          const F = _holeFilled(blurSrc, x0e, y0e, bw, bh, fm, blurPad - x0e, blurPad - y0e);
+          if (!_hfBlurCvs) { _hfBlurCvs = document.createElement('canvas'); _hfBlurCtx = _hfBlurCvs.getContext('2d'); }
+          if (_hfBlurCvs.width !== bw || _hfBlurCvs.height !== bh) { _hfBlurCvs.width = bw; _hfBlurCvs.height = bh; }
+          else _hfBlurCtx.clearRect(0, 0, bw, bh);
+          _hfBlurCtx.filter = 'url(#gblur)';
+          _hfBlurCtx.drawImage(F, 0, 0);
+          _hfBlurCtx.filter = 'none';
+          displayCtx.drawImage(_hfBlurCvs, ax0 + blurPad - x0e, ay0 + blurPad - y0e, ax1 - ax0, ay1 - ay0, ax0, ay0, ax1 - ax0, ay1 - ay0);
+        }
+      }
+      _drawMaskedRegion(displayCtx, frameSrc, fW, fH, fm, '', 0);
+    }
   }
   // 明るさ・コントラスト・彩度・色相: 全体は CSS（effectsWrap）。内のみ・外のみは、ここで表示用キャンバスに焼き込む
   const cf = _colorFilters();
