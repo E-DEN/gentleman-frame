@@ -188,9 +188,14 @@ export let _renderIntervalId = null; // 互換用（現在は未使用）
 
 // マスクの外接矩形だけの小さなキャンバスで前景を切り抜き、メインに貼る。
 // 4K 全面（約830万画素）を毎フレーム処理せず、マスクの面積に比例したコストで済む。
+// fx = { sigma, px }: 「ぼかし / ピクセル化」の適用範囲がマスク内のときは、枠で切る前の前景だけに掛ける
+// （合成後の絵に掛けると、枠の外の背景の色が縁の内側に混ざるため）。ピクセル → ぼかし の順
 let _maskBoxCvs = null;
 let _maskBoxCtx = null;
-function _drawFgInMaskBox(src, W, H, m, dx, dy, zz, alpha) {
+let _fxTmpCvs = null, _fxTmpCtx = null, _fgPixSmall = null, _fgPixSmallCtx = null;
+function _drawFgInMaskBox(src, W, H, m, dx, dy, zz, alpha, fx) {
+  const sigma = fx && fx.sigma > 0 ? fx.sigma : 0;
+  const px = fx && fx.px >= 4 ? fx.px : 0;
   let x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
   if (m.shape === 'spectrum' && m.specRotate) {
     // 回転すると外接矩形からはみ出すため、対角線を半径とする正方形で覆う
@@ -198,8 +203,10 @@ function _drawFgInMaskBox(src, W, H, m, dx, dy, zz, alpha) {
     const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
     x0 = cx - r; y0 = cy - r; x1 = cx + r; y1 = cy + r;
   }
-  x0 = Math.max(0, Math.floor(x0) - 2); y0 = Math.max(0, Math.floor(y0) - 2);
-  x1 = Math.min(W, Math.ceil(x1) + 2);  y1 = Math.min(H, Math.ceil(y1) + 2);
+  // ぼかしの端が枠の中に影響しないよう、3σ ぶん広めに取る
+  const pad = 2 + (sigma ? Math.ceil(sigma * 3) : 0);
+  x0 = Math.max(0, Math.floor(x0) - pad); y0 = Math.max(0, Math.floor(y0) - pad);
+  x1 = Math.min(W, Math.ceil(x1) + pad);  y1 = Math.min(H, Math.ceil(y1) + pad);
   const bw = x1 - x0, bh = y1 - y0;
   if (bw <= 0 || bh <= 0) return;
   const sw = src.videoWidth || src.naturalWidth || src.width;
@@ -208,15 +215,46 @@ function _drawFgInMaskBox(src, W, H, m, dx, dy, zz, alpha) {
   if (!_maskBoxCvs) { _maskBoxCvs = document.createElement('canvas'); _maskBoxCtx = _maskBoxCvs.getContext('2d'); }
   if (_maskBoxCvs.width !== bw || _maskBoxCvs.height !== bh) { _maskBoxCvs.width = bw; _maskBoxCvs.height = bh; }
   else _maskBoxCtx.clearRect(0, 0, bw, bh);
+  const bc = _maskBoxCtx;
   // 前景全体は (dx, dy, W*zz, H*zz) に描かれる。小キャンバスから見た相対位置に全体を描く
   // （元画像の矩形指定 drawImage は動画フレームで遅い経路に落ちるため使わない。はみ出し部分は描画されない）
-  _maskBoxCtx.drawImage(src, dx - x0, dy - y0, W * zz, H * zz);
-  _maskBoxCtx.save();
-  _maskBoxCtx.globalCompositeOperation = 'destination-in';
-  _maskBoxCtx.translate(-x0, -y0);
-  const gp = buildMaskPath(_maskBoxCtx, m);
-  gp ? _maskBoxCtx.fill(gp) : _maskBoxCtx.fill();
-  _maskBoxCtx.restore();
+  if (px) {
+    // ピクセル化: 前景を 1/px に縮めて、最近傍で画面基準のブロックに拡大する
+    const pw = Math.ceil(W / px), ph = Math.ceil(H / px);
+    if (!_fgPixSmall) { _fgPixSmall = document.createElement('canvas'); _fgPixSmallCtx = _fgPixSmall.getContext('2d'); }
+    if (_fgPixSmall.width !== pw || _fgPixSmall.height !== ph) { _fgPixSmall.width = pw; _fgPixSmall.height = ph; }
+    else _fgPixSmallCtx.clearRect(0, 0, pw, ph);
+    _fgPixSmallCtx.drawImage(src, dx / px, dy / px, W * zz / px, H * zz / px);
+    let t = bc;
+    if (sigma) {
+      if (!_fxTmpCvs) { _fxTmpCvs = document.createElement('canvas'); _fxTmpCtx = _fxTmpCvs.getContext('2d'); }
+      if (_fxTmpCvs.width !== bw || _fxTmpCvs.height !== bh) { _fxTmpCvs.width = bw; _fxTmpCvs.height = bh; }
+      else _fxTmpCtx.clearRect(0, 0, bw, bh);
+      t = _fxTmpCtx;
+    }
+    t.imageSmoothingEnabled = false;
+    t.drawImage(_fgPixSmall, 0, 0, pw, ph, -x0, -y0, pw * px, ph * px);
+    t.imageSmoothingEnabled = true;
+    if (sigma) {
+      svgGblurEl.setAttribute('stdDeviation', sigma);
+      bc.filter = 'url(#gblur)';
+      bc.drawImage(_fxTmpCvs, 0, 0);
+      bc.filter = 'none';
+    }
+  } else if (sigma) {
+    svgGblurEl.setAttribute('stdDeviation', sigma);
+    bc.filter = 'url(#gblur)';
+    bc.drawImage(src, dx - x0, dy - y0, W * zz, H * zz);
+    bc.filter = 'none';
+  } else {
+    bc.drawImage(src, dx - x0, dy - y0, W * zz, H * zz);
+  }
+  bc.save();
+  bc.globalCompositeOperation = 'destination-in';
+  bc.translate(-x0, -y0);
+  const gp = buildMaskPath(bc, m);
+  gp ? bc.fill(gp) : bc.fill();
+  bc.restore();
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.drawImage(_maskBoxCvs, x0, y0);
   ctx.globalAlpha = 1; ctx.restore();
@@ -459,8 +497,14 @@ export function _renderFrame() {
       }
     }
     if (!maskHidden) {
-      // マスクの外接矩形だけを処理する
-      _drawFgInMaskBox(_getVidSrc(1), W, H, m, dx, dy, zz, fgDraw);
+      // マスクの外接矩形だけを処理する。ぼかし / ピクセル化がマスク内のみなら、ここで前景だけに掛ける
+      const fxBlur = effectsHidden ? 0 : parseFloat(elFilterBlur.value) * BLUR_SIGMA_PER_UNIT;
+      const fxPix = effectsHidden ? 0 : parseFloat(elFilterPixel.value);
+      const fx = {
+        sigma: fxBlur > 0 && _maskScope('blur') === 1 ? fxBlur : 0,
+        px: fxPix >= 1 && _maskScope('pixel') === 1 ? Math.round(fxPix * 4) : 0,
+      };
+      _drawFgInMaskBox(_getVidSrc(1), W, H, m, dx, dy, zz, fgDraw, fx);
     } else {
       // マスク非表示: 前景を全面に描く
       offCtx.clearRect(0, 0, W, H);
@@ -1482,20 +1526,29 @@ export function render(now) {
   // copyモードでblit→透明画素も完全置換され残留しない
   // 内のみ・外のみのときは、マスク周辺の小さなキャンバスで反対側の絵を作って重ねる
   const fW = canvas.width, fH = canvas.height, fm = state.mask;
-  const pxAmt = effectsHidden ? 0 : parseFloat(elFilterPixel.value);
-  const pxScope = pxAmt >= 1 ? _maskScope('pixel') : 0;
-  if (pxAmt >= 1 && gb <= 0) {
+  // 前景があるときの「マスク内のみ」は、前景を切り抜く時点で掛けてある（_drawFgInMaskBox）ので、ここでは掛けない
+  const fgStage = loaded[1] && !visHidden[1] && !maskHidden;
+  let pxAmt = effectsHidden ? 0 : parseFloat(elFilterPixel.value);
+  let pxScope = pxAmt >= 1 ? _maskScope('pixel') : 0;
+  if (pxScope === 1 && fgStage) { pxAmt = 0; pxScope = 0; }
+  let gbF = gb;
+  let gbScope = gbF > 0 ? _maskScope('blur') : 0;
+  if (gbScope === 1 && fgStage) { gbF = 0; gbScope = 0; }
+  if (pxAmt >= 1 && gbF <= 0) {
     // ぼかしが無ければ、ピクセル化の結果を直接表示用キャンバスへ描く（全面コピーを 1 回省ける）
     _pixelateInto(displayCtx, renderCvs, fW, fH, fm, pxAmt, pxScope);
+  } else if (gbF <= 0) {
+    displayCtx.globalCompositeOperation = 'copy';
+    displayCtx.drawImage(renderCvs, 0, 0);
+    displayCtx.globalCompositeOperation = 'source-over';
   } else {
     const frameSrc = pxAmt >= 1 ? _pixelateFrame(renderCvs, fW, fH, fm, pxAmt, pxScope) : renderCvs;
-    const gbScope = gb > 0 ? _maskScope('blur') : 0;
-    if (gb > 0) svgGblurEl.setAttribute('stdDeviation', gb);
+    svgGblurEl.setAttribute('stdDeviation', gbF);
     // ぼかすときは端を外側へ複製した画像を使う（画面の端が薄れたり、端の数行だけぼけずに残るのを防ぐ）
-    const blurPad = gb > 0 ? Math.ceil(gb * 3) + 2 : 0;
-    const blurSrc = gb > 0 ? _edgeExtended(frameSrc, fW, fH, blurPad) : frameSrc;
+    const blurPad = Math.ceil(gbF * 3) + 2;
+    const blurSrc = _edgeExtended(frameSrc, fW, fH, blurPad);
     displayCtx.globalCompositeOperation = 'copy';
-    if (gb > 0 && gbScope !== 1) {
+    if (gbScope !== 1) {
       displayCtx.filter = 'url(#gblur)';
       displayCtx.drawImage(blurSrc, -blurPad, -blurPad);
       displayCtx.filter = 'none';
